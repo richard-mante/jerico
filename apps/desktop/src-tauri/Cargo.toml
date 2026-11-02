@@ -1,0 +1,16 @@
+[package]
+name = "jerico-desktop"
+version = "0.1.0"
+description = "Jerico desktop application"
+authors = ["Jerico Contributors"]
+edition = "2021"
+
+[lib]
+name = "jerico_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

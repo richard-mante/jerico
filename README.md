@@ -12,8 +12,17 @@ The longer-term vision is a complete Founder Operating System that combines prod
 - **Two deployment modes:** self-hosted and managed cloud, using the same core product.
 - **Observability first:** ship a useful standalone monitoring product before expanding the full Founder OS.
 - **TypeScript first:** browser and Node.js SDKs are the initial developer experience.
-- **OpenTelemetry compatible:** design telemetry contracts and storage so OTLP ingestion can be added without replacing the native SDK.
+- **Web and desktop:** Next.js powers the web dashboard; Tauri 2 provides a native desktop client using shared React UI.
 - **API-first and modular:** connectors, SDKs, storage, queues, and deployment adapters should be independently extensible.
+
+## Technology baseline
+
+- pnpm + Turborepo monorepo.
+- Next.js + React + TypeScript web dashboard.
+- Tauri 2 + Vite + React + TypeScript desktop client.
+- Hono APIs designed for Cloudflare Workers, with self-hosted runtime adapters to follow.
+- PostgreSQL for transactional data and ClickHouse for telemetry analytics.
+- Shared TypeScript contracts and UI packages.
 
 ## MVP capabilities
 
@@ -28,27 +37,23 @@ The longer-term vision is a complete Founder Operating System that combines prod
 9. Alert rules, incidents, and notifications.
 10. Docker-based self-hosting and developer documentation.
 
-## Architecture at a glance
-
-- **Web:** Next.js, TypeScript, Tailwind CSS, shadcn/ui.
-- **API and ingestion:** Hono, with separate management and telemetry boundaries.
-- **Core data:** PostgreSQL and Drizzle.
-- **Telemetry analytics:** ClickHouse.
-- **Processing:** asynchronous queue and background workers.
-- **Storage:** S3-compatible object storage.
-- **SDKs:** `@jerico/sdk-browser` and `@jerico/sdk-node` (package names are provisional).
-- **Deployment:** Docker Compose first; managed-cloud adapters later.
-
-See [Architecture](docs/architecture/README.md) and [Implementation Roadmap](docs/roadmap/implementation-plan.md).
-
 ## Repository status
 
-This repository currently contains the product and architecture baseline. Implementation should proceed in small, testable phases. Do not treat planned capabilities as implemented until they have working code, tests, and documentation.
+The repository is in **Phase 0 — foundation**. The web, desktop, API, ingestion, and shared-package directories are being scaffolded. A scaffold is not a completed product feature: authentication, persistence, telemetry ingestion, alerting, and monitoring workflows remain unimplemented until their respective phases are completed and tested.
 
-## Contributing
+## Getting started
 
-Contribution guidelines and security reporting instructions will be added before the first public development release.
+Requirements: Node.js 22.12+ and pnpm 12.7.0. Desktop development additionally requires Rust and the native prerequisites for Tauri 2.
+
+```bash
+corepack enable
+corepack prepare pnpm@12.7.0 --activate
+pnpm install
+pnpm dev
+```
+
+See [Contributing](CONTRIBUTING.md), [Architecture](docs/architecture/README.md), [Frontend and desktop architecture](docs/architecture/frontend-and-desktop.md), and [Implementation roadmap](docs/roadmap/implementation-plan.md).
 
 ## License
 
-The intended core license is Apache-2.0, subject to a dependency and licensing review before the first release.
+The intended core license is Apache-2.0, subject to dependency and licensing review before the first public release.

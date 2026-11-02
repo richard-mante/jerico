@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible problem in Jerico.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. ...\n2. ..."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Jerico version or commit
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, runtime, and deployment mode.
