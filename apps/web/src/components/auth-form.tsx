@@ -24,8 +24,8 @@ export function AuthForm({ mode }: AuthFormProps) {
     setMessage("");
     try {
       const result = isSignUp
-        ? await authClient.signUp.email({ name, email, password, callbackURL: "/" })
-        : await authClient.signIn.email({ email, password, callbackURL: "/" });
+        ? await authClient.signUp.email({ name, email, password, callbackURL: "/dashboard" })
+        : await authClient.signIn.email({ email, password, callbackURL: "/dashboard" });
       if (result.error) {
         setError(result.error.message ?? "Authentication failed. Please try again.");
       } else if (isSignUp) {

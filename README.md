@@ -39,7 +39,7 @@ The longer-term vision is a complete Founder Operating System that combines prod
 
 ## Identity and tenancy
 
-Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are under implementation and are not production-verified yet.
+Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are under implementation and are not production-verified yet. The initial web flow includes sign-up/sign-in and guided organization plus first-project setup.
 
 ## Repository status
 

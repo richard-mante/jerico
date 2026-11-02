@@ -16,6 +16,7 @@ Deliver persistent identity, organizations, memberships, products, projects, and
 - Composite foreign keys prevent projects from referencing products in another organization and environments from referencing projects in another organization.
 - Hono endpoints for session lookup, organization list/create, product list/create, project list/create, and environment list/create.
 - Web sign-in and sign-up screens.
+- First-run onboarding to create an organization, select an active organization, create a project, and provision Development and Production environments.
 - Shared Zod request contracts and focused validation tests.
 
 ## Deployment configuration required
@@ -33,7 +34,7 @@ Deliver persistent identity, organizations, memberships, products, projects, and
 - No live database has been provisioned or migration applied.
 - No email provider credentials have been configured.
 - No Google OAuth credentials have been configured.
-- No organization/project/environment UI beyond sign-in/sign-up.
+- Only basic first-run organization and project onboarding exists; ongoing project management, environment editing, and team administration UI remain unimplemented.
 - No API-key issuance, expanded role model, audit log, or tenant RLS policies.
 - No local Docker Compose database stack or PostgreSQL integration tests.
 - No production deployment or end-to-end authentication verification.

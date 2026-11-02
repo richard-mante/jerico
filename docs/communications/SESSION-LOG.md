@@ -13,7 +13,7 @@
 - Added email/password auth requiring email verification, Resend-backed verification/reset/invitation messages, and optional Google OAuth configuration.
 - Added organization, product, project, and environment API endpoints with session/membership checks.
 - Added composite foreign keys for same-tenant product/project/environment relationships.
-- Added web sign-in/sign-up pages and shared Zod contracts/tests.
+- Added web sign-in/sign-up pages, first-run organization/project onboarding, automatic Development/Production environment creation, and shared Zod contracts/tests.
 - No dependency install, typecheck, application build, migration execution, live database, or end-to-end auth test has been run yet.
 
 ### Next
