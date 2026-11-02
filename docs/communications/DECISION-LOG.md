@@ -49,3 +49,21 @@ This log records durable decisions. New entries should include date, decision, r
 - **Decision:** Keep concise communications, decisions, progress and handover records in `docs/communications/`.
 - **Rationale:** New ChatGPT conversations and coding agents should be able to resume without relying on chat history.
 - **Implication:** Update current state and session log after substantial work; avoid storing full transcripts, secrets or customer data.
+
+## D-009 — Use a pnpm and Turborepo monorepo
+- **Date:** 2026-11-02
+- **Decision:** Manage web, desktop, API, ingestion, SDKs, shared packages, and docs in one pnpm/Turborepo repository.
+- **Rationale:** Share contracts and UI while keeping deployable applications separate.
+- **Implication:** Add workspace packages only when there is a real consumer; use Turbo for task orchestration and caching.
+
+## D-010 — Web uses Next.js; desktop uses Tauri 2 with React/Vite
+- **Date:** 2026-11-02
+- **Decision:** Use Next.js + React + TypeScript for web and Tauri 2 + Vite + React + TypeScript for desktop.
+- **Rationale:** Next.js suits the complex dashboard; Tauri supplies native desktop capabilities while reusing React UI.
+- **Implication:** Keep distinct app shells, share UI/contracts/API clients where practical, and do not make monitoring dependent on desktop being open.
+
+## D-011 — Hono Workers are the initial managed backend runtime
+- **Date:** 2026-11-02
+- **Decision:** Use Hono for management and ingestion APIs, initially deployed to Cloudflare Workers, with self-hosted runtime adapters planned.
+- **Rationale:** TypeScript/Web Standards alignment and a small runtime fit the managed deployment direction.
+- **Implication:** Keep domain logic provider-neutral and validate the Next.js-on-Workers path before production.

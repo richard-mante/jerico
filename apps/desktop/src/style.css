@@ -1,0 +1,17 @@
+:root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; color: #f5f7fb; background: #090b10; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+.desktop-shell { min-height: 100vh; display: flex; flex-direction: column; padding: 28px 36px 20px; }
+.desktop-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid #ffffff18; }
+.brand { display: flex; align-items: center; gap: 11px; font-size: 17px; font-weight: 650; letter-spacing: -0.03em; }
+.brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #d9f36a; color: #15190b; font-size: 14px; font-weight: 900; }
+.platform-label { color: #8c94a3; font-size: 12px; }
+.desktop-content { width: min(100%, 650px); margin: auto; padding: 72px 0; }
+.eyebrow { color: #d9f36a; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; }
+h1 { margin: 22px 0; font-size: clamp(48px, 8vw, 76px); line-height: 0.98; letter-spacing: -0.06em; }
+.intro { max-width: 520px; color: #a8afbd; font-size: 16px; line-height: 1.8; }
+.desktop-panel { display: flex; gap: 13px; align-items: flex-start; margin: 34px 0 24px; padding: 18px; border: 1px solid #ffffff1c; border-radius: 16px; background: #ffffff08; }
+.status-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: #d9f36a; box-shadow: 0 0 14px #d9f36870; }
+.desktop-panel strong { font-size: 13px; }
+.desktop-panel p { margin: 6px 0 0; color: #929aaa; font-size: 12px; line-height: 1.6; }
+footer { padding-top: 18px; border-top: 1px solid #ffffff18; color: #737b89; font-size: 11px; }
