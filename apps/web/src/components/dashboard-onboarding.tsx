@@ -88,18 +88,6 @@ export function DashboardOnboarding() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error?.message ?? "Could not create project.");
       const created = payload.data as Project;
-      for (const environment of [
-        { name: "Development", slug: "development", isProduction: false },
-        { name: "Production", slug: "production", isProduction: true },
-      ]) {
-        const envResponse = await fetch(apiBase + "/api/v1/projects/" + created.id + "/environments", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json", "X-Jerico-Organization-Id": selectedOrganizationId },
-          body: JSON.stringify(environment),
-        });
-        if (!envResponse.ok) throw new Error("Project created, but its default environments could not be created. Refresh and retry.");
-      }
       setProjects((current) => [...current, created]);
       setProjectName("");
       setNotice("Project created with Development and Production environments.");

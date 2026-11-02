@@ -130,10 +130,17 @@ app.post("/api/v1/projects", async (context) => withOrganization(context, async 
   const parsed = createProjectSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The project details are invalid.", details: parsed.error.flatten() } }, 400);
   try {
-    const [created] = await database.insert(projects).values({
-      id: crypto.randomUUID(), organizationId, name: parsed.data.name, slug: parsed.data.slug ?? makeSlug(parsed.data.name),
-      productId: parsed.data.productId ?? null, framework: parsed.data.framework ?? null, platform: parsed.data.platform,
-    }).returning();
+    const created = await database.transaction(async (transaction) => {
+      const [project] = await transaction.insert(projects).values({
+        id: crypto.randomUUID(), organizationId, name: parsed.data.name, slug: parsed.data.slug ?? makeSlug(parsed.data.name),
+        productId: parsed.data.productId ?? null, framework: parsed.data.framework ?? null, platform: parsed.data.platform,
+      }).returning();
+      await transaction.insert(environments).values([
+        { id: crypto.randomUUID(), organizationId, projectId: project.id, name: "Development", slug: "development", isProduction: false },
+        { id: crypto.randomUUID(), organizationId, projectId: project.id, name: "Production", slug: "production", isProduction: true },
+      ]);
+      return project;
+    });
     return context.json({ data: created }, 201);
   } catch (error) {
     if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "A project with this slug already exists in the organization." } }, 409);
