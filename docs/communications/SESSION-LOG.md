@@ -36,7 +36,7 @@ The project was defined as an extensible open-source Founder Operating System, w
 - Repository tree and base branch were inspected before changes.
 - Code was committed through the GitHub Git database API.
 - Local dependency installation, lint, typecheck, tests, web build, Wrangler dry-run, and native Tauri build have not yet been run in this environment.
-- CI has been configured but its first run has not yet been verified.
+- CI has been configured. Three workflow attempts are visible, but the jobs terminate before any step is recorded and GitHub exposes no job logs; the cause remains undiagnosed.
 - A pnpm lockfile has not yet been generated.
 
 ### Next steps
