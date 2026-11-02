@@ -56,12 +56,12 @@ The API and ingestion routes intentionally return not-ready/not-implemented resp
 
 **Not yet run in a local checkout:** dependency installation, Biome, TypeScript checks, Vitest, Next.js build, Wrangler dry-run, Vite build, and native Tauri/Rust build.
 
-GitHub Actions is configured to run formatting, lint, typecheck, tests, and builds on pushes to main and pull requests. The first CI run is the next validation gate. The initial workflow currently installs without a committed lockfile; generate and commit `pnpm-lock.yaml` after a successful install, then switch CI to frozen-lockfile installs.
+GitHub Actions is configured to run lint, typecheck, tests, and builds on pushes to main and pull requests. The first three workflow attempts failed before any job step was recorded; GitHub exposed no step logs, so the cause is not yet diagnosed. Do not interpret this as a code-test failure or a successful validation. The workflow must be made to start and complete before the foundation is accepted. The repository has no committed `pnpm-lock.yaml`; generate it after a successful install, then switch CI to frozen-lockfile installs.
 
 ## Next actions
 
 1. Review the branch diff and resolve any scaffold/configuration issues.
-2. Run the first GitHub Actions workflow; fix all failures rather than claiming the scaffold is complete.
+2. Diagnose why GitHub Actions jobs are terminating before their first recorded step; then get a complete validation run and fix all actual code failures.
 3. Generate and commit `pnpm-lock.yaml`; use frozen installs in CI.
 4. Validate native Tauri build on Linux and add Windows/macOS build matrix.
 5. Test Next.js deployment compatibility on Cloudflare Workers; retain a Node.js/Docker fallback.
