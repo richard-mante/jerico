@@ -22,4 +22,9 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("The Jerico desktop root element is missing.");
+}
+
+ReactDOM.createRoot(rootElement).render(<React.StrictMode><App /></React.StrictMode>);

@@ -10,7 +10,7 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "biome lint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   }
