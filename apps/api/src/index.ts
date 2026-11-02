@@ -9,6 +9,7 @@ import {
 } from "@jerico/contracts";
 import { environments, member, products, projects } from "@jerico/database/schema";
 import { createAuth } from "./auth";
+import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 
 type Variables = { requestId: string };
@@ -76,7 +77,6 @@ function makeSlug(value: string): string {
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
   return slug || "resource";
 }
-function canManage(role: string): boolean { return role === "owner" || role === "admin"; }
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
 }
@@ -106,7 +106,7 @@ app.get("/api/v1/products", async (context) => withOrganization(context, async (
   return context.json({ data: rows });
 }));
 app.post("/api/v1/products", async (context) => withOrganization(context, async (database, organizationId, role) => {
-  if (!canManage(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create products." } }, 403);
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create products." } }, 403);
   const parsed = createProductSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The product details are invalid.", details: parsed.error.flatten() } }, 400);
   try {
@@ -126,7 +126,7 @@ app.get("/api/v1/projects", async (context) => withOrganization(context, async (
   return context.json({ data: rows });
 }));
 app.post("/api/v1/projects", async (context) => withOrganization(context, async (database, organizationId, role) => {
-  if (!canManage(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create projects." } }, 403);
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create projects." } }, 403);
   const parsed = createProjectSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The project details are invalid.", details: parsed.error.flatten() } }, 400);
   try {
@@ -158,7 +158,7 @@ app.get("/api/v1/projects/:projectId/environments", async (context) => withOrgan
   return context.json({ data: rows });
 }));
 app.post("/api/v1/projects/:projectId/environments", async (context) => withOrganization(context, async (database, organizationId, role) => {
-  if (!canManage(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create environments." } }, 403);
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create environments." } }, 403);
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
