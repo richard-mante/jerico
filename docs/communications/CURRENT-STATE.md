@@ -28,11 +28,11 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 
 Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository contains the pnpm/Turborepo scaffold, Next.js web shell, Tauri desktop shell, Hono management and ingestion Workers, shared UI/contracts, CI workflow, and contribution/security docs.
 
-**Verification remains incomplete:** the earlier GitHub Actions check failed and the repository still needs a generated lockfile plus a complete install/lint/typecheck/test/build run. The Phase 0 PR was merged at the user's explicit request; this is not evidence of passing checks.
+**Verification remains incomplete:** GitHub Actions attempts on the Phase 0 and Phase 1 pull requests have failed before any workflow step was recorded; job logs are unavailable. The repository still needs a generated lockfile plus a complete install/lint/typecheck/test/build run. The Phase 0 PR was merged at the user's explicit request; this is not evidence of passing checks.
 
 ## Phase 1 implementation in review
 
-Pull request: https://github.com/richard-mante/jerico/pull/2. Latest branch commit: 43bd98852cf886c02171bc0c764a8fa411723afe.
+Pull request: https://github.com/richard-mante/jerico/pull/2. Latest branch commit: 3b43a0628fd7ba8150fc08f4ba53953483e3cbd3.
 
 The feat/phase-1-identity-tenancy branch adds:
 - Better Auth identity, session, account, verification, organization, membership, and invitation schema.
@@ -43,7 +43,7 @@ The feat/phase-1-identity-tenancy branch adds:
 - Web sign-in and sign-up screens plus first-run organization/project onboarding, including Development and Production environment creation.
 - Shared Zod request contracts and validation tests.
 
-These capabilities are implemented in code but remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
+Project creation now creates Development and Production environments in the same database transaction. These capabilities are implemented in code but remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
 
 ## Required environment
 

@@ -15,7 +15,8 @@
 - Added composite foreign keys for same-tenant product/project/environment relationships.
 - Added web sign-in/sign-up pages, first-run organization/project onboarding, automatic Development/Production environment creation, and shared Zod contracts/tests.
 - Project creation and default Development/Production environment creation are committed atomically in one PostgreSQL transaction.
-- Phase 1 PR: https://github.com/richard-mante/jerico/pull/2; latest branch commit 43bd98852cf886c02171bc0c764a8fa411723afe.
+- Phase 1 PR: https://github.com/richard-mante/jerico/pull/2; latest branch commit 3b43a0628fd7ba8150fc08f4ba53953483e3cbd3.
+- Three GitHub Actions attempts on the Phase 1 PR are visible, but each job failed before any step was recorded; GitHub returned no job logs. This is not evidence of a TypeScript or test failure.
 - No dependency install, typecheck, application build, migration execution, live database, or end-to-end auth test has been run yet.
 
 ### Next
