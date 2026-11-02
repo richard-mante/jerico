@@ -19,6 +19,10 @@ Deliver persistent identity, organizations, memberships, products, projects, and
 - First-run onboarding to create an organization, select an active organization, create a project, and provision Development and Production environments.
 - Shared Zod request contracts and focused validation tests.
 
+## Migration baseline note
+
+The initial SQL migration and Drizzle journal are authored, but a Drizzle snapshot has not yet been generated. Migration application can be tested with the committed SQL; do not re-enable schema-generation scripts until the initial snapshot is generated and compared against the schema to avoid duplicate initial DDL.
+
 ## Deployment configuration required
 
 - Provision PostgreSQL and apply the migration in packages/database/drizzle.

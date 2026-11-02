@@ -32,6 +32,8 @@ Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository conta
 
 ## Phase 1 implementation in review
 
+Pull request: https://github.com/richard-mante/jerico/pull/2. Latest branch commit: 43bd98852cf886c02171bc0c764a8fa411723afe.
+
 The feat/phase-1-identity-tenancy branch adds:
 - Better Auth identity, session, account, verification, organization, membership, and invitation schema.
 - Drizzle database package and initial PostgreSQL migration.

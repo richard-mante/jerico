@@ -14,6 +14,8 @@
 - Added organization, product, project, and environment API endpoints with session/membership checks.
 - Added composite foreign keys for same-tenant product/project/environment relationships.
 - Added web sign-in/sign-up pages, first-run organization/project onboarding, automatic Development/Production environment creation, and shared Zod contracts/tests.
+- Project creation and default Development/Production environment creation are committed atomically in one PostgreSQL transaction.
+- Phase 1 PR: https://github.com/richard-mante/jerico/pull/2; latest branch commit 43bd98852cf886c02171bc0c764a8fa411723afe.
 - No dependency install, typecheck, application build, migration execution, live database, or end-to-end auth test has been run yet.
 
 ### Next
