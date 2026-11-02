@@ -1,12 +1,6 @@
 {
-  "name": "@jerico/contracts",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": {
-    "lint": "biome check .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  }
+  "name":"@jerico/contracts","version":"0.1.0","private":true,"type":"module",
+  "exports":{".":"./src/index.ts"},
+  "dependencies":{"zod":"^4.1.12"},
+  "scripts":{"lint":"biome lint .","typecheck":"tsc --noEmit","test":"vitest run"}
 }

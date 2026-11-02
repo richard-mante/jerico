@@ -976,3 +976,8 @@ After Observability MVP:
 8. Community connector ecosystem.
 9. Hosted cloud plans and advanced team capabilities.
 </content>
+
+
+## Identity and tenancy implementation
+
+See [Identity, Organizations, and Tenant Resources](identity-and-tenancy.md) for the Better Auth and Drizzle implementation boundary, session handling, organization membership checks, resource ownership constraints, and deployment secrets. The detailed Phase 1 implementation is being added incrementally; this architecture description is not proof of a live database or deployed authentication service.

@@ -37,6 +37,10 @@ The longer-term vision is a complete Founder Operating System that combines prod
 9. Alert rules, incidents, and notifications.
 10. Docker-based self-hosting and developer documentation.
 
+## Identity and tenancy
+
+Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are under implementation and are not production-verified yet.
+
 ## Repository status
 
 The repository is in **Phase 0 — foundation**. The web, desktop, API, ingestion, and shared-package directories are being scaffolded. A scaffold is not a completed product feature: authentication, persistence, telemetry ingestion, alerting, and monitoring workflows remain unimplemented until their respective phases are completed and tested.

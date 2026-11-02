@@ -1,47 +1,23 @@
 # Jerico Session Log
 
-Append newest entries at the bottom. Keep summaries factual and link to relevant PRs, commits, files, and test output where available.
+## 2026-11-02 — Foundation merge and Phase 1 identity/tenancy
 
-## 2026-11-02 — Product direction and repository initialization
+### Phase 0
+- Merged the initial monorepo foundation into main as commit 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7.
+- Added Next.js web shell, Tauri desktop shell, Hono management and ingestion Workers, shared packages, CI, and project handover.
+- The GitHub Actions check had failed; the merge was made at the user's explicit request. No passing build or test result is claimed.
 
-### Context
-The project was defined as an extensible open-source Founder Operating System, with observability as its first independently useful release.
+### Phase 1 implementation started
+- Created branch feat/phase-1-identity-tenancy.
+- Added Better Auth core schema and organization plugin schema, Drizzle package, PostgreSQL migration, and migration journal.
+- Added email/password auth requiring email verification, Resend-backed verification/reset/invitation messages, and optional Google OAuth configuration.
+- Added organization, product, project, and environment API endpoints with session/membership checks.
+- Added composite foreign keys for same-tenant product/project/environment relationships.
+- Added web sign-in/sign-up pages and shared Zod contracts/tests.
+- No dependency install, typecheck, application build, migration execution, live database, or end-to-end auth test has been run yet.
 
-### Decisions confirmed
-- Use the `richard-mante/jerico` repository for the entire project.
-- Design for self-hosted and managed cloud deployment.
-- Support both internal Jerico monitoring and external customer application monitoring.
-- Use TypeScript as the first SDK strategy.
-- Release observability first; expand into broader Founder OS capabilities later.
-- Keep project communications and handovers in the repository for continuity across chats and agents.
-- Use Next.js for web and Tauri 2 + React/Vite for desktop.
-- Use pnpm + Turborepo and Hono on Cloudflare Workers as the initial managed backend.
-
-### Documentation
-- Added README, architecture baseline, frontend/desktop architecture, implementation roadmap, and communications handover records.
-
-## 2026-11-02 — Phase 0 monorepo foundation scaffold
-
-### Repository work
-- Opened branch: `feat/phase-0-monorepo-foundation`.
-- Added root pnpm workspace, Turborepo configuration, TypeScript baseline, Biome configuration, environment example, and ignore rules.
-- Added GitHub Actions validation workflow, PR template, and issue templates.
-- Added CONTRIBUTING.md and SECURITY.md.
-- Added Next.js web shell and Tauri 2 + Vite + React desktop shell.
-- Added Hono management API and telemetry-ingestion Worker shells with explicit health/not-ready responses.
-- Added shared `@jerico/contracts` and `@jerico/ui` packages.
-- Updated README and current handover to distinguish scaffolding from implemented functionality.
-
-### Verification
-- Repository tree and base branch were inspected before changes.
-- Code was committed through the GitHub Git database API.
-- Local dependency installation, lint, typecheck, tests, web build, Wrangler dry-run, and native Tauri build have not yet been run in this environment.
-- CI has been configured. Three workflow attempts are visible, but the jobs terminate before any step is recorded and GitHub exposes no job logs; the cause remains undiagnosed.
-- A pnpm lockfile has not yet been generated.
-
-### Next steps
-1. Inspect the complete feature-branch tree and review the diff.
-2. Trigger/inspect CI and fix any build or type errors.
-3. Generate and commit the pnpm lockfile, then enable frozen-lockfile CI.
-4. Validate the native desktop build and Workers runtime adapters.
-5. Complete Phase 0 acceptance before moving to database/authentication.
+### Next
+- Review and correct the Phase 1 implementation before opening its PR.
+- Generate a real pnpm lockfile from a successful install.
+- Diagnose the Phase 0 CI startup/check failure.
+- Run PostgreSQL migration and integration tests before production use.

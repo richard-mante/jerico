@@ -1,0 +1,9 @@
+APP_ENV=development
+BETTER_AUTH_URL=http://localhost:8787
+BETTER_AUTH_SECRET=replace-with-a-long-random-secret
+WEB_APP_URL=http://localhost:3000
+DATABASE_URL=postgresql://jerico:jerico@localhost:5432/jerico
+RESEND_API_KEY=
+EMAIL_FROM=Jerico <no-reply@example.com>
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=

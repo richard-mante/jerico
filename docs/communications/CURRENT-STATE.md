@@ -1,10 +1,10 @@
 # Jerico — Current Project Handover
 
 **Last updated:** 2026-11-02  
-**Status:** Phase 0 foundation scaffold created; verification pending  
+**Status:** Phase 0 merged; Phase 1 identity and tenancy implementation in review  
 **Repository:** https://github.com/richard-mante/jerico  
-**Working branch:** `feat/phase-0-monorepo-foundation`  
-**Base branch:** `main`
+**Working branch:** feat/phase-1-identity-tenancy  
+**Base branch:** main
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -18,55 +18,49 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 - Web dashboard: Next.js + React + TypeScript.
 - Desktop client: Tauri 2 + Vite + React + TypeScript.
 - Backend APIs: Hono, designed for Cloudflare Workers and future self-hosted runtime adapters.
-- Transactional data: PostgreSQL.
-- Telemetry analytics: ClickHouse.
+- Transactional data: PostgreSQL through Drizzle ORM.
+- Telemetry analytics: ClickHouse (not yet implemented).
+- Authentication: Better Auth with Drizzle/PostgreSQL adapter and organization plugin.
 - Shared contracts and UI: workspace packages.
-- Lit is not the primary application framework; reconsider only for a future framework-neutral embed use case.
-- Desktop is a separate client of the same APIs. Monitoring must continue when desktop is closed.
-- Validate Next.js deployment on Workers before production; keep Node.js/Docker deployment available as fallback.
+- Desktop is a separate client of the same APIs; monitoring must continue when desktop is closed.
 
-## Repository baseline
+## Phase 0 status
 
-Planning and architecture documentation exists under `docs/`. The Phase 0 branch adds the initial workspace and application scaffolds.
+Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository contains the pnpm/Turborepo scaffold, Next.js web shell, Tauri desktop shell, Hono management and ingestion Workers, shared UI/contracts, CI workflow, and contribution/security docs.
 
-### Added in the Phase 0 branch
+**Verification remains incomplete:** the earlier GitHub Actions check failed and the repository still needs a generated lockfile plus a complete install/lint/typecheck/test/build run. The Phase 0 PR was merged at the user's explicit request; this is not evidence of passing checks.
 
-- Root pnpm workspace, Turborepo tasks, TypeScript baseline, Biome configuration, environment example, and ignore rules.
-- GitHub Actions validation workflow, PR template, and issue templates.
-- Contribution and security policy documents.
-- Next.js web application shell.
-- Tauri 2 + Vite + React desktop application shell.
-- Hono management API Worker and telemetry-ingestion Worker with health endpoints.
-- Shared `@jerico/contracts` and `@jerico/ui` workspace packages.
+## Phase 1 implementation in review
 
-### Explicitly not implemented
+The feat/phase-1-identity-tenancy branch adds:
+- Better Auth identity, session, account, verification, organization, membership, and invitation schema.
+- Drizzle database package and initial PostgreSQL migration.
+- Email/password auth requiring email verification; Resend adapter and optional Google OAuth configuration.
+- Organization-scoped product, project, and environment endpoints with membership checks.
+- Composite database foreign keys for same-organization product/project/environment relationships.
+- Web sign-in and sign-up screens.
+- Shared Zod request contracts and validation tests.
 
-- Authentication, authorization, organizations, memberships, projects, environments, or persistence.
-- PostgreSQL/Drizzle schema or migrations.
-- ClickHouse tables or telemetry queries.
-- Durable queue, queue consumers, retry/dead-letter behavior.
-- Functional telemetry ingestion, credential verification, rate limits, or redaction.
-- SDK packages.
-- Alerts, incidents, uptime probes, notifications, or monitoring UI.
-- Docker self-hosting, production deployment, or release signing.
+These capabilities are implemented in code but remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
 
-The API and ingestion routes intentionally return not-ready/not-implemented responses. Do not treat health endpoints as proof that persistence or telemetry works.
+## Required environment
 
-## Verification status
+- Local: PostgreSQL, DATABASE_URL, BETTER_AUTH_SECRET, RESEND_API_KEY, EMAIL_FROM.
+- Cloudflare API Worker: Hyperdrive binding HYPERDRIVE; Worker secrets for Better Auth and Resend; exact web origin in WEB_APP_URL.
+- Google OAuth is optional and requires provider credentials.
 
-**Not yet run in a local checkout:** dependency installation, Biome, TypeScript checks, Vitest, Next.js build, Wrangler dry-run, Vite build, and native Tauri/Rust build.
+## Not implemented yet
 
-GitHub Actions is configured to run lint, typecheck, tests, and builds on pushes to main and pull requests. The first three workflow attempts failed before any job step was recorded; GitHub exposed no step logs, so the cause is not yet diagnosed. Do not interpret this as a code-test failure or a successful validation. The workflow must be made to start and complete before the foundation is accepted. The repository has no committed `pnpm-lock.yaml`; generate it after a successful install, then switch CI to frozen-lockfile installs.
+ClickHouse telemetry storage, queueing, SDKs, ingestion credential lifecycle, observability dashboard, alerts, uptime probes, self-hosted Docker distribution, API key management, audit logging, and production deployment.
 
 ## Next actions
 
-1. Review the branch diff and resolve any scaffold/configuration issues.
-2. Diagnose why GitHub Actions jobs are terminating before their first recorded step; then get a complete validation run and fix all actual code failures.
-3. Generate and commit `pnpm-lock.yaml`; use frozen installs in CI.
-4. Validate native Tauri build on Linux and add Windows/macOS build matrix.
-5. Test Next.js deployment compatibility on Cloudflare Workers; retain a Node.js/Docker fallback.
-6. Add Phase 0 acceptance tests and only then begin Phase 1 database/authentication work.
+1. Verify Phase 1 code and resolve build/type issues.
+2. Provision a disposable PostgreSQL database and run the migration plus auth/resource integration tests.
+3. Fix Phase 0 CI startup and generate/commit the lockfile.
+4. Build organization switcher and first-project onboarding.
+5. Add permission helpers, audit logs, and API key lifecycle.
 
 ## Continuity rules
 
-At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and the next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
+At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
