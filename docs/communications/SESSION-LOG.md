@@ -13,6 +13,7 @@
 - Added email/password auth requiring email verification, Resend-backed verification/reset/invitation messages, and optional Google OAuth configuration.
 - Added organization, product, project, and environment API endpoints with session/membership checks.
 - Added composite foreign keys for same-tenant product/project/environment relationships.
+- Extracted owner/admin write permissions into a tested helper; members are read-only and unknown roles fail closed.
 - Added web sign-in/sign-up pages, first-run organization/project onboarding, automatic Development/Production environment creation, and shared Zod contracts/tests.
 - Project creation and default Development/Production environment creation are committed atomically in one PostgreSQL transaction.
 - Phase 1 PR: https://github.com/richard-mante/jerico/pull/2; latest branch commit 3b43a0628fd7ba8150fc08f4ba53953483e3cbd3.

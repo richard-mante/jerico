@@ -40,6 +40,7 @@ The feat/phase-1-identity-tenancy branch adds:
 - Email/password auth requiring email verification; Resend adapter and optional Google OAuth configuration.
 - Organization-scoped product, project, and environment endpoints with membership checks.
 - Composite database foreign keys for same-organization product/project/environment relationships.
+- Explicit owner/admin write-permission helper with unit tests; members remain read-only and unknown roles are denied.
 - Web sign-in and sign-up screens plus first-run organization/project onboarding, including Development and Production environment creation.
 - Shared Zod request contracts and validation tests.
 
