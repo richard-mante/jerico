@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #58 — `e76d1892c12f7fc2a74aabc75639bf889098b99b`  
-**Latest main merge:** PR #58 — `e76d1892c12f7fc2a74aabc75639bf889098b99b`  
+**Latest feature merge:** PR #60 — `db98488928d6f04fc683427697a0720fa14b22d4`  
+**Latest main merge:** PR #60 — `db98488928d6f04fc683427697a0720fa14b22d4`  
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -42,9 +42,9 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5C — alert rules and incidents | #31 | Merged |
 | Phase 5D — verified email notifications | #32 | Merged |
 | Phase 5E — signed webhook notifications | #33 | Merged |
-| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization | #39, #41, #43–#44, #49, #53, #56, #58 | Merged |
+| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing | #39, #41, #43–#44, #49, #53, #56, #58, #60 | Merged |
 
-Latest reliability milestone: [PR #58 — finalize exhausted notification and uptime DLQs](https://github.com/richard-mante/jerico/pull/58). Merge commit: `e76d1892c12f7fc2a74aabc75639bf889098b99b`.
+Latest reliability milestone: [PR #60 — fence stale uptime probe results](https://github.com/richard-mante/jerico/pull/60). Merge commit: `db98488928d6f04fc683427697a0720fa14b22d4`.
 
 ### Phase 5 notification capabilities
 
@@ -147,3 +147,8 @@ Merged PR #43. Alert rules now use an atomic token-owned evaluation lease with a
 ## Continuity rules
 
 At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry.
+
+
+### 2026-11-03 uptime result fencing
+
+Merged PR #60. Uptime monitors now store the active scheduled check ID. The scheduler persists the token as part of its atomic due-time claim and uses it for the queue message; failed enqueue rollback only clears the matching claim. Result callbacks still write valid results to history, but update current monitor state only when the result matches the active token, then clear it. Monitor edits invalidate in-flight tokens, public monitor responses omit the internal token, and last-checked timestamps remain monotonic. Migration `0014_uptime_active_check_fencing.sql` is required. Scheduler and API route tests were added but not executed; manual PostgreSQL/Queue concurrency validation remains outstanding.
