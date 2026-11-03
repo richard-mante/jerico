@@ -356,6 +356,7 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   check("notification_deliveries_status_check", sql`${t.status} IN ('queued', 'sent', 'failed')`),
   check("notification_deliveries_attempts_check", sql`${t.attempts} >= 0`),
   check("notification_deliveries_active_attempts_check", sql`${t.activeEnqueueAttempt} >= 0 AND ${t.activeQueueAttempt} >= 0`),
+  check("notification_deliveries_active_attempt_identity_check", sql`(${t.activeAttemptId} IS NULL AND ${t.activeEnqueueAttempt} = 0 AND ${t.activeQueueAttempt} = 0) OR (${t.activeAttemptId} IS NOT NULL AND ${t.activeEnqueueAttempt} >= 1 AND ${t.activeQueueAttempt} >= 1)`),
   foreignKey({ name: "notification_deliveries_incident_same_project_fk", columns: [t.incidentId, t.organizationId, t.projectId], foreignColumns: [incidents.id, incidents.organizationId, incidents.projectId] }).onDelete("cascade"),
   uniqueIndex("notification_deliveries_incident_channel_event_unique").on(t.incidentId, t.channelId, t.eventType),
   index("notification_deliveries_org_created_idx").on(t.organizationId, t.createdAt),
