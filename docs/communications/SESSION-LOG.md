@@ -184,3 +184,13 @@
 - Added the first live web explorer at `/dashboard/projects/:projectId/observability`, linked from project cards. It loads the user's organizations, project environments, overview counts, and selected telemetry stream; supports organization/environment/time filters, five telemetry tabs, cursor-based pagination, and loading/empty/error/unauthenticated states.
 - Updated the Phase 4 roadmap and current-state handover to reflect the API and UI slice.
 - Next: add route-level tenant isolation tests, verify ClickHouse SQL against a real instance, and improve the explorer with error grouping, metric charts, and trace detail. Do not call Phase 4 complete until browser and cross-tenant integration tests pass.
+
+
+## 2026-11-03 — Phase 4 grouped error query
+
+- Continued work on the existing `feat/phase-4-observability-query-api` branch and PR #9.
+- Added a ClickHouse query adapter that groups error telemetry by a query-time fingerprint derived from error name and message, returning occurrence count, first/last seen timestamps, latest message, and latest event ID.
+- Added authenticated `GET /api/v1/projects/:projectId/telemetry/errors/groups`. It reuses the organization membership guard, checks project ownership, validates optional environment ownership in PostgreSQL, bounds time range and limit, and binds tenant/project/environment values in ClickHouse query parameters.
+- Added unit coverage for grouping output and tenant/project/environment query binding.
+- Important limitation: the fingerprint is not stored, message changes split groups, and there are no issue resolve/ignore actions or stack-trace aggregation yet. The endpoint returns at most 100 groups.
+- No lint, typecheck, tests, build, ClickHouse SQL execution, PostgreSQL integration, or browser validation was run. GitHub Actions currently fails before runner steps are available.
