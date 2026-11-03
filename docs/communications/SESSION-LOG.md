@@ -154,3 +154,17 @@
 
 
 - After adding the Next.js and Express examples, latest PR #6 CI run #94 (ID `41562241700`) also failed before runner assignment; GitHub returned `steps: null` and no logs. No lint, typecheck, tests, or build steps executed.
+
+
+## 2026-11-03 — Phase 3 SDK foundation merged
+
+- Merged PR #6, “feat: add TypeScript browser and Node SDK foundations”, to `main`.
+- Merge commit: `d4894534940805f08ae0bc2e0d591e3762c7cd3a`.
+- Confirmed PR #6 is closed and merged; no other open pull requests were returned by the repository's open-PR query.
+- The merged PR contains `@jerico/sdk-core`, `@jerico/sdk-browser`, and `@jerico/sdk-node`, package-level tests, Next.js and Express integration examples, and Phase 3 documentation.
+- Updated the handover and roadmap to reflect that Phase 3 is merged, not an unmerged branch. Marked only implemented capabilities as complete; validation and production readiness remain explicitly outstanding.
+- Checked workflow runs for the merge commit; GitHub returned no associated workflow runs at the time of inspection. This does not establish that checks passed.
+- No dependency installation, lockfile generation, lint, typecheck, unit tests, build, PostgreSQL integration, ClickHouse integration, or live SDK ingestion test was executed in this session.
+- Outstanding blockers: no committed `pnpm-lock.yaml`; GitHub Actions hosted runner allocation has repeatedly failed before steps execute; no disposable PostgreSQL/ClickHouse or provisioned Cloudflare resources are connected to this session.
+- Next: resolve a runnable validation path, generate the lockfile, execute all workspace checks, then add request-level ingestion idempotency and end-to-end SDK-to-ingestion tests before starting dashboard query APIs.
+

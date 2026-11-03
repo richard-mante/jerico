@@ -1,6 +1,6 @@
 # Phase 3 — TypeScript SDKs
 
-**Status:** Initial SDK foundation implemented on `feat/phase-3-typescript-sdk-foundation`; automated validation and ingestion integration are pending.
+**Status:** Initial SDK foundation merged to `main` in PR #6 (`d4894534940805f08ae0bc2e0d591e3762c7cd3a`). Automated validation and ingestion integration remain pending.
 
 ## Packages
 
@@ -44,7 +44,7 @@ These examples are documentation only; they have not yet been run in sample appl
 1. Validate workspace install, lint, typecheck, tests, and builds.
 2. Add integration tests against the ingestion Worker and ClickHouse.
 3. Add request-level idempotency to the ingestion API before automatic SDK retries.
-4. Add browser session identity, identify/reset, route navigation instrumentation, and Core Web Vitals.
+4. Add browser route navigation instrumentation and Core Web Vitals (after deciding whether/how public keys may submit bounded performance metrics).
 5. Add richer Node instrumentation and framework adapters.
-6. Add Next.js, Astro, React, and Express examples.
+6. Add Astro/React examples and execute all sample apps.
 7. Add OpenTelemetry-compatible export/ingestion and package build/release workflows.

@@ -12,7 +12,15 @@
 - Run lint, type checks, tests, and builds before declaring work complete.
 
 ## Phase 0 — Repository foundation
-- [ ] Inspect repository, branch, settings, and existing files.
+- [x] Inspect repository, branch, settings, and existing files.
+- [ ] Confirm Apache-2.0 license and dependency-license compatibility.
+- [x] Configure pnpm workspace and Turborepo.
+- [x] Configure TypeScript, formatting, linting, and Vitest.
+- [x] Add environment validation and `.env.example`.
+- [x] Add CI for install, lint, typecheck, tests, and builds (runner allocation remains blocked).
+- [x] Add CONTRIBUTING.md, SECURITY.md, issue templates, and PR template.
+
+**Acceptance:** A clean clone installs and passes documented checks; CI runs on pull requests. This acceptance criterion is not yet met because automated validation has not completed.
 - [ ] Confirm Apache-2.0 license and dependency-license compatibility.
 - [ ] Configure pnpm workspace and Turborepo.
 - [ ] Configure TypeScript, formatting, linting, and Vitest.
@@ -43,25 +51,29 @@
 - [x] Define bounded versioned event, error, metric, log, and span contracts.
 - [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
 - [ ] Select a durable self-hosted queue and implement a queue adapter.
-- [ ] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits. (Authentication, validation, redaction, request limits, rate-limit hook, and atomic daily event quota implemented; monthly plan tiers remain.)
+- [ ] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits. (Implemented; integration validation pending.)
 - [ ] Implement queue consumers, retries, dead-letter handling, and backpressure. (Cloudflare consumer/retry/DLQ config implemented; load/backpressure validation pending.)
 - [ ] Add ingestion/processing health metrics and integration tests.
 
-**Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until the database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
+**Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
 
 ## Phase 3 — TypeScript SDKs
 
 See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
-- [x] Build shared SDK core: bounded in-memory batching, transport, explicit flush, and error reporting. Automatic retries are intentionally disabled until server-side request idempotency is available.
-- [ ] Browser SDK: custom events, anonymous/session IDs, identify/reset, navigation, JS errors, unhandled rejections, and Core Web Vitals. (Initial package supports custom events, page views, and JS error/unhandled-rejection capture; session identity, identify/reset, and Core Web Vitals remain.)
-- [ ] Node SDK: custom events, errors, structured logs, custom metrics, explicit flush, and graceful shutdown. (Initial package supports custom events, errors, logs, metrics, spans, flush, and close; production shutdown guidance and broader instrumentation remain.)
-- [ ] Ensure SDK failures never crash the host application.
-- [ ] Add Next.js, Astro, React, and Express examples.
-- [ ] Add installation, configuration, privacy, redaction, and troubleshooting documentation.
+- [x] Shared SDK core: bounded in-memory batching, transport, explicit flush, validation, and error reporting. Automatic retries remain disabled until request-level idempotency exists.
+- [x] Initial browser SDK: public-key enforcement, page views, session identity, identify/reset, JS errors, and unhandled rejections.
+- [x] Initial Node SDK: secret-key enforcement, events/errors/logs/metrics/spans, explicit flush/close, and opt-in unhandled-rejection capture.
+- [ ] Validate workspace install, lint, typecheck, tests, and builds.
+- [ ] Ensure SDK failures never crash the host application through integration tests.
+- [ ] Add route-change instrumentation and Core Web Vitals (requires a deliberate public-key metric permission decision).
+- [ ] Add richer Node instrumentation and framework adapters.
+- [x] Add Next.js App Router and Express/Node integration examples (documentation only; sample apps not executed).
+- [ ] Add installation, privacy, redaction, troubleshooting, package build, and release documentation.
 
 **Acceptance:** Example apps send telemetry to a local deployment and the data is queryable.
 
 ## Phase 4 — Observability dashboard
+- [ ] Tenant-safe query APIs for events, errors, logs, metrics, and traces.
 - [ ] Project overview with time range and environment filters.
 - [ ] Event explorer, event catalogue, top events, and time-series.
 - [ ] Error grouping, stack traces, occurrence history, resolve/ignore actions.
