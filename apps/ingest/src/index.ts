@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { telemetryBatchSchema, type TelemetryEvent } from "@jerico/contracts";
-import { projectIngestionKeys, projectIngestionUsage, schema } from "@jerico/database/schema";
+import { projectIngestionKeys, projectIngestionRequests, projectIngestionUsage, schema } from "@jerico/database/schema";
 import { hashPresentedCredential, readBearerCredential } from "./credentials";
 import { redactTelemetryEvent } from "./redaction";
 import { DailyQuotaExceeded, dailyEventLimit, secondsUntilUtcMidnight, utcUsageDate } from "./quota";
+import { createStableEventId, hashTelemetryRequest, isValidIdempotencyKey } from "./idempotency";
 
 const MAX_BODY_BYTES = 96 * 1024;
 const MAX_BATCH_EVENTS = 100;
@@ -219,22 +220,22 @@ app.post("/ingest/v1/events", async (context) => {
       return context.json({ error: { code: "INSUFFICIENT_CREDENTIAL_SCOPE", message: "Public credentials may submit only events and errors. Use a server-side secret credential for logs, metrics, and spans.", requestId } }, 403);
     }
 
+    const idempotencyHeader = context.req.header("idempotency-key");
+    const idempotencyKey = idempotencyHeader?.trim();
+    if (idempotencyHeader !== undefined && (!idempotencyKey || !isValidIdempotencyKey(idempotencyKey))) {
+      return context.json({ error: { code: "INVALID_IDEMPOTENCY_KEY", message: "Idempotency-Key must be 1–128 characters using letters, numbers, dot, underscore, colon, or hyphen.", requestId } }, 400);
+    }
+
     const usageDate = utcUsageDate();
-    await reserveDailyQuota(context.env, credential.projectId, usageDate, parsed.data.events.length);
-    reservedUsage = { projectId: credential.projectId, usageDate, eventCount: parsed.data.events.length };
-
-    await withCredentialDatabase(context.env, async (database) => {
-      await database.update(projectIngestionKeys)
-        .set({ lastUsedAt: new Date() })
-        .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
-    });
-
-    const events = parsed.data.events.map((event) => ({
+    const requestHash = idempotencyKey ? await hashTelemetryRequest(parsed.data) : null;
+    const events = await Promise.all(parsed.data.events.map(async (event, index) => ({
       ...redactTelemetryEvent(event),
-      // Generated once before queue publication; retries/redeliveries retain this ID.
-      eventId: crypto.randomUUID(),
-    }));
-    await queue.send({
+      // Stable across SDK retries for the same credential, key, payload, and event position.
+      eventId: idempotencyKey
+        ? await createStableEventId(credential.id, idempotencyKey, requestHash!, index)
+        : crypto.randomUUID(),
+    })));
+    const envelope: QueueMessage = {
       schemaVersion: 1,
       requestId,
       credentialId: credential.id,
@@ -243,7 +244,98 @@ app.post("/ingest/v1/events", async (context) => {
       environmentId: credential.environmentId,
       acceptedAt: new Date().toISOString(),
       events,
+    };
+
+    if (idempotencyKey && requestHash) {
+      const reservation = await withCredentialDatabase(context.env, async (database) =>
+        database.transaction(async (transaction) => {
+          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          const [created] = await transaction.insert(projectIngestionRequests).values({
+            id: crypto.randomUUID(),
+            credentialId: credential.id,
+            idempotencyKey,
+            requestHash,
+            envelope,
+            status: "pending",
+            expiresAt,
+          }).onConflictDoNothing({
+            target: [projectIngestionRequests.credentialId, projectIngestionRequests.idempotencyKey],
+          }).returning({ id: projectIngestionRequests.id });
+
+          if (created) {
+            const limit = dailyEventLimit(context.env.INGEST_DAILY_EVENT_LIMIT);
+            const [usage] = await transaction.insert(projectIngestionUsage).values({
+              projectId: credential.projectId,
+              usageDate,
+              eventCount: events.length,
+            }).onConflictDoUpdate({
+              target: [projectIngestionUsage.projectId, projectIngestionUsage.usageDate],
+              set: {
+                eventCount: sql`${projectIngestionUsage.eventCount} + ${events.length}`,
+                updatedAt: new Date(),
+              },
+            }).returning({ eventCount: projectIngestionUsage.eventCount });
+            if (!usage || usage.eventCount > limit) {
+              throw new DailyQuotaExceeded(secondsUntilUtcMidnight());
+            }
+            return { kind: "created" as const, id: created.id, envelope };
+          }
+
+          const [existing] = await transaction.select({
+            id: projectIngestionRequests.id,
+            requestHash: projectIngestionRequests.requestHash,
+            envelope: projectIngestionRequests.envelope,
+            status: projectIngestionRequests.status,
+            expiresAt: projectIngestionRequests.expiresAt,
+          }).from(projectIngestionRequests).where(and(
+            eq(projectIngestionRequests.credentialId, credential.id),
+            eq(projectIngestionRequests.idempotencyKey, idempotencyKey),
+          )).limit(1);
+
+          if (!existing) throw new Error("Idempotency record disappeared during reservation.");
+          if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
+          if (existing.expiresAt.getTime() <= Date.now()) return { kind: "expired" as const };
+          if (existing.status === "accepted") {
+            return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
+          }
+          return {
+            kind: "pending" as const,
+            id: existing.id,
+            envelope: existing.envelope as QueueMessage,
+          };
+        }),
+      );
+
+      if (reservation.kind === "conflict") {
+        return context.json({ error: { code: "IDEMPOTENCY_KEY_REUSED", message: "This Idempotency-Key was already used with a different telemetry payload.", requestId } }, 409);
+      }
+      if (reservation.kind === "expired") {
+        return context.json({ error: { code: "IDEMPOTENCY_KEY_EXPIRED", message: "This idempotency key has expired. Create a new key for a new request.", requestId } }, 409);
+      }
+      if (reservation.kind === "accepted") {
+        return context.json({ data: { accepted: reservation.envelope.events.length, requestId: reservation.envelope.requestId, idempotent: true } }, 202);
+      }
+
+      // Pending records are re-published on retry. Stable event IDs ensure an
+      // ambiguous queue-send outcome does not create distinct logical events.
+      await queue.send(reservation.envelope);
+      await withCredentialDatabase(context.env, async (database) => {
+        await database.update(projectIngestionRequests).set({ status: "accepted" })
+          .where(eq(projectIngestionRequests.id, reservation.id));
+      });
+      return context.json({ data: { accepted: reservation.envelope.events.length, requestId: reservation.envelope.requestId, idempotent: reservation.kind === "pending" } }, 202);
+    }
+
+    await reserveDailyQuota(context.env, credential.projectId, usageDate, events.length);
+    reservedUsage = { projectId: credential.projectId, usageDate, eventCount: events.length };
+
+    await withCredentialDatabase(context.env, async (database) => {
+      await database.update(projectIngestionKeys)
+        .set({ lastUsedAt: new Date() })
+        .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
     });
+
+    await queue.send(envelope);
     queueAccepted = true;
 
     return context.json({ data: { accepted: events.length, requestId } }, 202);
