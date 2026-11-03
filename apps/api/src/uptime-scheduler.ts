@@ -1,4 +1,4 @@
-import { and, asc, eq, lt, lte } from "drizzle-orm";
+import { and, asc, eq, lt, lte, sql } from "drizzle-orm";
 import { uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { withDatabase, type ApiBindings } from "./database";
 
@@ -21,24 +21,31 @@ export async function scheduleDueUptimeMonitors(env: ApiBindings): Promise<numbe
     return 0;
   }
   return withDatabase(env, async (database) => {
-    const now = new Date();
-    const due = await database.select().from(uptimeMonitors)
-      .where(and(eq(uptimeMonitors.enabled, true), lte(uptimeMonitors.nextCheckAt, now)))
+    const discoveredAt = new Date();
+    // Discover IDs only. Monitor configuration is read from the row returned
+    // by the atomic claim, not this potentially stale scheduling snapshot.
+    const due = await database.select({ id: uptimeMonitors.id }).from(uptimeMonitors)
+      .where(and(eq(uptimeMonitors.enabled, true), lte(uptimeMonitors.nextCheckAt, discoveredAt)))
       .orderBy(asc(uptimeMonitors.nextCheckAt))
       .limit(50);
     let enqueued = 0;
 
-    for (const monitor of due) {
-      const nextCheckAt = new Date(now.getTime() + monitor.intervalSeconds * 1000);
-      const [claimed] = await database.update(uptimeMonitors)
-        .set({ nextCheckAt, updatedAt: now })
+    for (const candidate of due) {
+      const claimedAt = new Date();
+      const [monitor] = await database.update(uptimeMonitors)
+        .set({
+          // Calculate from the current database row's interval while holding
+          // the update lock, so concurrent edits cannot leave a stale cadence.
+          nextCheckAt: sql`${claimedAt}::timestamptz + (${uptimeMonitors.intervalSeconds} * interval '1 second')`,
+          updatedAt: claimedAt,
+        })
         .where(and(
-          eq(uptimeMonitors.id, monitor.id),
+          eq(uptimeMonitors.id, candidate.id),
           eq(uptimeMonitors.enabled, true),
-          lte(uptimeMonitors.nextCheckAt, now),
+          lte(uptimeMonitors.nextCheckAt, claimedAt),
         ))
-        .returning({ id: uptimeMonitors.id });
-      if (!claimed) continue;
+        .returning();
+      if (!monitor) continue;
 
       const message: UptimeProbeMessage = {
         schemaVersion: 1,
@@ -56,9 +63,15 @@ export async function scheduleDueUptimeMonitors(env: ApiBindings): Promise<numbe
         await env.UPTIME_PROBES.send(message);
         enqueued += 1;
       } catch (error) {
+        // Only roll back the schedule if it is still the exact claim made by
+        // this invocation. A concurrent edit or newer schedule must win.
         await database.update(uptimeMonitors)
-          .set({ nextCheckAt: now, updatedAt: now })
-          .where(and(eq(uptimeMonitors.id, monitor.id), eq(uptimeMonitors.enabled, true)));
+          .set({ nextCheckAt: claimedAt, updatedAt: new Date() })
+          .where(and(
+            eq(uptimeMonitors.id, monitor.id),
+            eq(uptimeMonitors.enabled, true),
+            eq(uptimeMonitors.nextCheckAt, monitor.nextCheckAt),
+          ));
         console.error("Jerico failed to enqueue uptime probe", {
           monitorId: monitor.id,
           error: error instanceof Error ? error.message : String(error),
