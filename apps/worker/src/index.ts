@@ -34,6 +34,7 @@ type UptimeProbeMessage = {
 type WorkerEnv = ClickHouseEnv & {
   API_URL?: string;
   UPTIME_RESULTS_SECRET?: string;
+  PROBE_WORKER_HOST?: string;
 };
 type ClickHouseEnv = {
   CLICKHOUSE_URL?: string;
@@ -92,7 +93,7 @@ export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryM
 }
 
 async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): Promise<void> {
-  if (!env.API_URL || !env.UPTIME_RESULTS_SECRET || env.UPTIME_RESULTS_SECRET.length < 32) {
+  if (!env.API_URL || !env.UPTIME_RESULTS_SECRET || env.UPTIME_RESULTS_SECRET.length < 32 || !env.PROBE_WORKER_HOST) {
     throw new Error("Uptime result callback is not configured.");
   }
   const apiUrl = new URL("/internal/uptime-results", env.API_URL);
@@ -102,6 +103,7 @@ async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): 
     method: message.method,
     timeoutMs: message.timeoutMs,
     expectedStatusCode: message.expectedStatusCode,
+    blockedHosts: [env.PROBE_WORKER_HOST],
   });
   const callbackController = new AbortController();
   const callbackTimeout = setTimeout(() => callbackController.abort(), 10000);
