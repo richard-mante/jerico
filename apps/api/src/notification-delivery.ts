@@ -21,7 +21,7 @@ export function notificationEnqueueRetryDelay(attempt: number): number {
 }
 
 function buildNotificationMessage(
-  delivery: { id: string; target: string; eventType: string; createdAt: Date },
+  delivery: { id: string; eventType: string; createdAt: Date },
   channel: { type: string; target: string; secretCiphertext: string | null; secretIv: string | null },
   incident: { id: string; projectId: string; title: string; triggerValue: number },
   env: ApiBindings,
@@ -111,6 +111,7 @@ export async function queueIncidentNotifications(
       id: notificationDeliveries.id,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
       attempts: notificationDeliveries.attempts,
+      eventType: notificationDeliveries.eventType,
       createdAt: notificationDeliveries.createdAt,
     });
     if (!delivery) continue;
@@ -199,7 +200,6 @@ export async function retryFailedNotificationEnqueues(
       id: notificationDeliveries.id,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
       attempts: notificationDeliveries.attempts,
-      target: notificationDeliveries.target,
       eventType: notificationDeliveries.eventType,
       createdAt: notificationDeliveries.createdAt,
     });
