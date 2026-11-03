@@ -12,7 +12,7 @@ function formatDate(value: string | null) {
 }
 
 export function NotificationChannelManager({ projectId, organizationId }: { projectId: string; organizationId: string }) {
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);\n  const [canManageChannels, setCanManageChannels] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,7 +37,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       request("/api/v1/notification-channels"),
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries?limit=25`),
     ]);
-    if (results[0].status === "fulfilled") setChannels((results[0].value.data ?? []) as Channel[]);
+    if (results[0].status === "fulfilled") { setChannels((results[0].value.data ?? []) as Channel[]); setCanManageChannels(true); }\n    else setCanManageChannels(false);
     if (results[1].status === "fulfilled") setDeliveries((results[1].value.data ?? []) as Delivery[]);
     if (results[0].status === "rejected" && results[1].status === "rejected") throw results[0].reason;
     if (results[0].status === "rejected") setError(results[0].reason instanceof Error ? results[0].reason.message : "You may not have permission to manage notification channels.");
@@ -82,17 +82,19 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       <div><h2 className="font-semibold">Notification delivery</h2><p className="mt-1 text-xs text-[#737b89]">Verified email channels receive incident opened, acknowledged, and resolved updates.</p></div>
       {error && <p role="alert" className="mt-4 text-xs text-red-300">{error}</p>}
       {notice && <p role="status" className="mt-4 text-xs text-[#d9f36a]">{notice}</p>}
-      <form onSubmit={addEmail} className="mt-5 flex flex-wrap gap-2">
-        <input type="email" required maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ops@yourcompany.com" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3 text-sm outline-none focus:border-[#d9f36a]/60" />
-        <button disabled={busy || !organizationId} className="rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Working…" : "Add email"}</button>
-      </form>
-      <div className="mt-4 divide-y divide-white/10">
-        {channels.map((channel) => <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-          <div><p className="text-sm">{channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}</p></div>
-          <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
-        </div>)}
-        {!channels.length && <p className="py-5 text-sm text-[#737b89]">No email channels configured.</p>}
-      </div>
+      {canManageChannels ? <>
+        <form onSubmit={addEmail} className="mt-5 flex flex-wrap gap-2">
+          <input type="email" required maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ops@yourcompany.com" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3 text-sm outline-none focus:border-[#d9f36a]/60" />
+          <button disabled={busy || !organizationId} className="rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Working…" : "Add email"}</button>
+        </form>
+        <div className="mt-4 divide-y divide-white/10">
+          {channels.map((channel) => <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div><p className="text-sm">{channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}</p></div>
+            <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
+          </div>)}
+          {!channels.length && <p className="py-5 text-sm text-[#737b89]">No email channels configured.</p>}
+        </div>
+      </> : <p className="mt-5 text-xs text-[#737b89]">Only organization owners and admins can manage notification email channels. Recent delivery history remains visible below.</p>}
       <div className="mt-6 border-t border-white/10 pt-5">
         <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent deliveries</h3><span className="text-xs text-[#737b89]">Latest 25</span></div>
         <div className="mt-3 divide-y divide-white/10">
