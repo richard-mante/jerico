@@ -44,6 +44,9 @@ type WorkerEnv = ClickHouseEnv & {
   API_URL?: string;
   UPTIME_RESULTS_SECRET?: string;
   PROBE_WORKER_HOST?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  NOTIFICATION_DELIVERY_SECRET?: string;
 };
 
 export function escapeIdentifier(value: string): string {
