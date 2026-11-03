@@ -1,8 +1,10 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
+  createWebhookNotificationChannelSchema,
+  webhookVerificationResultSchema,
   verifyNotificationChannelSchema,
   notificationDeliveryResultSchema,
   createAlertRuleSchema,
@@ -25,6 +27,7 @@ import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-sch
 import { evaluateAlertRules } from "./alert-evaluator";
 import { safelyQueueIncidentNotifications } from "./notification-delivery";
 import { sendEmail } from "./email";
+import { encryptWebhookSecret } from "./webhook-crypto";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
@@ -634,6 +637,7 @@ app.get("/api/v1/notification-channels", async (context) => withOrganization(con
     target: notificationChannels.target,
     verifiedAt: notificationChannels.verifiedAt,
     enabled: notificationChannels.enabled,
+    lastVerificationErrorCode: notificationChannels.lastVerificationErrorCode,
     createdAt: notificationChannels.createdAt,
   }).from(notificationChannels).where(eq(notificationChannels.organizationId, organizationId)).orderBy(desc(notificationChannels.createdAt));
   return context.json({ data });
@@ -683,6 +687,63 @@ app.post("/api/v1/notification-channels", async (context) => withOrganization(co
   return context.json({ data: { id: channelId, email: parsed.data.email, verifiedAt: null, verificationExpiresAt: expiresAt } }, existing ? 200 : 201);
 }));
 
+app.post("/api/v1/notification-channels/webhook", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
+  if (!context.env.NOTIFICATIONS) return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "Webhook verification queue is not configured." } }, 503);
+  const parsed = createWebhookNotificationChannelSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide a public HTTPS webhook URL.", details: parsed.error.flatten() } }, 400);
+  const [existing] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt })
+    .from(notificationChannels).where(and(
+      eq(notificationChannels.organizationId, organizationId),
+      eq(notificationChannels.type, "webhook"),
+      eq(notificationChannels.target, parsed.data.url),
+    )).limit(1);
+  if (existing) return context.json({ error: { code: existing.verifiedAt ? "CHANNEL_ALREADY_VERIFIED" : "CHANNEL_EXISTS", message: existing.verifiedAt ? "This webhook is already verified." : "This webhook already exists. Resend its verification challenge." } }, 409);
+  const challenge = createVerificationToken();
+  const signingSecret = createVerificationToken();
+  let encrypted: { secretCiphertext: string; secretIv: string };
+  try {
+    encrypted = await encryptWebhookSecret(signingSecret, context.env.WEBHOOK_ENCRYPTION_KEY);
+  } catch {
+    return context.json({ error: { code: "WEBHOOK_ENCRYPTION_UNAVAILABLE", message: "Webhook secret encryption is not configured correctly." } }, 503);
+  }
+  const channelId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await database.insert(notificationChannels).values({
+    id: channelId,
+    organizationId,
+    type: "webhook",
+    target: parsed.data.url,
+    verificationTokenHash: await hashVerificationToken(challenge),
+    verificationExpiresAt: expiresAt,
+    secretCiphertext: encrypted.secretCiphertext,
+    secretIv: encrypted.secretIv,
+    createdBy: userId,
+  });
+  try {
+    await context.env.NOTIFICATIONS.send({
+      schemaVersion: 1,
+      type: "notification.webhook.verify",
+      channelId,
+      url: parsed.data.url,
+      challenge,
+    });
+  } catch (error) {
+    await database.delete(notificationChannels).where(and(
+      eq(notificationChannels.id, channelId),
+      eq(notificationChannels.organizationId, organizationId),
+    ));
+    console.error("Jerico webhook verification could not be queued", {
+      organizationId, channelId, error: error instanceof Error ? error.message : String(error),
+    });
+    return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "The webhook could not be saved because verification could not be queued. Check the notification queue and try again." } }, 503);
+  }
+  return context.json({ data: {
+    id: channelId, type: "webhook", target: parsed.data.url, verifiedAt: null,
+    verificationExpiresAt: expiresAt, signingSecret,
+  } }, 201);
+}));
+
 app.post("/api/v1/notification-channels/:channelId/resend-verification", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
   const [channel] = await database.select().from(notificationChannels).where(and(
@@ -690,14 +751,30 @@ app.post("/api/v1/notification-channels/:channelId/resend-verification", async (
     eq(notificationChannels.organizationId, organizationId),
   )).limit(1);
   if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
-  if (channel.verifiedAt) return context.json({ error: { code: "CHANNEL_ALREADY_VERIFIED", message: "This email address is already verified." } }, 409);
+  if (channel.verifiedAt) return context.json({ error: { code: "CHANNEL_ALREADY_VERIFIED", message: "This notification channel is already verified." } }, 409);
+  if (channel.type === "webhook" && !context.env.NOTIFICATIONS) {
+    return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "Webhook verification queue is not configured." } }, 503);
+  }
   const token = createVerificationToken();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await database.update(notificationChannels).set({
     verificationTokenHash: await hashVerificationToken(token),
     verificationExpiresAt: expiresAt,
+    lastVerificationErrorCode: null,
     updatedAt: new Date(),
   }).where(eq(notificationChannels.id, channel.id));
+  if (channel.type === "webhook") {
+    try {
+      await context.env.NOTIFICATIONS.send({
+        schemaVersion: 1, type: "notification.webhook.verify", channelId: channel.id,
+        url: channel.target, challenge: token,
+      });
+    } catch {
+      await database.update(notificationChannels).set({ lastVerificationErrorCode: "queue_unavailable", updatedAt: new Date() }).where(eq(notificationChannels.id, channel.id));
+      return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "The webhook verification could not be queued. Try again later." } }, 503);
+    }
+    return context.json({ data: { id: channel.id, verificationExpiresAt: expiresAt } }, 202);
+  }
   try {
     await sendEmail(context.env, {
       to: channel.target,
@@ -951,6 +1028,60 @@ app.get("/api/v1/projects/:projectId/uptime-monitors/:monitorId/checks", async (
 
 
 
+app.post("/internal/webhook-verification-results", async (context) => {
+  const secret = context.env.NOTIFICATION_DELIVERY_SECRET;
+  const supplied = context.req.header("x-jerico-notification-secret") ?? "";
+  if (!secret || secret.length < 32) return context.json({ error: { code: "NOTIFICATION_CALLBACK_UNAVAILABLE", message: "Notification callback is not configured." } }, 503);
+  if (!constantTimeEqual(secret, supplied)) return context.json({ error: { code: "UNAUTHORIZED", message: "Invalid internal credential." } }, 401);
+  let body: unknown;
+  try { body = await readBoundedJson(context.req.raw, 4096); }
+  catch (error) {
+    const tooLarge = error instanceof RangeError;
+    return context.json({ error: { code: tooLarge ? "PAYLOAD_TOO_LARGE" : "INVALID_JSON", message: "The webhook verification result is invalid." } }, tooLarge ? 413 : 400);
+  }
+  const parsed = webhookVerificationResultSchema.safeParse(body);
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The webhook verification result is invalid." } }, 400);
+  const result = parsed.data;
+  const challengeHash = await hashVerificationToken(result.challenge);
+  const now = new Date();
+  const accepted = await withDatabase(context.env, async (database) => {
+    const [channel] = await database.select({
+      id: notificationChannels.id,
+      organizationId: notificationChannels.organizationId,
+      verifiedAt: notificationChannels.verifiedAt,
+      verificationTokenHash: notificationChannels.verificationTokenHash,
+      verificationExpiresAt: notificationChannels.verificationExpiresAt,
+      lastVerificationChallengeHash: notificationChannels.lastVerificationChallengeHash,
+    }).from(notificationChannels).where(and(
+      eq(notificationChannels.id, result.channelId),
+      eq(notificationChannels.type, "webhook"),
+    )).limit(1);
+    if (!channel) return false;
+    // Queue redelivery or a lost callback response must not turn a successful
+    // verification into a retry/DLQ event after the one-time token was consumed.
+    if (channel.verifiedAt && channel.lastVerificationChallengeHash === challengeHash) return true;
+    if (channel.verifiedAt || channel.verificationTokenHash !== challengeHash
+      || !channel.verificationExpiresAt || channel.verificationExpiresAt < now) return false;
+    const [updated] = await database.update(notificationChannels).set({
+      verifiedAt: result.status === "verified" ? now : null,
+      verificationTokenHash: result.status === "verified" ? null : challengeHash,
+      verificationExpiresAt: result.status === "verified" ? null : channel.verificationExpiresAt,
+      lastVerificationChallengeHash: result.status === "verified" ? challengeHash : null,
+      lastVerificationErrorCode: result.status === "failed" ? result.errorCode ?? "endpoint_unavailable" : null,
+      enabled: result.status === "verified",
+      updatedAt: now,
+    }).where(and(
+      eq(notificationChannels.id, channel.id),
+      eq(notificationChannels.organizationId, channel.organizationId),
+      eq(notificationChannels.verificationTokenHash, challengeHash),
+      gte(notificationChannels.verificationExpiresAt, now),
+    )).returning({ id: notificationChannels.id });
+    return Boolean(updated);
+  });
+  if (!accepted) return context.json({ error: { code: "VERIFICATION_EXPIRED", message: "The webhook challenge is no longer current." } }, 409);
+  return context.json({ data: { accepted: true } }, 202);
+});
+
 app.post("/internal/notification-delivery-results", async (context) => {
   const secret = context.env.NOTIFICATION_DELIVERY_SECRET;
   const supplied = context.req.header("x-jerico-notification-secret") ?? "";
@@ -965,16 +1096,22 @@ app.post("/internal/notification-delivery-results", async (context) => {
   const parsed = notificationDeliveryResultSchema.safeParse(body);
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
   const result = parsed.data;
-  const [updated] = await withDatabase(context.env, async (database) => database.update(notificationDeliveries).set({
-    status: result.status === "attempting" ? "queued" : result.status,
-    attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
-    providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
-    lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
-    lastAttemptAt: new Date(),
-    sentAt: result.status === "sent" ? new Date() : null,
-    updatedAt: new Date(),
-  }).where(eq(notificationDeliveries.id, result.deliveryId)).returning({ id: notificationDeliveries.id }));
-  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
+  const accepted = await withDatabase(context.env, async (database) => {
+    const [updated] = await database.update(notificationDeliveries).set({
+      status: result.status === "attempting" ? "queued" : result.status,
+      attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
+      providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
+      lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
+      lastAttemptAt: new Date(),
+      sentAt: result.status === "sent" ? new Date() : null,
+      updatedAt: new Date(),
+    }).where(and(eq(notificationDeliveries.id, result.deliveryId), ne(notificationDeliveries.status, "sent"))).returning({ id: notificationDeliveries.id });
+    if (updated) return true;
+    const [existing] = await database.select({ id: notificationDeliveries.id, status: notificationDeliveries.status })
+      .from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+    return existing?.status === "sent";
+  });
+  if (!accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
   return context.json({ data: { accepted: true } }, 202);
 });
 

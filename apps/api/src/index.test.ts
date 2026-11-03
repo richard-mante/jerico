@@ -169,6 +169,26 @@ describe("notification channel authorization", () => {
     expect(response.status).toBe(403);
     expect(mocks.insert).not.toHaveBeenCalled();
   });
+  it("does not allow organization members to create webhook channels", async () => {
+    setSelectResults([{ role: "member" }]);
+    const response = await app.request("/api/v1/notification-channels/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ url: "https://hooks.example.com/jerico" }),
+    });
+    expect(response.status).toBe(403);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+  it("rejects invalid webhook targets before encryption or persistence", async () => {
+    setSelectResults([{ role: "owner" }]);
+    const response = await app.request("/api/v1/notification-channels/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ url: "http://127.0.0.1/hook" }),
+    }, { NOTIFICATIONS: { send: vi.fn() } });
+    expect(response.status).toBe(400);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it("rejects invalid verification tokens before querying the database", async () => {
     const response = await app.request("/api/v1/notification-channels/verify", {
       method: "POST",
@@ -177,6 +197,31 @@ describe("notification channel authorization", () => {
     });
     expect(response.status).toBe(400);
     expect(mocks.select).not.toHaveBeenCalled();
+  });
+  it("accepts a repeated webhook verification callback after its challenge was consumed", async () => {
+    const challenge = "v".repeat(43);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(challenge));
+    const challengeHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    setSelectResults([{
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      organizationId: "org-a",
+      verifiedAt: new Date(),
+      verificationTokenHash: null,
+      verificationExpiresAt: null,
+      lastVerificationChallengeHash: challengeHash,
+    }]);
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/webhook-verification-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({
+        channelId: "550e8400-e29b-41d4-a716-446655440000",
+        challenge,
+        status: "verified",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true } });
   });
   it("rejects delivery callbacks without the shared internal secret", async () => {
     const response = await app.request("/internal/notification-delivery-results", {

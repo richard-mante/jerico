@@ -21,3 +21,6 @@ UPTIME_RESULTS_SECRET=replace-with-a-long-random-secret
 
 # Shared secret for internal notification delivery callbacks (match the Worker value)
 NOTIFICATION_DELIVERY_SECRET=replace-with-a-long-random-secret
+
+# Base64url-encoded 32-byte AES-GCM key; use the same value on API and Worker
+WEBHOOK_ENCRYPTION_KEY=replace-with-a-base64url-encoded-32-byte-key

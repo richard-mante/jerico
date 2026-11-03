@@ -76,6 +76,30 @@ describe("notification queue contract", () => {
       to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
     })).toBe(true);
   });
+  it("accepts bounded webhook verification and delivery messages", () => {
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.webhook.verify",
+      channelId: "550e8400-e29b-41d4-a716-446655440000",
+      url: "https://hooks.example.com/jerico", challenge: "x".repeat(43),
+    })).toBe(true);
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.webhook",
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      url: "https://hooks.example.com/jerico",
+      secretCiphertext: "c".repeat(48), secretIv: "i".repeat(16),
+      eventType: "incident.opened", incidentId: "incident-a", projectId: "project-a",
+      title: "High error rate", triggerValue: 12, occurredAt: "2026-11-03T10:00:00.000Z",
+    })).toBe(true);
+  });
+  it("rejects webhook messages targeting the probe worker or unsafe hosts", () => {
+    const base = {
+      schemaVersion: 1, type: "notification.webhook.verify",
+      channelId: "550e8400-e29b-41d4-a716-446655440000",
+      challenge: "x".repeat(43),
+    };
+    expect(isValidNotificationMessage({ ...base, url: "https://probe.example.com/hook" }, "probe.example.com")).toBe(false);
+    expect(isValidNotificationMessage({ ...base, url: "https://service.corp/hook" })).toBe(false);
+  });
   it("rejects unsafe or oversized queue payloads", () => {
     expect(isValidNotificationMessage({
       schemaVersion: 1, type: "notification.email", deliveryId: "not-a-uuid",

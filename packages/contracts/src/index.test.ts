@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAlertRuleSchema, updateAlertRuleSchema, createNotificationChannelSchema, verifyNotificationChannelSchema, notificationDeliveryResultSchema, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
+import { createAlertRuleSchema, updateAlertRuleSchema, createNotificationChannelSchema, verifyNotificationChannelSchema, notificationDeliveryResultSchema, createWebhookNotificationChannelSchema, webhookVerificationResultSchema, isAllowedWebhookUrl, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
 
 describe("resource request contracts", () => {
   it("accepts a standalone project without a product", () => {
@@ -111,5 +111,37 @@ describe("email notification contracts", () => {
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "sent", providerMessageId: "msg_123" }).success).toBe(true);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed" }).success).toBe(false);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed", errorCode: "private endpoint response" }).success).toBe(false);
+  });
+});
+
+describe("webhook notification contracts", () => {
+  it("accepts public HTTPS webhook endpoints", () => {
+    expect(createWebhookNotificationChannelSchema.safeParse({ url: "https://hooks.example.com/jerico" }).success).toBe(true);
+  });
+  it("rejects local, IP-literal, insecure, credentialed, and redirected query targets", () => {
+    for (const url of [
+      "http://hooks.example.com/jerico",
+      "https://localhost/hook",
+      "https://127.0.0.1/hook",
+      "https://192.168.1.10/hook",
+      "https://[::1]/hook",
+      "https://user:pass@hooks.example.com/hook",
+      "https://hooks.example.com:8443/hook",
+      "https://hooks.example.com/hook?token=secret",
+      "https://hooks.example.com/hook#fragment",
+      "https://service.internal/hook",
+      "https://service.corp/hook",
+      "https://metadata/hook",
+      "https://service.private/hook",
+      "https://service.onion/hook",
+    ]) expect(isAllowedWebhookUrl(url)).toBe(false);
+  });
+  it("requires a safe error code for failed endpoint verification", () => {
+    expect(webhookVerificationResultSchema.safeParse({
+      channelId: "550e8400-e29b-41d4-a716-446655440000", challenge: "x".repeat(43), status: "verified",
+    }).success).toBe(true);
+    expect(webhookVerificationResultSchema.safeParse({
+      channelId: "550e8400-e29b-41d4-a716-446655440000", challenge: "x".repeat(43), status: "failed",
+    }).success).toBe(false);
   });
 });

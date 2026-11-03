@@ -20,7 +20,6 @@ export async function queueIncidentNotifications(
 ): Promise<void> {
   const channels = await database.select().from(notificationChannels).where(and(
     eq(notificationChannels.organizationId, incident.organizationId),
-    eq(notificationChannels.type, "email"),
     eq(notificationChannels.enabled, true),
     isNotNull(notificationChannels.verifiedAt),
   ));
@@ -37,6 +36,54 @@ export async function queueIncidentNotifications(
       status: "queued",
     }).onConflictDoNothing().returning({ id: notificationDeliveries.id });
     if (!delivery) continue;
+
+    if (channel.type === "webhook") {
+      if (!channel.secretCiphertext || !channel.secretIv) {
+        await database.update(notificationDeliveries).set({
+          status: "failed",
+          lastErrorCode: "configuration_missing",
+          updatedAt: new Date(),
+        }).where(eq(notificationDeliveries.id, delivery.id));
+        continue;
+      }
+      const message = {
+        schemaVersion: 1 as const,
+        type: "notification.webhook" as const,
+        deliveryId: delivery.id,
+        url: channel.target,
+        secretCiphertext: channel.secretCiphertext,
+        secretIv: channel.secretIv,
+        eventType,
+        incidentId: incident.id,
+        projectId: incident.projectId,
+        title: incident.title.slice(0, 200),
+        triggerValue: incident.triggerValue,
+        occurredAt: new Date().toISOString(),
+      };
+      if (!env.NOTIFICATIONS) {
+        await database.update(notificationDeliveries).set({
+          status: "failed",
+          lastErrorCode: "queue_unavailable",
+          updatedAt: new Date(),
+        }).where(eq(notificationDeliveries.id, delivery.id));
+        continue;
+      }
+      try {
+        await env.NOTIFICATIONS.send(message);
+      } catch (error) {
+        await database.update(notificationDeliveries).set({
+          status: "failed",
+          lastErrorCode: "queue_unavailable",
+          updatedAt: new Date(),
+        }).where(eq(notificationDeliveries.id, delivery.id));
+        console.error("Jerico could not enqueue webhook notification", {
+          deliveryId: delivery.id,
+          incidentId: incident.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
 
     if (!env.NOTIFICATIONS) {
       await database.update(notificationDeliveries).set({

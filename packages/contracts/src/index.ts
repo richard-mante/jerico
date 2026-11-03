@@ -125,4 +125,29 @@ export const notificationDeliveryResultSchema = z.object({
   errorCode: z.enum(["provider_rejected", "provider_unavailable", "configuration_missing", "invalid_message"]).optional(),
 }).strict().refine((value) => value.status !== "failed" || Boolean(value.errorCode), "Failed deliveries require a safe error code.");
 
+
+export function isAllowedWebhookUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
+    if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || url.search || url.hash) return false;
+    if (!host.includes(".") || host.length > 253 || host.startsWith("[") || host.includes(":")) return false;
+    if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(host)) return false;
+    if (["localhost", "metadata", "metadata.google.internal", "metadata.azure.internal", "instance-data"].includes(host)) return false;
+    if ([".localhost", ".local", ".internal", ".test", ".invalid", ".example", ".home.arpa", ".lan", ".corp", ".home", ".intranet", ".private", ".arpa", ".onion"].some((suffix) => host.endsWith(suffix))) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+export const createWebhookNotificationChannelSchema = z.object({
+  url: z.string().trim().url().max(2048).refine(isAllowedWebhookUrl, "Webhook URLs must be public HTTPS endpoints on port 443 without credentials, query strings, or fragments."),
+}).strict();
+export const webhookVerificationResultSchema = z.object({
+  channelId: z.string().uuid(),
+  challenge: z.string().min(32).max(128),
+  status: z.enum(["verified", "failed"]),
+  errorCode: z.enum(["endpoint_rejected", "endpoint_unavailable", "invalid_response"]).optional(),
+}).strict().refine((value) => value.status !== "failed" || Boolean(value.errorCode), "Failed verification requires a safe error code.");
+
 export const API_VERSION = "v1" as const;

@@ -167,3 +167,32 @@ Apply migration 0007_email_notification_channels.sql before deploying. The code 
 - Webhook channel support and endpoint verification.
 - Delivery preferences by event type, quiet hours, escalation policies, and retry controls.
 - Real Resend delivery, queue retry/DLQ, callback idempotency, and database integration verification.
+
+## Phase 5E: signed webhook notifications
+
+### Channel setup and endpoint ownership
+
+- Organization owners/admins can add public HTTPS webhook endpoints on port 443. URLs with credentials, IP literals, query strings, fragments, localhost, and reserved/internal hostnames are rejected.
+- Jerico sends a one-time verification challenge through the notifications queue. The endpoint must return a successful response containing the exact challenge in a JSON `challenge` field. Verification callbacks are authenticated with the existing notification callback secret and only the current, unexpired SHA-256 challenge hash can activate a channel.
+- Webhook signing secrets are generated once, shown to the owner/admin once, and encrypted at rest with AES-256-GCM. The 256-bit `WEBHOOK_ENCRYPTION_KEY` must be configured identically on API and Worker. Never put this key in source control or expose ciphertext/plaintext through channel-list APIs.
+
+### Delivery contract
+
+- Verified, enabled webhook channels receive incident opened, acknowledged, and resolved events through the existing notification queue.
+- Requests use POST with JSON and the headers `X-Jerico-Event`, `X-Jerico-Delivery`, `X-Jerico-Timestamp`, and `X-Jerico-Signature`.
+- The signature is HMAC-SHA256 over `<unix-timestamp>.<exact-raw-request-body>`, encoded as `sha256=<lowercase-hex>`. Receivers should enforce a short timestamp tolerance (recommended five minutes), compare signatures in constant time, and deduplicate delivery IDs because queue retries are at-least-once.
+- Redirects are rejected, requests time out after 10 seconds, response bodies are discarded, and delivery attempts/results use the existing bounded callback and history table.
+- The Worker retains `global_fetch_strictly_public`; this is essential to prevent webhook URLs from reaching private or metadata IP ranges after DNS resolution. Keep the Worker on workers.dev with no VPC binding/private egress. Do not weaken the public-only fetch policy.
+
+### Provisioning
+
+In addition to Phase 5D queue and callback configuration:
+- Generate a random 32-byte key, encode it as unpadded base64url, and set `WEBHOOK_ENCRYPTION_KEY` on both API and Worker.
+- Apply migration `0008_webhook_notification_channels.sql`.
+- The existing `jerico-notifications` queue and `jerico-notifications-dlq` are reused; no additional queue is required.
+
+### Validation and remaining work
+
+- Contract, encryption, worker signing/delivery, queue validation, and mocked API authorization tests are included but must be executed.
+- Provision the encryption key and notification queue in a non-production environment; verify challenge echo, invalid challenge rejection, successful signed delivery, signature verification, retries, duplicate delivery-ID handling, and DLQ behavior.
+- The signing-secret value is only returned on channel creation. If the response is lost, remove and recreate the unverified channel rather than assuming the secret can be recovered.
