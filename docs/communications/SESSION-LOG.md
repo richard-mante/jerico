@@ -240,3 +240,13 @@
 - Added optional `level` filtering to API log queries with strict supported-level validation and ClickHouse parameter binding; historical entries without a level default to `info` in the query.
 - Added API unit coverage for severity parameter binding and a Logs-tab severity selector that persists across Load more.
 - No lint, typecheck, tests, build, or live ClickHouse/browser validation was run.
+
+
+## 2026-11-03 — Phase 4 SDK trace context helpers
+
+- Created `feat/phase-4-sdk-span-context` from `main` after merging PR #14.
+- Added `SpanContext`/`SpanHandle`, `startSpan()`, and `withSpan()` to `@jerico/sdk-core`. Root spans generate trace IDs, child spans reuse trace ID and parent span ID, and durations/status are recorded in existing span telemetry fields.
+- Browser SDK explicitly rejects the server-only span helpers.
+- Added tests for parent/child correlation, duration metadata, idempotent end, and error status (authored, not executed).
+- Updated Node SDK usage documentation and Phase 4 handover.
+- No lint, typecheck, tests, build, or runtime validation was run.
