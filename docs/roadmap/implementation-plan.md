@@ -78,13 +78,13 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [x] Tenant-safe query APIs for events, errors, logs, metrics, and spans (implemented; tests and PostgreSQL/ClickHouse integration validation pending).
 - [x] Project overview aggregates (implemented; query validation pending).
 - [x] First project explorer UI with environment/time filters, overview cards, signal tabs, and pagination (implemented; browser validation pending).
-- [ ] Event catalogue, top events, and time-series charts.
-- [x] First query-time error grouping endpoint (name + message fingerprint, occurrence count, first/last seen); persisted issue identity, stack traces, occurrence history, resolve/ignore actions remain open.
-- [ ] Metric charts, Core Web Vitals, route performance, and percentiles.
-- [ ] Span waterfall and trace detail views.
-- [ ] Structured log explorer with severity and time filters.
+- [x] Event catalogue, top events, latest-event details, and event-volume time-series charts.
+- [x] Error grouping with latest stack trace, occurrence drill-down, and persisted open/resolved/ignored lifecycle (assignment, comments, notifications, audit history, and richer fingerprinting remain open).
+- [x] Initial metric average/min/max time-series charts; Core Web Vitals, route performance, percentiles, units, and metric drill-down remain open.
+- [x] Initial span waterfall and explicit SDK trace-context helpers; automatic framework instrumentation and full trace detail remain open.
+- [x] Structured log severity filters and selected time-range filtering; richer structured-field exploration remains open.
 
-**Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization.
+**Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization. Feature slices and mocked route tests are merged. Real ClickHouse integration, PostgreSQL migration/transaction validation, browser validation, and a successful CI run remain release blockers; do not mark Phase 4 fully accepted until they pass.
 
 ## Phase 5 — Uptime, alerts, incidents
 - [ ] Uptime monitor CRUD, scheduler, probes, history, and state transitions.
