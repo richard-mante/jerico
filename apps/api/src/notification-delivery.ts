@@ -15,6 +15,9 @@ export type EmailNotificationMessage = {
 const MAX_ENQUEUE_ATTEMPTS = 5;
 const ENQUEUE_RETRY_BASE_MS = 60_000;
 const ENQUEUE_RETRY_MAX_MS = 60 * 60_000;
+const ENQUEUE_LEASE_MS = 2 * 60_000;
+
+export function notificationEnqueueLeaseDuration(): number { return ENQUEUE_LEASE_MS; }
 
 export function notificationEnqueueRetryDelay(attempt: number): number {
   return Math.min(ENQUEUE_RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1), ENQUEUE_RETRY_MAX_MS);
@@ -75,6 +78,7 @@ async function markEnqueueFailure(
     status: "failed",
     lastErrorCode: exhausted ? "queue_retry_exhausted" : "queue_unavailable",
     nextEnqueueAt: exhausted ? null : new Date(now.getTime() + notificationEnqueueRetryDelay(delivery.enqueueAttempts)),
+    enqueueLeaseExpiresAt: null,
     updatedAt: now,
   }).where(and(
     eq(notificationDeliveries.id, delivery.id),
@@ -107,6 +111,7 @@ export async function queueIncidentNotifications(
       eventType,
       status: "queued",
       enqueueAttempts: 1,
+      enqueueLeaseExpiresAt: new Date(Date.now() + ENQUEUE_LEASE_MS),
     }).onConflictDoNothing().returning({
       id: notificationDeliveries.id,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
@@ -133,6 +138,8 @@ export async function queueIncidentNotifications(
     }
     try {
       await env.NOTIFICATIONS.send(message);
+      await database.update(notificationDeliveries).set({ enqueueLeaseExpiresAt: null, updatedAt: new Date() })
+        .where(and(eq(notificationDeliveries.id, delivery.id), eq(notificationDeliveries.status, "queued"), eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts), eq(notificationDeliveries.attempts, delivery.attempts)));
     } catch (error) {
       await markEnqueueFailure(database, delivery, new Date());
       console.error("Jerico could not enqueue incident notification", {
