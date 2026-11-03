@@ -114,9 +114,7 @@ export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryM
     method: "POST",
     headers,
     signal: AbortSignal.timeout(10_000),
-    body: rows.map((row) => JSON.stringify(row)).join("
-") + "
-",
+    body: rows.map((row) => JSON.stringify(row)).join("\n") + "\n",
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 1000);
