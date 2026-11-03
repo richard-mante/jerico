@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema } from "./index";
+import { createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
 
 describe("resource request contracts", () => {
   it("accepts a standalone project without a product", () => {
@@ -41,5 +41,29 @@ describe("uptime monitor contracts", () => {
     expect(createUptimeMonitorSchema.safeParse({ name: "Too slow", url: "https://example.com", timeoutMs: 60000 }).success).toBe(false);
     expect(updateUptimeMonitorSchema.safeParse({}).success).toBe(false);
     expect(updateUptimeMonitorSchema.safeParse({ enabled: false }).success).toBe(true);
+  });
+});
+
+describe("internal uptime probe result contract", () => {
+  it("accepts a bounded result envelope", () => {
+    expect(uptimeProbeResultSchema.safeParse({
+      checkId: "550e8400-e29b-41d4-a716-446655440000",
+      monitorId: "monitor-a",
+      organizationId: "org-a",
+      projectId: "project-a",
+      status: "down",
+      statusCode: null,
+      responseTimeMs: 10000,
+      errorCode: "timeout",
+      checkedAt: "2026-11-03T05:00:00.000Z",
+    }).success).toBe(true);
+  });
+
+  it("rejects arbitrary error strings and invalid result identifiers", () => {
+    expect(uptimeProbeResultSchema.safeParse({
+      checkId: "not-a-uuid", monitorId: "monitor-a", organizationId: "org-a", projectId: "project-a",
+      status: "down", statusCode: null, responseTimeMs: null, errorCode: "internal database password leaked",
+      checkedAt: "2026-11-03T05:00:00.000Z",
+    }).success).toBe(false);
   });
 });
