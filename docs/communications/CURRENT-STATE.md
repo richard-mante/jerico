@@ -4,7 +4,7 @@
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Latest feature merge:** PR #33 — `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
-**Latest main merge:** PR #37 — `3680ed33f26b8f19cd7f4532d36880a1c9c46dcb`  
+**Latest main merge:** PR #39 — `4d23197e52f95edbf71741b1f8735b7f3b709c13`  
 **Current milestone:** Phase 5E — signed webhook notifications merged; Phase 0–5 implementation is present, but validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -102,6 +102,10 @@ Potential Phase 5 follow-ups include per-event notification preferences, quiet h
 ### 2026-11-03 source-level review update
 
 Reviewed the current Worker probe/webhook delivery paths, API notification callbacks and channel lifecycle, database constraints, telemetry query construction, and auth setup. No confirmed exploitable issue was established from source inspection alone. In particular, the public-only Worker fetch compatibility flag remains configured, redirect handling is explicit, webhook secrets are AES-GCM encrypted at rest, and internal callbacks use bounded payload parsing plus shared-secret authentication. These are source observations, not deployed SSRF certification or runtime verification. Remaining review/validation items include deployed Workerd egress behavior, retry/DLQ semantics under callback outages, concurrent scheduler/evaluator behavior, tenant isolation against a live PostgreSQL instance, and ClickHouse query timeouts/resource limits.
+
+### 2026-11-03 ClickHouse request-bound update
+
+Merged PR #39. All API telemetry query operations now apply ClickHouse `max_execution_time=8` and a 10-second client request timeout. Worker telemetry inserts use the same server-side execution bound and a 10-second client request timeout. Focused tests assert the configured limits. This is an implementation-level safeguard only: tests were authored but not executed, and ClickHouse integration/runtime behavior remains unverified.
 
 ## Continuity rules
 
