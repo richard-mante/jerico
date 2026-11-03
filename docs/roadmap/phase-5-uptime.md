@@ -98,3 +98,10 @@ Set `API_URL` to the HTTPS `workers.dev` URL of the Jerico API and `PROBE_WORKER
 - Verify DNS/private address blocking and redirects in the deployed Workerd runtime.
 - Verify retries, duplicate callback idempotency, DLQ behavior, paused/deleted monitors, and queue outage recovery.
 - Add alert/incident state transitions only after this pipeline is verified.
+
+
+## Phase 5C: availability summaries
+
+The project API exposes `GET /api/v1/projects/:projectId/uptime-monitors/summary?window=24h|7d|30d`. It groups stored check results by monitor and returns successful/failed check counts, observed uptime percentage, average response time, p95 response time, and last checked timestamp. The query is bounded to the selected time window and the authenticated organization/project.
+
+The uptime percentage is **sample-based**: successful recorded checks divided by all recorded checks in the selected window. It is not a time-weighted availability calculation and does not count missed schedules as downtime. The UI labels it as observed uptime and exposes 24-hour, 7-day, and 30-day windows. Once scheduler/queue provisioning is complete, the summary will populate from actual stored checks.
