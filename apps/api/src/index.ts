@@ -1130,7 +1130,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
         ...common,
         eq(notificationDeliveries.activeConsumerAttempt, result.attemptNumber),
       )).returning({ id: notificationDeliveries.id });
-    if (updated) return true;
+    if (updated) return { accepted: true, active: true };
 
     const [existing] = await database.select({
       id: notificationDeliveries.id,
@@ -1138,20 +1138,22 @@ app.post("/internal/notification-delivery-results", async (context) => {
       activeEnqueueToken: notificationDeliveries.activeEnqueueToken,
       activeConsumerAttempt: notificationDeliveries.activeConsumerAttempt,
     }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
-    if (!existing) return false;
-    if (existing.status === "sent") return true;
+    if (!existing) return { accepted: false, active: false };
+    if (existing.status === "sent") return { accepted: true, active: false };
     // During a rolling deployment, an older Worker may still send callbacks
     // without the enqueue token. Do not acknowledge those against a new
     // token-owned enqueue; returning 404 makes that queue attempt retry.
-    if (!result.enqueueToken && existing.activeEnqueueToken !== null) return false;
-    if (result.enqueueToken && existing.activeEnqueueToken !== result.enqueueToken) return true;
-    if (existing.activeConsumerAttempt > result.attemptNumber) return true;
-    if (existing.activeConsumerAttempt === result.attemptNumber
-      && (existing.status === result.status || result.status === "attempting")) return true;
-    return false;
+    if (!result.enqueueToken && existing.activeEnqueueToken !== null) return { accepted: false, active: false };
+    if (result.enqueueToken && existing.activeEnqueueToken !== result.enqueueToken) return { accepted: true, active: false };
+    if (existing.activeConsumerAttempt > result.attemptNumber) return { accepted: true, active: false };
+    if (existing.activeConsumerAttempt === result.attemptNumber) {
+      if (result.status === "attempting") return { accepted: true, active: existing.status === "queued" };
+      if (existing.status === result.status) return { accepted: true, active: false };
+    }
+    return { accepted: false, active: false };
   });
-  if (!accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
-  return context.json({ data: { accepted: true } }, 202);
+  if (!accepted.accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
+  return context.json({ data: { accepted: true, active: accepted.active } }, 202);
 });
 
 app.post("/internal/uptime-results", async (context) => {
