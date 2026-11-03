@@ -27,6 +27,7 @@ type ErrorGroup = {
   firstSeen: string;
   lastSeen: string;
   latestEventId: string;
+  latestStack: string;
 };
 type Overview = {
   total: number;
@@ -338,6 +339,10 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                   </div>
                   <p className="mt-2 break-words text-sm leading-6 text-[#a4adba]">{group.latestMessage || "No error message provided."}</p>
                   <p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {group.latestEventId}</p>
+                  {group.latestStack && <details className="mt-3 rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                    <summary className="cursor-pointer text-xs font-medium text-[#aab4c2]">View stack trace</summary>
+                    <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-5 text-[#929eae]">{group.latestStack}</pre>
+                  </details>}
                 </div>
                 <div className="grid gap-2 text-xs text-[#8791a0] sm:min-w-48 sm:text-right">
                   <p><span className="text-[#626e7d]">Last seen</span><br />{formatTimestamp(group.lastSeen)}</p>
