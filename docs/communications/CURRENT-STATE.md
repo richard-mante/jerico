@@ -3,9 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `feat/phase-2-ingestion-credentials`  
-**Current PR:** https://github.com/richard-mante/jerico/pull/3 (draft)  
-**Current milestone:** Phase 2A credentials + Phase 2B telemetry ingestion; validation pending
+**Current work branch:** `chore/phase-2c-validation-handover`  
+**Current milestone:** Phase 2C — validation and infrastructure readiness
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -26,75 +25,65 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 - Cloudflare Queues for managed telemetry buffering; a self-hosted durable queue adapter is still required.
 - Cloudflare-specific services must remain behind narrow adapters so self-hosted deployments remain viable.
 
-## Phase 0 and Phase 1 status
+## Merged implementation
 
-- Phase 0 foundation merged to `main`.
-- Phase 1 identity and tenancy PR #2 merged to `main` as `5952c67ead9868783a7d764d06ca78bf3d4fa37b`.
-- Phase 1 code includes Better Auth email/password authentication, PostgreSQL/Drizzle schema and migration, organization/membership/invitation support, organization-scoped product/project/environment APIs, basic web onboarding, and invitation acceptance.
-- Better Auth is a self-hosted open-source library running inside the Hono API Worker. It is not a separate hosted service.
-- Hyperdrive-aware request-scoped `pg.Client` lifecycle is implemented. A real Hyperdrive resource/binding has not been provisioned.
+### Phase 0 — Foundation
 
-**Verification remains incomplete:** no generated pnpm lockfile; install, lint, typecheck, tests, and builds have not been successfully run. PostgreSQL migrations have not been applied to a real/disposable database. GitHub Actions jobs have repeatedly failed before runner allocation (`runner_id: 0`, no steps/logs); pinning Ubuntu 24.04 did not resolve it. Do not treat this as evidence that code checks pass or fail.
+Merged to `main`; includes the monorepo/application scaffolding, shared foundations, CI workflow, architecture and continuity documentation.
 
-## Phase 2A — Project ingestion credentials
+### Phase 1 — Identity and tenancy
 
-Draft PR #3: https://github.com/richard-mante/jerico/pull/3
+PR #2 merged to `main` as `5952c67ead9868783a7d764d06ca78bf3d4fa37b`.
 
-Implemented on the branch:
-- `project_ingestion_keys` Drizzle schema and SQL migration (`0001_project_ingestion_keys.sql`).
-- Credentials are bound to organization, project, and environment with composite foreign-key constraints.
-- Public (`jk_pub_`) and secret (`jk_sec_`) credentials use 256-bit Web Crypto randomness.
-- Store only SHA-256 hashes and a short display prefix; return raw credential once at creation.
-- Authenticated project key list/create/revoke endpoints. Owners/admins create and revoke; members view metadata.
-- Shared Zod request contract and tests.
-- Web credential management page at `/dashboard/projects/[projectId]/keys`, linked from project cards.
+Includes Better Auth email/password authentication, PostgreSQL/Drizzle schema and migration, organization/membership/invitation support, organization-scoped product/project/environment APIs, basic web onboarding, and invitation acceptance.
 
-## Phase 2B — Authenticated telemetry ingestion
+Better Auth is a self-hosted open-source library running inside the Hono API Worker. It is not a separate hosted service.
 
-Implemented on the same draft branch:
-- Added bounded Zod telemetry contracts for events, errors, logs, metrics, and spans.
-- Added `POST /ingest/v1/events` with bearer credential parsing and SHA-256 lookup.
-- Rejects unknown and revoked keys. Public keys can submit only events/errors; secret keys can submit all current telemetry types.
-- Tenant, project, and environment IDs are taken from the credential record, not client payloads.
-- Request body capped at 96 KiB; batches capped at 100 events.
-- Redacts sensitive attribute names, email addresses, bearer tokens, and JWT-like strings before enqueueing.
-- Optional per-credential Cloudflare Rate Limiting binding; production mode returns 503 when configured with `APP_ENV=production` but the binding is missing.
-- Atomic per-project daily event quota in PostgreSQL (`project_ingestion_usage`, migration `0002_project_ingestion_usage.sql`), default 100,000 events per UTC day, configurable through `INGEST_DAILY_EVENT_LIMIT`; failed queue sends refund the reservation.
-- Enqueues trusted, versioned envelopes to Cloudflare Queue `jerico-telemetry`.
-- Adds queue consumer in `apps/worker`, ClickHouse HTTP `JSONEachRow` writer, retry behavior, and dead-letter queue config.
-- Adds initial ClickHouse schema with 7-day log and 30-day other telemetry retention.
-- Adds unit tests for credential parsing, redaction, ClickHouse row mapping, and write behavior.
-- Adds Phase 2B documentation.
+### Phase 2A/2B — Credentials and telemetry ingestion
 
-### Phase 2B limitations / provisioning
+PR #3 merged to `main` as `d0430e584f496057ca73dda70e6df718a290e8ea`.
 
-- Cloudflare Queue resources must be created and bound.
-- A real Hyperdrive ID must be added to the ingest Worker config.
-- Cloudflare Rate Limiting binding must be provisioned and named `INGEST_RATE_LIMITER`; production requests fail closed without it when `APP_ENV=production`.
-- ClickHouse must be provisioned and its SQL schema applied; Worker URL/token secrets must be configured.
-- Queue delivery is at-least-once. Duplicate writes are possible if a worker crashes after a successful ClickHouse insert but before acknowledgement. Event IDs/idempotency are follow-up work.
-- Monthly plan tiers/billing metering, adaptive backpressure, self-hosted runtime/queue adapter, dashboard query APIs, and SDKs are not implemented.
-- The current Worker runtime is Cloudflare-specific. Do not claim self-hosted ingestion is supported yet.
+Includes:
+- Organization/project/environment-scoped ingestion credentials; public (`jk_pub_`) and secret (`jk_sec_`) values are generated using Web Crypto. Only hashes and short prefixes are stored.
+- Authenticated credential list/create/revoke APIs and project credential UI.
+- Bounded Zod contracts for events, errors, logs, metrics, and spans.
+- `POST /ingest/v1/events` with credential verification, tenant scope derived from the credential record, public-vs-secret type permissions, payload/batch limits, and redaction.
+- Per-project daily event quota (default 100,000 events per UTC day) with transactional reservation and refund when queue publication fails.
+- Cloudflare Queue producer/consumer, ClickHouse HTTP JSONEachRow writer, retry/DLQ configuration, and initial ClickHouse retention schema.
 
-## Validation blockers
+## Phase 2C — Validation and infrastructure readiness (current)
 
-- PR #3 is draft and not production-ready.
-- No dependency install or pnpm lockfile.
-- No lint/typecheck/unit test/build run for Phase 1, Phase 2A, or Phase 2B.
-- No PostgreSQL migration execution or API integration tests.
-- No queue provisioning, Hyperdrive binding, Rate Limiting binding, or ClickHouse deployment/write verification.
-- GitHub Actions hosted runner allocation issue remains unresolved.
-- Do not merge until validation and database/queue/ClickHouse integration tests pass.
+**No automated checks are currently confirmed passing.** The repository has no committed `pnpm-lock.yaml`; dependency installation, lint, typecheck, tests, builds, and PostgreSQL integration tests remain outstanding.
 
-## Next actions
+The latest main-branch CI run after PR #3 merged is run #73 (ID `41559078138`). It failed within seconds. The job endpoint returned no runner assignment, no steps, and no logs (`steps: null`). Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
 
-1. Review Phase 2B code and fix type/runtime issues found by actual dependency install and tests.
-2. Establish a working validation environment; generate pnpm lockfile and run lint/typecheck/tests/build.
-3. Apply PostgreSQL migrations to disposable PostgreSQL and test credential/tenant isolation.
-4. Provision Cloudflare queues, Hyperdrive, rate limiting, and ClickHouse; test end-to-end ingestion and DLQ behavior.
-5. Add idempotent event IDs, monthly plan quotas, and billing metering.
-6. Extract a queue interface and implement the self-hosted durable queue/runtime adapter before claiming self-host support.
-7. Build TypeScript browser and Node SDKs after the ingestion contract stabilizes.
+Database migrations have not been applied to a disposable or production PostgreSQL instance. Cloudflare Hyperdrive, Queue, Rate Limiting bindings, and ClickHouse have not been provisioned or exercised end-to-end. No production deployment has been verified.
+
+### Remaining validation work
+
+1. Establish a working local or CI environment and generate/commit `pnpm-lock.yaml`.
+2. Run workspace install, lint, typecheck, unit tests, and builds; fix all resulting errors.
+3. Review Drizzle schema/migration consistency and generate the required initial migration snapshot.
+4. Apply migrations to disposable PostgreSQL; add integration coverage for Better Auth, tenant isolation, credential permissions/revocation, and atomic quotas.
+5. Provision Hyperdrive, Cloudflare Queues, Rate Limiting, and ClickHouse; verify ingestion, retries, and DLQ.
+6. Add event idempotency/deduplication before relying on at-least-once queue delivery for production analytics.
+
+### Known product gaps
+
+- Dashboard telemetry query APIs and observability views are not implemented.
+- TypeScript browser and Node SDKs are not implemented.
+- Alerts, notification channels, and full uptime monitoring are not implemented.
+- Monthly plan tiers, billing metering, adaptive backpressure, and configurable retention are not implemented.
+- A self-hosted durable queue/runtime adapter and Docker Compose deployment are not implemented. The current ingestion runtime is Cloudflare-specific; do not claim self-hosted ingestion support yet.
+
+## Next milestones after Phase 2C
+
+1. Stabilize the ingestion pipeline and its contracts.
+2. Build the TypeScript browser and Node SDKs with integration examples.
+3. Build dashboard query APIs and the Observability UI (events/errors/logs/metrics/traces).
+4. Add uptime checks, alert rules, and notification channels.
+5. Add usage metering/billing and production operational safeguards.
+6. Implement self-hosted runtime/queue adapters and Docker Compose deployment.
 
 ## Continuity rules
 
