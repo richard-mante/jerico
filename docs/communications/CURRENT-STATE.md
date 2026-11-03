@@ -92,7 +92,7 @@ Implemented on the same draft branch:
 2. Establish a working validation environment; generate pnpm lockfile and run lint/typecheck/tests/build.
 3. Apply PostgreSQL migrations to disposable PostgreSQL and test credential/tenant isolation.
 4. Provision Cloudflare queues, Hyperdrive, rate limiting, and ClickHouse; test end-to-end ingestion and DLQ behavior.
-5. Add idempotent event IDs and daily plan quotas.
+5. Add idempotent event IDs, monthly plan quotas, and billing metering.
 6. Extract a queue interface and implement the self-hosted durable queue/runtime adapter before claiming self-host support.
 7. Build TypeScript browser and Node SDKs after the ingestion contract stabilizes.
 
