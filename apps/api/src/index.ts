@@ -259,6 +259,39 @@ app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) =
   }
 }));
 
+app.get("/api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/occurrences", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const fingerprint = context.req.param("fingerprint");
+  if (!/^[0-9]{1,20}$/.test(fingerprint)) return context.json({ error: { code: "INVALID_FINGERPRINT", message: "The error group fingerprint is invalid." } }, 400);
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const environmentId = context.req.query("environmentId");
+  if (environmentId) {
+    const [environment] = await database.select({ id: environments.id }).from(environments)
+      .where(and(eq(environments.id, environmentId), eq(environments.projectId, projectId), eq(environments.organizationId, organizationId))).limit(1);
+    if (!environment) return context.json({ error: { code: "INVALID_ENVIRONMENT", message: "The environment does not belong to this project." } }, 400);
+  }
+  if (!context.env.CLICKHOUSE_URL) return context.json({ error: { code: "TELEMETRY_UNAVAILABLE", message: "Telemetry query storage is not configured." } }, 503);
+  const range = parseTimeRange(context.req.query("from"), context.req.query("to"));
+  if (!range) return context.json({ error: { code: "INVALID_TIME_RANGE", message: "Provide a valid time range no longer than 31 days and not in the future." } }, 400);
+  const limit = parseQueryLimit(context.req.query("limit"));
+  if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
+  const cursorValue = context.req.query("cursor");
+  const cursor = cursorValue ? decodeTelemetryCursor(cursorValue) : null;
+  if (cursorValue && !cursor) return context.json({ error: { code: "INVALID_CURSOR", message: "The pagination cursor is invalid." } }, 400);
+  try {
+    const rows = await queryTelemetry(context.env, { organizationId, projectId, environmentId, ...range, limit, cursor: cursor ?? undefined, eventType: "error", errorFingerprint: fingerprint });
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
+    const last = data[data.length - 1];
+    const nextCursor = hasMore && last ? encodeTelemetryCursor({ timestamp: last.timestamp, eventId: last.eventId }) : null;
+    return context.json({ data, pagination: { limit, hasMore, nextCursor }, filters: { ...range, environmentId: environmentId ?? null, fingerprint } });
+  } catch (error) {
+    console.error("Jerico telemetry error occurrence query failed", { requestId: context.get("requestId"), projectId, error: error instanceof Error ? error.message : String(error) });
+    return context.json({ error: { code: "TELEMETRY_QUERY_FAILED", message: "Error occurrences could not be loaded right now.", requestId: context.get("requestId") } }, 502);
+  }
+}));
 app.post("/api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/status", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can change error group status." } }, 403);
   const projectId = context.req.param("projectId");
