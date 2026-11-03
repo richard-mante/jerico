@@ -185,3 +185,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Adds credential-scoped idempotency records, canonical payload hashing, deterministic event IDs, pending/accepted queue envelopes, 24-hour expiry, scheduled cleanup, and SDK batch key/body reuse on explicit retry.
 - Daily quota is reserved atomically with the first idempotency record. Pending quota is conservatively not refunded at expiry because queue acceptance may be ambiguous.
 - PR #16 is the rebased mainline implementation. No local install/lint/typecheck/tests/build, PostgreSQL migration, Cloudflare Queue, or ClickHouse integration test has been run.
+
+
+### Phase 4 event catalogue (PR #17)
+
+- PR #16 merged request-level ingestion idempotency into `main` (merge commit `932abd421c516ef311388f6866a91b75bd5dd763`); the older conflicting PR #8 was closed as superseded.
+- Branch `feat/phase-4-event-catalogue` adds a tenant-scoped event catalogue endpoint and a top-events view in the dashboard Events tab.
+- The catalogue returns up to 100 event names ranked by count, with last-seen and latest event ID. Counts may include duplicates until ClickHouse background merges complete.
+- PR #17 is the event analytics follow-up. Validation remains outstanding.
