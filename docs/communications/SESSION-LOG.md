@@ -535,3 +535,16 @@
 - Confirmed ClickHouse's HTTP interface supports per-request query settings via URL parameters in the official documentation. This does not replace live ClickHouse integration testing.
 - Tests were authored but not executed. No lint, typecheck, build, ClickHouse service, or queue runtime validation was run. No lockfile was generated or modified.
 - Next review: make notification queue-enqueue failures recoverable (currently recorded as failed without an automatic outbox retry), then verify evaluator overlap behavior and proceed to the blocked runtime validation sequence.
+
+
+## 2026-11-03 — Notification enqueue retry reconciliation
+
+- Reviewed notification queue enqueue failure handling and confirmed Cloudflare consumer retries/DLQ cannot recover messages rejected before queue acceptance.
+- Added `enqueue_attempts` and `next_enqueue_at` to notification deliveries with migration `0009_notification_enqueue_retries.sql` and Drizzle journal/schema updates.
+- Added a minute-scheduled reconciliation path for `queue_unavailable` rows. It atomically claims failed rows, uses five total enqueue attempts with exponential backoff (1, 2, 4, 8, 16 minutes), and retains stable delivery IDs.
+- Retry reconstruction loads the original channel and incident. Disabled/unverified or missing channels and missing webhook signing material are not re-enqueued. Failure updates are conditional on the delivery still being queued with unchanged attempt counters, protecting callbacks that have already advanced the row.
+- Added unit tests for backoff. Tests were not executed.
+- Opened and merged [PR #41](https://github.com/richard-mante/jerico/pull/41); merge commit: `eca004ec9034f7275caaf581f26f453937c1c767`.
+- CI run #208 failed before runner allocation; job had no steps and its log download returned `BlobNotFound`. No source checks executed. No lockfile was generated or modified.
+- Migration 0009 must be applied before deploying this change. Queue/database concurrency and end-to-end delivery still require non-production validation.
+- Next review: inspect alert evaluator overlap/claim semantics and ClickHouse query resource limits, then continue the release validation gate.
