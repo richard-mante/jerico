@@ -754,6 +754,8 @@ app.onError((error, context) => {
   return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed.", requestId: context.get("requestId") } }, 500);
 });
 
+export { app };
+
 export default {
   fetch: app.fetch.bind(app),
   scheduled(_controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
