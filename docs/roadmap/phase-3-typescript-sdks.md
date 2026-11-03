@@ -32,6 +32,13 @@ The SDK requires both a project ingestion key and an explicit endpoint. No hoste
 - Browser logs, metrics, and spans are blocked because the current public-key ingestion policy permits only events and errors.
 - Redaction is performed by the ingestion service; SDK-side redaction and configurable sampling are future work.
 
+## Integration examples
+
+- [Next.js App Router browser instrumentation](../examples/sdk-nextjs.md)
+- [Express / Node.js server instrumentation](../examples/sdk-express.md)
+
+These examples are documentation only; they have not yet been run in sample applications.
+
 ## Remaining work
 
 1. Validate workspace install, lint, typecheck, tests, and builds.
