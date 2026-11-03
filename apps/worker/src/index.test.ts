@@ -102,6 +102,12 @@ describe("notification queue contract", () => {
     expect(isValidNotificationMessage({ ...base, url: "https://probe.example.com/hook" }, "probe.example.com")).toBe(false);
     expect(isValidNotificationMessage({ ...base, url: "https://service.corp/hook" })).toBe(false);
   });
+  it("rejects notification messages with an invalid enqueue generation", () => {
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueAttempt: 6, to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
+    })).toBe(false);
+  });
   it("rejects unsafe or oversized queue payloads", () => {
     expect(isValidNotificationMessage({
       schemaVersion: 1, type: "notification.email", deliveryId: "not-a-uuid",
