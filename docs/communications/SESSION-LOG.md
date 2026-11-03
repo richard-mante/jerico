@@ -1,5 +1,14 @@
 # Jerico Session Log
 
+## 2026-11-03 — CI runner diagnosis and explicit runner image
+
+- Inspected GitHub Actions run #18 and its underlying job payload. The job has `runner_id: 0`, an empty `runner_name`, and `steps: []`; it starts and fails within seconds before a hosted runner is assigned. This is stronger evidence of a GitHub Actions runner-startup problem than a source-code/test failure, but the precise platform-side cause remains unknown.
+- Updated `.github/workflows/ci.yml` to pin the runner label from `ubuntu-latest` to `ubuntu-24.04` for a stable, explicit LTS image.
+- Workflow commit: `70a7e4d7399008e287bb17722f1d49f62b3ca421`.
+- A new workflow run has not yet appeared for that workflow-file commit at the time of this entry. Need trigger/observe a run against the updated workflow and inspect whether GitHub assigns a runner.
+- No CI job has reached checkout, pnpm setup, install, lint, typecheck, tests, or build. Do not report any of those checks as passing or failing.
+- PR #2 remains open and must not be merged until the workspace is actually validated.
+
 ## 2026-11-03 — Phase 1 Hyperdrive lifecycle review
 
 - Resumed PR #2 on `feat/phase-1-identity-tenancy`; confirmed the PR remains open and the head before this session was `7acd867df7fa8731f80f332de39e4407c8df8fec`.
@@ -10,9 +19,9 @@
 - Updated `docs/communications/CURRENT-STATE.md` with the implementation and validation status.
 - Code commit: `7dad40c71b64a7f1a14ebb85ffacc72bf4d27464` (database lifecycle fix).
 - Documentation commit: `80ae14fa18959ac5db187149138396ace0bfdb8e` (identity/tenancy architecture update). Current-state handover was then updated in a later docs commit.
-- CI run #16 (created for the database lifecycle commit) failed in approximately three seconds before recording any job steps. GitHub reports `steps: null`; the job logs endpoint returns 404. This does not identify a source-code failure and remains an unresolved GitHub Actions startup/runner issue.
+- CI run #16 (created for the database lifecycle commit) failed in approximately three seconds before recording any job steps. GitHub reports `steps: null` and no downloadable logs. This does not identify a source-code failure and remains an unresolved GitHub Actions startup/runner issue.
 - No dependency installation, lockfile generation, lint, typecheck, tests, build, PostgreSQL migration, or end-to-end authentication test was run. The Cloudflare Hyperdrive binding ID and deployment secrets are not configured.
-- PR #2 remains open and must not be merged until a runnable validation environment is established and required checks/integration tests pass.
+- PR #2 remains open and must not be merged until checks and database integration validation pass.
 
 ## 2026-11-03 — Phase 1 invitation acceptance flow
 
@@ -25,7 +34,7 @@
 - PR #2 remains open and must not be merged until CI, build, tests, and database integration validation pass.
 
 ### Next
-- Diagnose CI startup and establish a runnable validation environment; generate and commit the pnpm lockfile.
-- Run lint/typecheck/tests/build and add PostgreSQL-backed Better Auth and tenancy integration tests.
-- Apply the migration to a disposable database and verify the Hyperdrive deployment path once an actual binding exists.
+- Observe a workflow run using the explicit Ubuntu 24.04 runner; if runner allocation still fails, report the platform-level blocker and establish a separate local validation environment.
+- Generate and commit the pnpm lockfile; run lint/typecheck/tests/build.
+- Add PostgreSQL-backed Better Auth and tenancy integration tests and apply the migration to a disposable database.
 - Continue organization management/switching, project management, audit logging, and API-key lifecycle after Phase 1 validation.
