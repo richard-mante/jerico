@@ -81,3 +81,8 @@ The Errors tab calls the dedicated `/telemetry/errors/groups` endpoint and rende
 ## Metric time-series slice
 
 The API exposes `GET /api/v1/projects/:projectId/telemetry/metrics/series`. It validates organization membership, project ownership, and optional environment ownership before querying ClickHouse. It aggregates non-null metric values into average/minimum/maximum/sample-count buckets. Bucket sizes are selected from a fixed allowlist based on the requested time range (1, 15, 60, or 360 minutes). The query is bounded to the eight most frequently sampled metric names and 1,200 result rows. The dashboard Metrics tab renders one responsive SVG line chart per returned metric with latest average, sample count, and average range. This is a first overview, not yet a full metric explorer: unit metadata, percentile aggregation, metric selection, and drill-down are not included.
+
+
+## Span trace waterfall slice
+
+The Traces tab now groups the currently loaded span rows by `attributes.traceId`. When `traceId` is absent, each span is shown as a standalone span rather than being incorrectly joined to unrelated spans. Each group displays span names, optional span IDs, parent-span indication, timestamp-relative bars, and duration in milliseconds (the existing SDK `span()` contract stores duration in `value`). This is a best-effort waterfall over the currently loaded page(s), not full distributed trace reconstruction: the SDK does not yet generate or propagate trace/span context automatically, and missing `traceId`/`parentSpanId` attributes cannot be inferred. Load more can extend the visible span set.
