@@ -32,6 +32,7 @@ export async function queueIncidentNotifications(
       projectId: incident.projectId,
       incidentId: incident.id,
       channelId: channel.id,
+      target: channel.target,
       eventType,
       status: "queued",
     }).onConflictDoNothing().returning({ id: notificationDeliveries.id });
