@@ -24,6 +24,7 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - Uptime scheduling now claims the current monitor row and constructs probe messages from the returned configuration; queue-failure rollback is guarded by the exact claimed schedule timestamp (PR #44). No migration was needed; manual concurrency/runtime validation remains outstanding.
 - Email notification verification now atomically consumes the current unexpired token, preventing stale links from winning a resend race (PR #45). Alert-rule edits revoke active evaluation leases so old evaluator snapshots cannot commit after configuration changes (PR #46). Focused route tests were added but not executed.
 - Notification channels now reference their owning organization with cascading deletion (PR #47; migration `0011_notification_channel_organization_fk.sql`), preventing orphaned tenant channel rows while preserving individual-channel delivery history.
+- Notification enqueue reconciliation now runs with a real database connection and recovers stale queued outbox rows after a two-minute handoff lease expires (PR #49; migration `0012_notification_delivery_enqueued_at.sql`). Stable delivery IDs and bounded attempts are preserved; tests were added but not executed.
 - The latest CI run checked for PR #43 is [#213](https://github.com/richard-mante/jerico/actions/runs/41640848052). Its job failed before recording workflow steps; no source checks executed, so this is not a source-check result.
 
 ## Phase 0 — Repository foundation
