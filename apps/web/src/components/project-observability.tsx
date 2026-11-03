@@ -22,6 +22,7 @@ type EventSeries = { name: string; points: EventPoint[] };
 type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string; latestMessage: string; latestAttributes: string };
 type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
 type MetricSeries = { name: string; points: MetricPoint[] };
+type ErrorGroupStatus = "open" | "resolved" | "ignored";
 type ErrorGroup = {
   fingerprint: string;
   name: string;
@@ -31,6 +32,7 @@ type ErrorGroup = {
   lastSeen: string;
   latestEventId: string;
   latestStack: string;
+  status: ErrorGroupStatus;
 };
 type Overview = {
   total: number;
@@ -107,6 +109,8 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [overview, setOverview] = useState<Overview>(emptyOverview);
   const [rows, setRows] = useState<TelemetryItem[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
+  const [canManageErrorGroups, setCanManageErrorGroups] = useState(false);
+  const [updatingErrorGroup, setUpdatingErrorGroup] = useState<string | null>(null);
   const [eventCatalogue, setEventCatalogue] = useState<EventSummary[]>([]);
   const [eventSeries, setEventSeries] = useState<EventSeries[]>([]);
   const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
@@ -188,6 +192,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       setOverview(overviewPayload.data as Overview);
       if (tab === "errors") {
         setErrorGroups((listPayload.data ?? []) as ErrorGroup[]);
+        setCanManageErrorGroups(Boolean(listPayload.canManage));
         setEventCatalogue([]);
         setEventSeries([]);
         setMetricSeries([]);
@@ -197,6 +202,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setMetricSeries((listPayload.data ?? []) as MetricSeries[]);
         setEventSeries([]);
         setErrorGroups([]);
+        setCanManageErrorGroups(false);
         setEventCatalogue([]);
         setRows([]);
         setNextCursor(null);
@@ -210,6 +216,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       } else {
         setRows((listPayload.data ?? []) as TelemetryItem[]);
         setErrorGroups([]);
+        setCanManageErrorGroups(false);
         setEventCatalogue([]);
         setEventSeries([]);
         setMetricSeries([]);
@@ -219,6 +226,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       if (!controller.signal.aborted) {
         setRows([]);
         setErrorGroups([]);
+        setCanManageErrorGroups(false);
         setEventCatalogue([]);
         setEventSeries([]);
         setMetricSeries([]);
@@ -231,6 +239,26 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     return () => controller.abort();
   }, [organizationId, session, projectId, tab, environmentId, queryWindow, logLevel]);
 
+  async function updateErrorGroupStatus(fingerprint: string, status: ErrorGroupStatus) {
+    if (!organizationId || !canManageErrorGroups || updatingErrorGroup) return;
+    setUpdatingErrorGroup(fingerprint);
+    setError("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/errors/groups/${encodeURIComponent(fingerprint)}/status`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Jerico-Organization-Id": organizationId },
+        body: JSON.stringify({ status }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "Could not update error group status.");
+      setErrorGroups((current) => current.map((group) => group.fingerprint === fingerprint ? { ...group, status } : group));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update error group status.");
+    } finally {
+      setUpdatingErrorGroup(null);
+    }
+  }
   async function loadMore() {
     if (!organizationId || !nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -410,7 +438,13 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                     <span className="rounded-md border border-red-400/20 bg-red-400/[0.07] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-300">{group.occurrences.toLocaleString()} {group.occurrences === 1 ? "occurrence" : "occurrences"}</span>
                   </div>
                   <p className="mt-2 break-words text-sm leading-6 text-[#a4adba]">{group.latestMessage || "No error message provided."}</p>
-                  <p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {group.latestEventId}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="rounded-md border border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#aab4c2]">{group.status}</span>
+                    {canManageErrorGroups && <select aria-label={`Change status for ${group.name}`} value={group.status} disabled={updatingErrorGroup === group.fingerprint} onChange={(event) => void updateErrorGroupStatus(group.fingerprint, event.target.value as ErrorGroupStatus)} className="rounded-lg border border-white/10 bg-[#111620] px-2 py-1.5 text-[10px] text-[#dce2ea] disabled:opacity-50">
+                      <option value="open">Open</option><option value="resolved">Resolved</option><option value="ignored">Ignored</option>
+                    </select>}
+                  </div>
+<p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {group.latestEventId}</p>
                   {group.latestStack && <details className="mt-3 rounded-lg border border-white/[0.07] bg-black/15 p-3">
                     <summary className="cursor-pointer text-xs font-medium text-[#aab4c2]">View stack trace</summary>
                     <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-5 text-[#929eae]">{group.latestStack}</pre>
