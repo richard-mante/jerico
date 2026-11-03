@@ -23,7 +23,7 @@ import { withDatabase, type ApiBindings, type JericoDatabase } from "./database"
 import { createIngestionCredential } from "./ingestion-keys";
 import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
 import { evaluateAlertRules } from "./alert-evaluator";
-import { queueIncidentNotifications } from "./notification-delivery";
+import { safelyQueueIncidentNotifications } from "./notification-delivery";
 import { sendEmail } from "./email";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
@@ -821,7 +821,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async 
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
-  await queueIncidentNotifications(database, context.env, {
+  await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
   }, "incident.acknowledged");
   return context.json({ data: updated });
@@ -837,7 +837,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (con
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
-  await queueIncidentNotifications(database, context.env, {
+  await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
   }, "incident.resolved");
   return context.json({ data: updated });
