@@ -16,6 +16,12 @@ jerico.log("billing.invoice.created", "Invoice created", { amount: 49 }); // def
 jerico.logWithLevel("warn", "billing.payment.retry", "Payment retry scheduled", { attempt: 2 });
 jerico.metric("queue.depth", 12);
 
+await jerico.withSpan("http.request", async (trace) => {
+  await jerico.withSpan("database.query", async () => {
+    // Perform the database operation.
+  }, { table: "orders" }, trace);
+}, { method: "GET" });
+
 await jerico.flush();
 await jerico.close();
 ```
@@ -24,3 +30,6 @@ Call `close()` during graceful shutdown to stop the timer and flush pending even
 
 
 Supported log levels are `debug`, `info`, `warn`, `error`, and `fatal`. Existing `log(name, message, attributes)` calls remain compatible and are recorded at `info` by default. Use `logWithLevel(level, name, message, attributes)` when the severity is known.
+
+
+`startSpan(name, attributes?, parentContext?)` returns a span handle with a generated `traceId`/`spanId` context and an idempotent `end()` method. Pass the returned context to child spans to preserve the parent relationship. `withSpan(name, operation, attributes?, parentContext?)` measures duration automatically and records `status: "ok"` or `status: "error"`. Context propagation is explicit; the SDK does not patch async-local or framework request context automatically.

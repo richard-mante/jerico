@@ -85,7 +85,7 @@ The API exposes `GET /api/v1/projects/:projectId/telemetry/metrics/series`. It v
 
 ## Span trace waterfall slice
 
-The Traces tab now groups the currently loaded span rows by `attributes.traceId`. When `traceId` is absent, each span is shown as a standalone span rather than being incorrectly joined to unrelated spans. Each group displays span names, optional span IDs, parent-span indication, timestamp-relative bars, and duration in milliseconds (the existing SDK `span()` contract stores duration in `value`). This is a best-effort waterfall over the currently loaded page(s), not full distributed trace reconstruction: the SDK does not yet generate or propagate trace/span context automatically, and missing `traceId`/`parentSpanId` attributes cannot be inferred. Load more can extend the visible span set.
+The Traces tab now groups the currently loaded span rows by `attributes.traceId`. When `traceId` is absent, each span is shown as a standalone span rather than being incorrectly joined to unrelated spans. Each group displays span names, optional span IDs, parent-span indication, timestamp-relative bars, and duration in milliseconds (the existing SDK `span()` contract stores duration in `value`). The Node SDK now provides `startSpan()` and `withSpan()` helpers that generate trace/span IDs, measure duration, and record success/error status. Pass a parent span context explicitly to nested spans to populate `parentSpanId`; framework/async context propagation is not automatic. The waterfall remains limited to currently loaded rows, and manually emitted spans without IDs remain standalone. Load more can extend the visible span set.
 
 
 ## Error stack trace details
@@ -96,3 +96,8 @@ The grouped-error query now extracts the latest event's `attributes.stack` value
 ## Structured log severity filters
 
 The Node SDK now supports `logWithLevel(level, name, message, attributes)` with `debug`, `info`, `warn`, `error`, and `fatal`. Existing `log()` calls remain compatible and default to `info`. The API accepts an optional `level` query parameter on the logs route, validates it against the supported set, and filters ClickHouse rows using the JSON `attributes.level` value. Historical logs without a level are treated as `info`. The dashboard exposes a severity selector on the Logs tab and carries the filter into pagination. Browser SDK log submission remains prohibited because public keys cannot submit logs.
+
+
+## SDK trace context helpers
+
+`@jerico/sdk-core` now provides `startSpan(name, attributes?, parentContext?)` and `withSpan(name, operation, attributes?, parentContext?)`. Root spans create a trace ID; child spans reuse the parent trace ID and store the parent's span ID. `withSpan` records elapsed milliseconds in the existing span `value` field and writes `status: ok|error`. Context is passed explicitly by the caller; no global async context or automatic HTTP framework instrumentation is installed. The browser SDK blocks these server-only span methods.

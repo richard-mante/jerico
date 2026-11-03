@@ -169,3 +169,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-structured-logs` adds `logWithLevel()` to the trusted Node/core SDK, defaults existing `log()` calls to `info`, and keeps browser log submission blocked.
 - API logs query accepts `level=debug|info|warn|error|fatal`; legacy logs without a level are treated as `info`. The dashboard Logs tab includes a severity selector.
 - PR #14 is the structured logging follow-up. Validation remains outstanding.
+
+
+### Phase 4 SDK trace context (PR #15)
+
+- PR #14 merged structured log severity into `main` (merge commit `7488712a2c7693d5adebe71c45e2b8bf3d4a6e9e`).
+- Branch `feat/phase-4-sdk-span-context` adds `startSpan()` and `withSpan()` to the core/Node SDK. Root spans generate trace IDs; nested spans accept parent context and record parent IDs. Duration and ok/error status are captured automatically.
+- Browser SDK explicitly blocks these server-only span helpers. Context propagation remains explicit; no framework/async-local integration is included.
+- PR #15 is the trace SDK follow-up. Validation remains outstanding.

@@ -1,6 +1,8 @@
 export type TelemetryType = "event" | "error" | "log" | "metric" | "span";
 export type TelemetryValue = string | number | boolean | null;
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
+export type SpanContext = { traceId: string; spanId: string };
+export type SpanHandle = { context: SpanContext; end(attributes?: Record<string, TelemetryValue>): boolean };
 export type TelemetryEvent = {
   type: TelemetryType;
   name: string;
@@ -96,6 +98,43 @@ export class JericoClient {
   span(name: string, valueMs: number, attributes?: Record<string, TelemetryValue>): boolean {
     if (!Number.isFinite(valueMs) || valueMs < 0) throw new Error("Span duration must be a non-negative finite number.");
     return this.enqueue({ type: "span", name, value: valueMs, attributes });
+  }
+
+  startSpan(name: string, attributes?: Record<string, TelemetryValue>, parentContext?: SpanContext): SpanHandle {
+    const context: SpanContext = { traceId: parentContext?.traceId ?? crypto.randomUUID(), spanId: crypto.randomUUID() };
+    const startedAt = Date.now();
+    let ended = false;
+    return {
+      context,
+      end: (endAttributes) => {
+        if (ended) return false;
+        ended = true;
+        return this.span(name, Math.max(0, Date.now() - startedAt), {
+          ...attributes,
+          ...endAttributes,
+          traceId: context.traceId,
+          spanId: context.spanId,
+          ...(parentContext ? { parentSpanId: parentContext.spanId } : {}),
+        });
+      },
+    };
+  }
+
+  async withSpan<T>(
+    name: string,
+    operation: (context: SpanContext) => Promise<T> | T,
+    attributes?: Record<string, TelemetryValue>,
+    parentContext?: SpanContext,
+  ): Promise<T> {
+    const span = this.startSpan(name, attributes, parentContext);
+    try {
+      const result = await operation(span.context);
+      span.end({ status: "ok" });
+      return result;
+    } catch (error) {
+      span.end({ status: "error" });
+      throw error;
+    }
   }
 
   private enqueue(event: Omit<TelemetryEvent, "timestamp">): boolean {
