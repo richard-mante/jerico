@@ -731,10 +731,14 @@ app.post("/api/v1/notification-channels/webhook", async (context) => withOrganiz
   } catch (error) {
     await database.update(notificationChannels).set({ lastVerificationErrorCode: "queue_unavailable", updatedAt: new Date() })
       .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organizationId, organizationId)));
+    await database.delete(notificationChannels).where(and(
+      eq(notificationChannels.id, channelId),
+      eq(notificationChannels.organizationId, organizationId),
+    ));
     console.error("Jerico webhook verification could not be queued", {
       organizationId, channelId, error: error instanceof Error ? error.message : String(error),
     });
-    return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "The webhook was saved but its verification could not be queued. Use resend verification to try again." } }, 503);
+    return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "The webhook could not be saved because verification could not be queued. Check the notification queue and try again." } }, 503);
   }
   return context.json({ data: {
     id: channelId, type: "webhook", target: parsed.data.url, verifiedAt: null,
@@ -749,7 +753,10 @@ app.post("/api/v1/notification-channels/:channelId/resend-verification", async (
     eq(notificationChannels.organizationId, organizationId),
   )).limit(1);
   if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
-  if (channel.verifiedAt) return context.json({ error: { code: "CHANNEL_ALREADY_VERIFIED", message: "This email address is already verified." } }, 409);
+  if (channel.verifiedAt) return context.json({ error: { code: "CHANNEL_ALREADY_VERIFIED", message: "This notification channel is already verified." } }, 409);
+  if (channel.type === "webhook" && !context.env.NOTIFICATIONS) {
+    return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "Webhook verification queue is not configured." } }, 503);
+  }
   const token = createVerificationToken();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await database.update(notificationChannels).set({
@@ -759,7 +766,6 @@ app.post("/api/v1/notification-channels/:channelId/resend-verification", async (
     updatedAt: new Date(),
   }).where(eq(notificationChannels.id, channel.id));
   if (channel.type === "webhook") {
-    if (!context.env.NOTIFICATIONS) return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "Webhook verification queue is not configured." } }, 503);
     try {
       await context.env.NOTIFICATIONS.send({
         schemaVersion: 1, type: "notification.webhook.verify", channelId: channel.id,
