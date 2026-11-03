@@ -215,7 +215,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
 async function postNotificationResult(
   env: WorkerEnv,
   result: { deliveryId: string; enqueueToken?: string; attemptNumber: number; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
-): Promise<void> {
+ ): Promise<boolean> {
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification result callback is not configured.");
   }
@@ -236,6 +236,8 @@ async function postNotificationResult(
     });
     await response.body?.cancel().catch(() => undefined);
     if (!response.ok) throw new Error("Notification result callback rejected.");
+    const payload = await response.json().catch(() => null) as { data?: { active?: boolean } } | null;
+    return payload?.data?.active !== false;
   } finally {
     clearTimeout(timeout);
   }
@@ -243,7 +245,8 @@ async function postNotificationResult(
 
 async function processNotification(message: EmailNotificationMessage, env: WorkerEnv, attemptNumber: number): Promise<void> {
   const callbackIdentity = { deliveryId: message.deliveryId, ...(message.enqueueToken ? { enqueueToken: message.enqueueToken } : {}), attemptNumber };
-  await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
+  const active = await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
+  if (!active) return;
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "configuration_missing" });
     throw new Error("Resend email delivery is not configured.");
@@ -362,7 +365,8 @@ async function processWebhookVerification(message: WebhookVerificationMessage, e
 
 async function processWebhookNotification(message: WebhookNotificationMessage, env: WorkerEnv, attemptNumber: number): Promise<void> {
   const callbackIdentity = { deliveryId: message.deliveryId, enqueueToken: message.enqueueToken, attemptNumber };
-  await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
+  const active = await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
+  if (!active) return;
   try {
     await deliverWebhook({
       url: message.url,
