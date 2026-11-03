@@ -236,7 +236,7 @@ async function postNotificationResult(
   }
 }
 
-async function processNotification(message: NotificationMessage, env: WorkerEnv): Promise<void> {
+async function processNotification(message: EmailNotificationMessage, env: WorkerEnv): Promise<void> {
   await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" });
