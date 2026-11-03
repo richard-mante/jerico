@@ -148,6 +148,65 @@ async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): 
   }
 }
 
+async function processUptimeDeadLetterBatch(batch: MessageBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
+  for (const message of batch.messages) {
+    const body = message.body;
+    const valid = body?.schemaVersion === 1
+      && body.type === "uptime.probe"
+      && /^[0-9a-f-]{36}$/i.test(body.checkId)
+      && typeof body.monitorId === "string" && body.monitorId.length > 0 && body.monitorId.length <= 128
+      && typeof body.organizationId === "string" && body.organizationId.length > 0 && body.organizationId.length <= 128
+      && typeof body.projectId === "string" && body.projectId.length > 0 && body.projectId.length <= 128;
+    if (!valid) {
+      message.ack();
+      continue;
+    }
+    try {
+      if (!env.API_URL || !env.UPTIME_RESULTS_SECRET || env.UPTIME_RESULTS_SECRET.length < 32) {
+        throw new Error("Uptime dead-letter callback is not configured.");
+      }
+      const callbackUrl = new URL("/internal/uptime-results", env.API_URL);
+      if (callbackUrl.protocol !== "https:") throw new Error("Uptime dead-letter callback must use HTTPS.");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const response = await fetch(callbackUrl, {
+          method: "POST",
+          redirect: "error",
+          signal: controller.signal,
+          headers: {
+            "content-type": "application/json",
+            "x-jerico-uptime-secret": env.UPTIME_RESULTS_SECRET,
+          },
+          body: JSON.stringify({
+            checkId: body.checkId,
+            monitorId: body.monitorId,
+            organizationId: body.organizationId,
+            projectId: body.projectId,
+            status: "down",
+            statusCode: null,
+            responseTimeMs: null,
+            errorCode: "network_error",
+            checkedAt: new Date().toISOString(),
+          }),
+        });
+        await response.body?.cancel().catch(() => undefined);
+        if (!response.ok) throw new Error("Uptime dead-letter callback rejected with status " + response.status + ".");
+      } finally {
+        clearTimeout(timeout);
+      }
+      message.ack();
+    } catch (error) {
+      console.error("Jerico uptime dead-letter finalization failed", {
+        checkId: body.checkId,
+        monitorId: body.monitorId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      message.retry({ delaySeconds: 60 });
+    }
+  }
+}
+
 async function processUptimeProbeBatch(batch: MessageBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     const body = message.body;
@@ -295,9 +354,42 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
   }
 }
 
+async function postNotificationDeadLetterResult(
+  env: WorkerEnv,
+  message: EmailNotificationMessage | WebhookNotificationMessage,
+): Promise<void> {
+  if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
+    throw new Error("Notification dead-letter callback is not configured.");
+  }
+  const callbackUrl = new URL("/internal/notification-dead-letter-results", env.API_URL);
+  if (callbackUrl.protocol !== "https:") throw new Error("Notification dead-letter callback must use HTTPS.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(callbackUrl, {
+      method: "POST",
+      redirect: "error",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        "x-jerico-notification-secret": env.NOTIFICATION_DELIVERY_SECRET,
+      },
+      body: JSON.stringify({
+        deliveryId: message.deliveryId,
+        ...(message.enqueueToken ? { enqueueToken: message.enqueueToken } : {}),
+      }),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    if (!response.ok) throw new Error("Notification dead-letter callback rejected with status " + response.status + ".");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function postWebhookVerificationResult(
   env: WorkerEnv,
   result: { channelId: string; challenge: string; status: "verified" | "failed"; errorCode?: "endpoint_rejected" | "endpoint_unavailable" | "invalid_response" },
+  ignoreStale = false,
 ): Promise<void> {
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Webhook verification callback is not configured.");
@@ -312,6 +404,10 @@ async function postWebhookVerificationResult(
       headers: { "content-type": "application/json", "x-jerico-notification-secret": env.NOTIFICATION_DELIVERY_SECRET },
       body: JSON.stringify(result),
     });
+    if (ignoreStale && response.status === 409) {
+      await response.body?.cancel().catch(() => undefined);
+      return;
+    }
     await response.body?.cancel().catch(() => undefined);
     if (!response.ok) throw new Error("Webhook verification callback rejected.");
   } finally { clearTimeout(timeout); }
@@ -396,6 +492,34 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
   }
 }
 
+async function processNotificationDeadLetterBatch(batch: MessageBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
+  for (const message of batch.messages) {
+    if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
+      message.ack();
+      continue;
+    }
+    try {
+      if (message.body.type === "notification.webhook.verify") {
+        await postWebhookVerificationResult(env, {
+          channelId: message.body.channelId,
+          challenge: message.body.challenge,
+          status: "failed",
+          errorCode: "endpoint_unavailable",
+        }, true);
+      } else {
+        await postNotificationDeadLetterResult(env, message.body);
+      }
+      message.ack();
+    } catch (error) {
+      console.error("Jerico notification dead-letter finalization failed", {
+        ...(message.body.type === "notification.webhook.verify" ? { channelId: message.body.channelId } : { deliveryId: message.body.deliveryId }),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      message.retry({ delaySeconds: 60 });
+    }
+  }
+}
+
 async function processNotificationBatch(batch: MessageBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
@@ -419,7 +543,7 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
 
 export default {
   async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
-    if (batch.queue === "jerico-notifications") {
+    if (batch.queue === "jerico-notifications-dlq") {\n      await processNotificationDeadLetterBatch(batch as MessageBatch<NotificationMessage>, env);\n      return;\n    }\n    if (batch.queue === "jerico-uptime-probes-dlq") {\n      await processUptimeDeadLetterBatch(batch as MessageBatch<UptimeProbeMessage>, env);\n      return;\n    }\n    if (batch.queue === "jerico-notifications") {
       await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);
       return;
     }
