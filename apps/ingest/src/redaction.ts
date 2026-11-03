@@ -4,11 +4,13 @@ const sensitiveKey = /(authorization|cookie|password|passwd|secret|token|api[-_]
 const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const bearerPattern = /Bearer\s+[A-Za-z0-9._~+/-]+=*/gi;
 const jwtPattern = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
+const assignmentPattern = /\b(password|passwd|token|secret|api[_-]?key|authorization)\s*[:=]\s*([^\s,;]+)/gi;
 
 function redactText(value: string): string {
   return value.replace(emailPattern, "[REDACTED_EMAIL]")
     .replace(bearerPattern, "Bearer [REDACTED]")
-    .replace(jwtPattern, "[REDACTED_TOKEN]");
+    .replace(jwtPattern, "[REDACTED_TOKEN]")
+    .replace(assignmentPattern, "$1=[REDACTED]");
 }
 
 export function redactTelemetryEvent(event: TelemetryEvent): TelemetryEvent {
