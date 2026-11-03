@@ -17,6 +17,8 @@ type TelemetryItem = {
   value: number | null;
   attributes: string;
 };
+type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
+type MetricSeries = { name: string; points: MetricPoint[] };
 type ErrorGroup = {
   fingerprint: string;
   name: string;
@@ -54,6 +56,18 @@ function formatTimestamp(value: string) {
   }).format(date);
 }
 
+function metricLine(points: MetricPoint[]) {
+  if (!points.length) return "";
+  const values = points.map((point) => point.average);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = max - min || 1;
+  return points.map((point, index) => {
+    const x = points.length === 1 ? 320 : 12 + (index / (points.length - 1)) * 616;
+    const y = 144 - ((point.average - min) / spread) * 128;
+    return `${x},${y}`;
+  }).join(" ");
+}
 export function ProjectObservability({ initialOrganizationId }: { initialOrganizationId: string }) {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -67,6 +81,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [overview, setOverview] = useState<Overview>(emptyOverview);
   const [rows, setRows] = useState<TelemetryItem[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
+  const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -119,7 +134,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
         credentials: "include", headers, signal: controller.signal,
       }),
-      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab === "errors" ? "errors/groups" : tab}?${query}&limit=50`, {
+      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab === "errors" ? "errors/groups" : tab === "metrics" ? "metrics/series" : tab}?${query}&limit=50`, {
         credentials: "include", headers, signal: controller.signal,
       }),
     ]).then(async ([overviewResponse, listResponse]) => {
@@ -130,17 +145,25 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       setOverview(overviewPayload.data as Overview);
       if (tab === "errors") {
         setErrorGroups((listPayload.data ?? []) as ErrorGroup[]);
+        setMetricSeries([]);
+        setRows([]);
+        setNextCursor(null);
+      } else if (tab === "metrics") {
+        setMetricSeries((listPayload.data ?? []) as MetricSeries[]);
+        setErrorGroups([]);
         setRows([]);
         setNextCursor(null);
       } else {
         setRows((listPayload.data ?? []) as TelemetryItem[]);
         setErrorGroups([]);
+        setMetricSeries([]);
         setNextCursor(listPayload.pagination?.nextCursor ?? null);
       }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) {
         setRows([]);
         setErrorGroups([]);
+        setMetricSeries([]);
         setOverview(emptyOverview);
         setError(cause instanceof Error ? cause.message : "Could not load telemetry.");
       }
@@ -231,6 +254,28 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 <span className="w-fit rounded-md border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-[#b4bdca]">{row.eventType}</span>
                 <div className="min-w-0"><p className="truncate text-sm font-medium">{row.name}</p>{row.message && <p className="mt-1 break-words text-xs leading-5 text-[#8f98a7]">{row.message}</p>}<p className="mt-1 font-mono text-[10px] text-[#606b7a]">{row.eventId}</p></div>
               </article>)}
+            </div>
+          ) : tab === "metrics" && metricSeries.length ? (
+            <div className="grid gap-4 p-4 md:grid-cols-2">
+              {metricSeries.map((series) => {
+                const latest = series.points[series.points.length - 1];
+                const values = series.points.map((point) => point.average);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                return <article key={series.name} className="min-w-0 rounded-xl border border-white/10 bg-black/10 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0"><h3 className="truncate text-sm font-semibold">{series.name}</h3><p className="mt-1 text-[10px] text-[#758091]">{series.points.length} time buckets · {series.points.reduce((sum, point) => sum + point.samples, 0).toLocaleString()} samples</p></div>
+                    {latest && <div className="text-right"><p className="text-lg font-semibold tabular-nums">{latest.average.toLocaleString(undefined, { maximumFractionDigits: 3 })}</p><p className="text-[10px] text-[#758091]">Latest average</p></div>}
+                  </div>
+                  <svg viewBox="0 0 640 160" role="img" aria-label={`${series.name} average metric values over time`} className="mt-4 h-32 w-full overflow-visible">
+                    <line x1="12" y1="144" x2="628" y2="144" stroke="currentColor" opacity=".15" />
+                    <line x1="12" y1="80" x2="628" y2="80" stroke="currentColor" opacity=".08" />
+                    <polyline points={metricLine(series.points)} fill="none" stroke="#d9f36a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div className="flex justify-between text-[10px] text-[#758091]"><span>Min average: {min.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span><span>Max average: {max.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span></div>
+                  {latest && <p className="mt-2 text-[10px] text-[#606b7a]">{formatTimestamp(series.points[0].timestamp)} — {formatTimestamp(latest.timestamp)}</p>}
+                </article>;
+              })}
             </div>
           ) : tab === "errors" && errorGroups.length ? (
             <div className="divide-y divide-white/[0.06]">

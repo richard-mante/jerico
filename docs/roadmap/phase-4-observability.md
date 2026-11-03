@@ -76,3 +76,8 @@ The project API now exposes `GET /api/v1/projects/:projectId/telemetry/errors/gr
 ## Grouped errors dashboard slice
 
 The Errors tab calls the dedicated `/telemetry/errors/groups` endpoint and renders each group with its name, latest message, occurrence count, first/last seen times, and latest event ID. The current endpoint returns at most 100 groups; there is no group pagination or issue lifecycle workflow yet. The fingerprint remains query-time and is derived from error name + message.
+
+
+## Metric time-series slice
+
+The API exposes `GET /api/v1/projects/:projectId/telemetry/metrics/series`. It validates organization membership, project ownership, and optional environment ownership before querying ClickHouse. It aggregates non-null metric values into average/minimum/maximum/sample-count buckets. Bucket sizes are selected from a fixed allowlist based on the requested time range (1, 15, 60, or 360 minutes). The query is bounded to the eight most frequently sampled metric names and 1,200 result rows. The dashboard Metrics tab renders one responsive SVG line chart per returned metric with latest average, sample count, and average range. This is a first overview, not yet a full metric explorer: unit metadata, percentile aggregation, metric selection, and drill-down are not included.
