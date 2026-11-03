@@ -43,7 +43,7 @@
 - [x] Define bounded versioned event, error, metric, log, and span contracts.
 - [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
 - [ ] Select a durable self-hosted queue and implement a queue adapter.
-- [ ] Implement ingestion authentication, validation, redaction, configured rate limits, per-credential daily quotas, and size limits. (Authentication, validation, redaction, request limits, rate-limit hook, and atomic daily event quota implemented; monthly plan tiers remain.)
+- [ ] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits. (Authentication, validation, redaction, request limits, rate-limit hook, and atomic daily event quota implemented; monthly plan tiers remain.)
 - [ ] Implement queue consumers, retries, dead-letter handling, and backpressure. (Cloudflare consumer/retry/DLQ config implemented; load/backpressure validation pending.)
 - [ ] Add ingestion/processing health metrics and integration tests.
 
