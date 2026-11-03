@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNotNull, isNull, lte, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, lte, lt, or, sql } from "drizzle-orm";
 import { incidents, notificationChannels, notificationDeliveries } from "@jerico/database/schema";
 import type { ApiBindings, JericoDatabase } from "./database";
 
@@ -15,11 +15,9 @@ export type EmailNotificationMessage = {
 const MAX_ENQUEUE_ATTEMPTS = 5;
 const ENQUEUE_RETRY_BASE_MS = 60_000;
 const ENQUEUE_RETRY_MAX_MS = 60 * 60_000;
-export const NOTIFICATION_ENQUEUE_LEASE_MS = 2 * 60_000;
+const ENQUEUE_LEASE_MS = 2 * 60_000;
 
-export function notificationEnqueueLeaseExpiresAt(now: Date): Date {
-  return new Date(now.getTime() + NOTIFICATION_ENQUEUE_LEASE_MS);
-}
+export function notificationEnqueueLeaseDuration(): number { return ENQUEUE_LEASE_MS; }
 
 export function notificationEnqueueRetryDelay(attempt: number): number {
   return Math.min(ENQUEUE_RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1), ENQUEUE_RETRY_MAX_MS);
@@ -80,6 +78,7 @@ async function markEnqueueFailure(
     status: "failed",
     lastErrorCode: exhausted ? "queue_retry_exhausted" : "queue_unavailable",
     nextEnqueueAt: exhausted ? null : new Date(now.getTime() + notificationEnqueueRetryDelay(delivery.enqueueAttempts)),
+    enqueueLeaseExpiresAt: null,
     updatedAt: now,
   }).where(and(
     eq(notificationDeliveries.id, delivery.id),
@@ -102,8 +101,6 @@ export async function queueIncidentNotifications(
   ));
 
   for (const channel of channels) {
-    const enqueueStartedAt = new Date();
-    const enqueueLeaseExpiresAt = notificationEnqueueLeaseExpiresAt(enqueueStartedAt);
     const [delivery] = await database.insert(notificationDeliveries).values({
       id: crypto.randomUUID(),
       organizationId: incident.organizationId,
@@ -114,7 +111,7 @@ export async function queueIncidentNotifications(
       eventType,
       status: "queued",
       enqueueAttempts: 1,
-      nextEnqueueAt: enqueueLeaseExpiresAt,
+      enqueueLeaseExpiresAt: new Date(Date.now() + ENQUEUE_LEASE_MS),
     }).onConflictDoNothing().returning({
       id: notificationDeliveries.id,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
@@ -130,6 +127,7 @@ export async function queueIncidentNotifications(
         status: "failed",
         lastErrorCode: "configuration_missing",
         nextEnqueueAt: null,
+        enqueueLeaseExpiresAt: null,
         updatedAt: new Date(),
       }).where(and(eq(notificationDeliveries.id, delivery.id), eq(notificationDeliveries.status, "queued")));
       continue;
@@ -141,16 +139,8 @@ export async function queueIncidentNotifications(
     }
     try {
       await env.NOTIFICATIONS.send(message);
-      // A successful send completes the outbox lease. If the Worker dies
-      // before this write, the lease expires and reconciliation re-enqueues
-      // the same stable delivery ID.
-      await database.update(notificationDeliveries).set({ nextEnqueueAt: null, enqueuedAt: new Date(), updatedAt: new Date() }).where(and(
-        eq(notificationDeliveries.id, delivery.id),
-        eq(notificationDeliveries.status, "queued"),
-        eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
-        eq(notificationDeliveries.attempts, delivery.attempts),
-        eq(notificationDeliveries.nextEnqueueAt, enqueueLeaseExpiresAt),
-      ));
+      await database.update(notificationDeliveries).set({ enqueueLeaseExpiresAt: null, updatedAt: new Date() })
+        .where(and(eq(notificationDeliveries.id, delivery.id), eq(notificationDeliveries.status, "queued"), eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts), eq(notificationDeliveries.attempts, delivery.attempts)));
     } catch (error) {
       await markEnqueueFailure(database, delivery, new Date());
       console.error("Jerico could not enqueue incident notification", {
@@ -169,22 +159,6 @@ export async function retryFailedNotificationEnqueues(
 ): Promise<number> {
   if (!env.NOTIFICATIONS) return 0;
 
-  
-  // A queued row with an expired lease may represent a Worker termination
-  // between the DB insert and queue send (or after queue acceptance but
-  // before the lease-clear write). Preserve the stable delivery ID on retry.
-  await database.update(notificationDeliveries).set({
-    status: "failed",
-    lastErrorCode: "queue_retry_exhausted",
-    nextEnqueueAt: null,
-    updatedAt: now,
-  }).where(and(
-    eq(notificationDeliveries.status, "queued"),
-    gte(notificationDeliveries.enqueueAttempts, MAX_ENQUEUE_ATTEMPTS),
-    isNull(notificationDeliveries.enqueuedAt),
-    lte(notificationDeliveries.nextEnqueueAt, now),
-  ));
-
   const due = await database.select().from(notificationDeliveries).where(or(
     and(
       eq(notificationDeliveries.status, "failed"),
@@ -194,14 +168,41 @@ export async function retryFailedNotificationEnqueues(
     ),
     and(
       eq(notificationDeliveries.status, "queued"),
-      isNull(notificationDeliveries.enqueuedAt),
-      lt(notificationDeliveries.enqueueAttempts, MAX_ENQUEUE_ATTEMPTS),
-      lte(notificationDeliveries.nextEnqueueAt, now),
+      isNotNull(notificationDeliveries.enqueueLeaseExpiresAt),
+      lte(notificationDeliveries.enqueueLeaseExpiresAt, now),
     ),
   )).orderBy(asc(notificationDeliveries.createdAt)).limit(50);
 
   let enqueued = 0;
   for (const delivery of due) {
+    const wasFailed = delivery.status === "failed";
+    const eligible = wasFailed
+      ? and(
+          eq(notificationDeliveries.status, "failed"),
+          eq(notificationDeliveries.lastErrorCode, "queue_unavailable"),
+          or(isNull(notificationDeliveries.nextEnqueueAt), lte(notificationDeliveries.nextEnqueueAt, now)),
+        )
+      : and(
+          eq(notificationDeliveries.status, "queued"),
+          isNotNull(notificationDeliveries.enqueueLeaseExpiresAt),
+          lte(notificationDeliveries.enqueueLeaseExpiresAt, now),
+        );
+
+    if (delivery.enqueueAttempts >= MAX_ENQUEUE_ATTEMPTS) {
+      await database.update(notificationDeliveries).set({
+        status: "failed",
+        lastErrorCode: "queue_retry_exhausted",
+        nextEnqueueAt: null,
+        enqueueLeaseExpiresAt: null,
+        updatedAt: now,
+      }).where(and(
+        eq(notificationDeliveries.id, delivery.id),
+        eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
+        eligible,
+      ));
+      continue;
+    }
+
     const [channel] = await database.select().from(notificationChannels).where(and(
       eq(notificationChannels.id, delivery.channelId),
       eq(notificationChannels.organizationId, delivery.organizationId),
@@ -219,37 +220,33 @@ export async function retryFailedNotificationEnqueues(
         status: "failed",
         lastErrorCode: "channel_unavailable",
         nextEnqueueAt: null,
+        enqueueLeaseExpiresAt: null,
         updatedAt: now,
       }).where(and(
         eq(notificationDeliveries.id, delivery.id),
-        eq(notificationDeliveries.status, delivery.status),
         eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
-        eq(notificationDeliveries.attempts, delivery.attempts),
+        eligible,
       ));
       continue;
     }
 
-    const leaseExpiresAt = notificationEnqueueLeaseExpiresAt(now);
-    const dueCondition = delivery.status === "failed"
-      ? and(
-        eq(notificationDeliveries.status, "failed"),
-        eq(notificationDeliveries.lastErrorCode, "queue_unavailable"),
-        or(isNull(notificationDeliveries.nextEnqueueAt), lte(notificationDeliveries.nextEnqueueAt, now)),
-      )
-      : and(
-        eq(notificationDeliveries.status, "queued"),
-        isNull(notificationDeliveries.enqueuedAt),
-        lte(notificationDeliveries.nextEnqueueAt, now),
-      );
     const [claimed] = await database.update(notificationDeliveries).set({
       status: "queued",
       enqueueAttempts: sql`${notificationDeliveries.enqueueAttempts} + 1`,
-      nextEnqueueAt: leaseExpiresAt,
+      nextEnqueueAt: null,
+      enqueueLeaseExpiresAt: new Date(now.getTime() + ENQUEUE_LEASE_MS),
       updatedAt: now,
     }).where(and(
       eq(notificationDeliveries.id, delivery.id),
       eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
-      dueCondition,
+      eligible,
+      sql`EXISTS (
+        SELECT 1 FROM "notification_channels"
+        WHERE "notification_channels"."id" = ${notificationDeliveries.channelId}
+          AND "notification_channels"."organization_id" = ${notificationDeliveries.organizationId}
+          AND "notification_channels"."enabled" = TRUE
+          AND "notification_channels"."verified_at" IS NOT NULL
+      )`,
     )).returning({
       id: notificationDeliveries.id,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
@@ -265,6 +262,7 @@ export async function retryFailedNotificationEnqueues(
         status: "failed",
         lastErrorCode: "configuration_missing",
         nextEnqueueAt: null,
+        enqueueLeaseExpiresAt: null,
         updatedAt: now,
       }).where(and(
         eq(notificationDeliveries.id, delivery.id),
@@ -278,15 +276,13 @@ export async function retryFailedNotificationEnqueues(
     try {
       await env.NOTIFICATIONS.send(message);
       await database.update(notificationDeliveries).set({
-        nextEnqueueAt: null,
-        enqueuedAt: new Date(),
-        updatedAt: new Date(),
+        enqueueLeaseExpiresAt: null,
+        updatedAt: now,
       }).where(and(
-        eq(notificationDeliveries.id, claimed.id),
+        eq(notificationDeliveries.id, delivery.id),
         eq(notificationDeliveries.status, "queued"),
         eq(notificationDeliveries.enqueueAttempts, claimed.enqueueAttempts),
         eq(notificationDeliveries.attempts, claimed.attempts),
-        eq(notificationDeliveries.nextEnqueueAt, leaseExpiresAt),
       ));
       enqueued += 1;
     } catch (error) {
