@@ -11,6 +11,9 @@ All routes require a valid Better Auth session and membership in the selected or
 - `GET /api/v1/projects/:projectId/telemetry/events`
 - `GET /api/v1/projects/:projectId/telemetry/errors`
 - `GET /api/v1/projects/:projectId/telemetry/logs`
+- `GET /api/v1/projects/:projectId/telemetry/metrics`
+- `GET /api/v1/projects/:projectId/telemetry/spans`
+- `GET /api/v1/projects/:projectId/telemetry/overview`
 
 Supported query parameters:
 
@@ -22,7 +25,7 @@ Supported query parameters:
 | `limit` | 1–100; defaults to 50 |
 | `cursor` | Opaque cursor returned by the previous page |
 
-Time ranges are limited to 31 days and cannot extend more than one minute into the future. Results are ordered newest first by timestamp and event ID. The API fetches one extra row to determine whether another page exists.
+Time ranges are limited to 31 days and cannot extend more than one minute into the future. Results are ordered newest first by timestamp and event ID. The API fetches one extra row to determine whether another page exists. The overview endpoint returns total counts for events, errors, logs, metrics, and spans, plus the latest event timestamp.
 
 ## Security and query behavior
 
@@ -47,7 +50,7 @@ Use secrets for credentials in deployed environments. Do not commit actual token
 
 ## Tests and validation
 
-The query adapter has unit coverage for time-range bounds, page limits, opaque cursor handling, parameter binding, and identifier injection rejection. These tests have been authored but not executed in this environment. Route-level tenant isolation and ClickHouse SQL behavior still require integration tests against PostgreSQL and ClickHouse.
+The query adapter has unit coverage for time-range bounds, page limits, opaque cursor handling, parameter binding, and identifier injection rejection. These tests have been authored but not executed in this environment. Route-level tenant isolation and ClickHouse SQL behavior still require integration tests against PostgreSQL and ClickHouse. Counts can temporarily include duplicate queue deliveries until ClickHouse ReplacingMergeTree background merges complete; they are not strict real-time unique-event counts.
 
 ## Next slice
 
