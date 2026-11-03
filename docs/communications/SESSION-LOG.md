@@ -472,3 +472,18 @@
 ### Next
 - Resolve GitHub Actions runner allocation or establish a working local runner, then generate and commit the pnpm lockfile and run the full validation suite.
 - Continue database, ClickHouse, queue, uptime, and notification runtime validation before self-hosted deployment work.
+
+
+## 2026-11-03 — Roadmap correction merged; CI allocation remains blocked
+
+- Reviewed and merged documentation PR #34: https://github.com/richard-mante/jerico/pull/34.
+- Merge commit: `6bf0a9964f1684ce2f6c873a7c1665d3b0248b73`.
+- Verified `main` points to that merge commit and there are no open pull requests.
+- CI runs #192 (PR branch) and #193 (post-merge `main`) both failed before runner allocation. Both jobs report `runner_id: 0`, empty runner name, and no steps. Retrying run #191 also failed in the same way.
+- Tried to use the available container for local validation; it has Node.js 22.16.0 but cannot resolve `github.com`, so repository cloning and dependency installation cannot proceed from this environment. No source checks ran.
+- Removed a duplicate self-hosted queue checklist item from the roadmap; the actual selection/adapter task remains explicitly open.
+
+### Next
+- Restore GitHub-hosted runner allocation or provide a reachable local checkout/networked validation environment.
+- Generate and commit the missing `pnpm-lock.yaml`, then run install, lint, typecheck, tests, build, and database/ClickHouse integration checks.
+- Keep Phase 6 implementation behind the validation gate; queue technology selection should follow a measured adapter spike, not guesswork.

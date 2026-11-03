@@ -52,7 +52,6 @@ The implementation through Phase 5E is present on `main`, but no successful work
 - [x] Separate public ingestion credentials from server-only secrets.
 - [x] Define bounded versioned event, error, metric, log, and span contracts.
 - [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
-- [ ] Select a durable self-hosted queue and implement a queue adapter.
 - [x] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits (integration validation pending).
 - [x] Implement Cloudflare queue consumers, retries, and dead-letter routing (load/backpressure validation pending).
 - [ ] Select and implement a durable self-hosted queue adapter.
