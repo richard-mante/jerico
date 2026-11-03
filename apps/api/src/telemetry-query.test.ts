@@ -129,4 +129,17 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("query")).toContain("event_type = 'metric'");
     expect(parsed.searchParams.get("query")).toContain("INTERVAL 15 MINUTE");
   });
+  it("binds structured log severity as a ClickHouse query parameter", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await queryTelemetry(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z", limit: 10, eventType: "log", logLevel: "warn" },
+    );
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_logLevel")).toBe("warn");
+    expect(parsed.searchParams.get("query")).toContain("JSONExtractString(attributes");
+    expect(parsed.searchParams.get("query")).toContain("{logLevel:String}");
+  });
 });
