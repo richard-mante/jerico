@@ -17,6 +17,7 @@ type TelemetryItem = {
   value: number | null;
   attributes: string;
 };
+type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string };
 type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
 type MetricSeries = { name: string; points: MetricPoint[] };
 type ErrorGroup = {
@@ -92,6 +93,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [overview, setOverview] = useState<Overview>(emptyOverview);
   const [rows, setRows] = useState<TelemetryItem[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
+  const [eventCatalogue, setEventCatalogue] = useState<EventSummary[]>([]);
   const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -157,7 +159,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
         credentials: "include", headers, signal: controller.signal,
       }),
-      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab === "errors" ? "errors/groups" : tab === "metrics" ? "metrics/series" : tab}?${query}&limit=50`, {
+      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab === "errors" ? "errors/groups" : tab === "metrics" ? "metrics/series" : tab === "events" ? "events/catalogue" : tab}?${query}&limit=50`, {
         credentials: "include", headers, signal: controller.signal,
       }),
     ]).then(async ([overviewResponse, listResponse]) => {
@@ -168,17 +170,26 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       setOverview(overviewPayload.data as Overview);
       if (tab === "errors") {
         setErrorGroups((listPayload.data ?? []) as ErrorGroup[]);
+        setEventCatalogue([]);
         setMetricSeries([]);
         setRows([]);
         setNextCursor(null);
       } else if (tab === "metrics") {
         setMetricSeries((listPayload.data ?? []) as MetricSeries[]);
         setErrorGroups([]);
+        setEventCatalogue([]);
+        setRows([]);
+        setNextCursor(null);
+      } else if (tab === "events") {
+        setEventCatalogue((listPayload.data ?? []) as EventSummary[]);
+        setErrorGroups([]);
+        setMetricSeries([]);
         setRows([]);
         setNextCursor(null);
       } else {
         setRows((listPayload.data ?? []) as TelemetryItem[]);
         setErrorGroups([]);
+        setEventCatalogue([]);
         setMetricSeries([]);
         setNextCursor(listPayload.pagination?.nextCursor ?? null);
       }
@@ -186,6 +197,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       if (!controller.signal.aborted) {
         setRows([]);
         setErrorGroups([]);
+        setEventCatalogue([]);
         setMetricSeries([]);
         setOverview(emptyOverview);
         setError(cause instanceof Error ? cause.message : "Could not load telemetry.");
@@ -311,7 +323,18 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 <div className="min-w-0"><p className="truncate text-sm font-medium">{row.name}</p>{row.message && <p className="mt-1 break-words text-xs leading-5 text-[#8f98a7]">{row.message}</p>}<p className="mt-1 font-mono text-[10px] text-[#606b7a]">{row.eventId}</p></div>
               </article>)}
             </div>
-          ) : tab === "metrics" && metricSeries.length ? (
+          ) : tab === "events" && eventCatalogue.length ? (
+            <div className="divide-y divide-white/[0.06]">
+              {eventCatalogue.map((event) => {
+                const maxCount = Math.max(1, ...eventCatalogue.map((item) => item.occurrences));
+                const width = Math.max(2, (event.occurrences / maxCount) * 100);
+                return <article key={event.name} className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center">
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold">{event.name}</p><span className="rounded-md border border-white/10 px-2 py-1 text-[10px] tabular-nums text-[#aeb8c5]">{event.occurrences.toLocaleString()} occurrences</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><span className="block h-full rounded-full bg-[#d9f36a]/80" style={{ width: String(width) + "%" }} /></div><p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {event.latestEventId}</p></div>
+                  <div className="text-xs text-[#8791a0] sm:text-right"><span className="text-[#626e7d]">Last seen</span><p className="mt-1">{formatTimestamp(event.lastSeen)}</p></div>
+                </article>;
+              })}
+            </div>
+: tab === "metrics" && metricSeries.length ? (
             <div className="grid gap-4 p-4 md:grid-cols-2">
               {metricSeries.map((series) => {
                 const latest = series.points[series.points.length - 1];
@@ -354,7 +377,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 </div>
               </article>)}
             </div>
-          ) : <div className="px-5 py-16 text-center"><p className="text-sm font-medium text-[#c6cdd7]">No {tab === "errors" ? "error groups" : tab} yet</p><p className="mt-2 text-xs text-[#7f8998]">When your application sends {tab}, they will appear here.</p></div>}
+          ) : <div className="px-5 py-16 text-center"><p className="text-sm font-medium text-[#c6cdd7]">No {tab === "errors" ? "error groups" : tab === "events" ? "events" : tab} yet</p><p className="mt-2 text-xs text-[#7f8998]">When your application sends {tab}, they will appear here.</p></div>}
           {nextCursor && <div className="border-t border-white/10 px-5 py-4 text-center"><button disabled={loadingMore} onClick={() => void loadMore()} className="rounded-lg border border-white/15 px-4 py-2 text-xs font-medium text-[#cbd2dc] hover:bg-white/5 disabled:opacity-50">{loadingMore ? "Loading…" : "Load more"}</button></div>}
         </section>
         <p className="mt-5 text-xs text-[#687382]">Latest signal: {overview.lastEventAt ? formatTimestamp(overview.lastEventAt) : "No telemetry received in this range."}</p>
