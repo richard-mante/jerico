@@ -74,7 +74,7 @@ describe("ClickHouse telemetry adapter", () => {
 describe("notification queue contract", () => {
   it("accepts bounded email delivery messages", () => {
     expect(isValidNotificationMessage({
-      schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000", enqueueAttempt: 1,
       to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
     })).toBe(true);
   });
@@ -86,7 +86,7 @@ describe("notification queue contract", () => {
     })).toBe(true);
     expect(isValidNotificationMessage({
       schemaVersion: 1, type: "notification.webhook",
-      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000", enqueueAttempt: 1,
       url: "https://hooks.example.com/jerico",
       secretCiphertext: "c".repeat(48), secretIv: "i".repeat(16),
       eventType: "incident.opened", incidentId: "incident-a", projectId: "project-a",
