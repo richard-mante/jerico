@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildUptimeDeadLetterResult, escapeIdentifier, isValidNotificationMessage, toRow, writeToClickHouse } from "./index";
+import { buildNotificationDeadLetterResult, buildUptimeDeadLetterResult, escapeIdentifier, isValidNotificationMessage, toRow, writeToClickHouse } from "./index";
 
 const message = {
   schemaVersion: 1 as const,
@@ -68,6 +68,36 @@ describe("ClickHouse telemetry adapter", () => {
     await expect(writeToClickHouse({
       CLICKHOUSE_URL: "https://clickhouse.example",
     }, [{ ...message, events: [{ type: "event", name: "signup" }] }])).rejects.toThrow("503");
+  });
+});
+
+describe("notification dead-letter results", () => {
+  it("preserves the delivery ID and enqueue token for stale-message fencing", () => {
+    expect(buildNotificationDeadLetterResult({
+      schemaVersion: 1,
+      type: "notification.email",
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+      enqueueAttempt: 1,
+      to: "ops@example.com",
+      subject: "Incident opened",
+      text: "An incident needs attention.",
+    })).toEqual({
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+    });
+  });
+
+  it("supports legacy messages without an enqueue token", () => {
+    expect(buildNotificationDeadLetterResult({
+      schemaVersion: 1,
+      type: "notification.email",
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueAttempt: 1,
+      to: "ops@example.com",
+      subject: "Incident opened",
+      text: "An incident needs attention.",
+    })).toEqual({ deliveryId: "550e8400-e29b-41d4-a716-446655440000" });
   });
 });
 
