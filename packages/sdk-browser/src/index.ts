@@ -5,7 +5,26 @@ export type BrowserJericoOptions = JericoClientOptions & {
   captureErrors?: boolean;
 };
 
+const SESSION_STORAGE_KEY = "jerico.session_id";
+
 export class BrowserJericoClient extends JericoClient {
+  private sessionId: string;
+  private userId: string | undefined;
+
+  private createSessionId(): string {
+    const id = crypto.randomUUID();
+    try { window.sessionStorage.setItem(SESSION_STORAGE_KEY, id); } catch { /* Storage may be disabled. */ }
+    return id;
+  }
+
+  private loadSessionId(): string {
+    try {
+      const existing = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (existing) return existing;
+    } catch { /* Storage may be disabled. */ }
+    return this.createSessionId();
+  }
+
   private readonly onWindowError = (event: ErrorEvent): void => {
     if (event.error instanceof Error) this.captureError(event.error, { source: "window" });
     else this.track("javascript.error", { message: event.message, source: "window" });
@@ -24,11 +43,40 @@ export class BrowserJericoClient extends JericoClient {
       throw new Error("The browser SDK requires a public Jerico key (jk_pub_). Never expose secret keys in a browser.");
     }
     super(options);
+    this.sessionId = this.loadSessionId();
     if (options.capturePageViews) this.capturePageView();
     if (options.captureErrors !== false) {
       window.addEventListener("error", this.onWindowError);
       window.addEventListener("unhandledrejection", this.onUnhandledRejection);
     }
+  }
+
+  override track(name: string, attributes?: Record<string, TelemetryValue>): boolean {
+    return super.track(name, {
+      ...attributes,
+      sessionId: this.sessionId,
+      ...(this.userId ? { userId: this.userId } : {}),
+    });
+  }
+
+  override captureError(error: Error, attributes?: Record<string, TelemetryValue>): boolean {
+    return super.captureError(error, {
+      ...attributes,
+      sessionId: this.sessionId,
+      ...(this.userId ? { userId: this.userId } : {}),
+    });
+  }
+
+  identify(userId: string, traits?: Record<string, TelemetryValue>): boolean {
+    const normalized = userId.trim();
+    if (!normalized || normalized.length > 2048) throw new Error("User identity must contain 1–2048 characters.");
+    this.userId = normalized;
+    return this.track("user.identify", { ...traits, userId: normalized });
+  }
+
+  reset(): void {
+    this.userId = undefined;
+    this.sessionId = this.createSessionId();
   }
 
   override log(_name: string, _message: string, _attributes?: Record<string, TelemetryValue>): never {
