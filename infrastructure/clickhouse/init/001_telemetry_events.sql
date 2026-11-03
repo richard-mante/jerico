@@ -2,6 +2,7 @@ CREATE DATABASE IF NOT EXISTS jerico;
 
 CREATE TABLE IF NOT EXISTS jerico.telemetry_events
 (
+  event_id String,
   timestamp DateTime64(3, 'UTC'),
   accepted_at DateTime64(3, 'UTC'),
   organization_id String,
@@ -15,9 +16,9 @@ CREATE TABLE IF NOT EXISTS jerico.telemetry_events
   value Nullable(Float64),
   attributes String
 )
-ENGINE = MergeTree
+ENGINE = ReplacingMergeTree
 PARTITION BY toYYYYMM(timestamp)
-ORDER BY (organization_id, project_id, environment_id, timestamp, event_type)
+ORDER BY (organization_id, project_id, environment_id, timestamp, event_type, event_id)
 TTL
   timestamp + INTERVAL 7 DAY DELETE WHERE event_type = 'log',
   timestamp + INTERVAL 30 DAY DELETE WHERE event_type != 'log';
