@@ -4,6 +4,7 @@
   "workers_dev": true,
   "main": "src/index.ts",
   "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "observability": { "enabled": true },
   "queues": {
     "consumers": [
