@@ -26,7 +26,7 @@ export function notificationEnqueueRetryDelay(attempt: number): number {
 }
 
 function buildNotificationMessage(
-  delivery: { id: string; eventType: string; createdAt: Date },
+  delivery: { id: string; enqueueToken: string; eventType: string; createdAt: Date },
   channel: { type: string; target: string; secretCiphertext: string | null; secretIv: string | null },
   incident: { id: string; projectId: string; title: string; triggerValue: number },
   env: ApiBindings,
@@ -37,6 +37,7 @@ function buildNotificationMessage(
       schemaVersion: 1 as const,
       type: "notification.webhook" as const,
       deliveryId: delivery.id,
+      enqueueToken: delivery.enqueueToken,
       url: channel.target,
       secretCiphertext: channel.secretCiphertext,
       secretIv: channel.secretIv,
@@ -58,6 +59,7 @@ function buildNotificationMessage(
     schemaVersion: 1 as const,
     type: "notification.email" as const,
     deliveryId: delivery.id,
+    enqueueToken: delivery.enqueueToken,
     to: channel.target,
     subject: `[${eventLabel}] ${incident.title}`,
     text: [
@@ -104,6 +106,7 @@ export async function queueIncidentNotifications(
   for (const channel of channels) {
     const enqueueStartedAt = new Date();
     const enqueueLeaseExpiresAt = notificationEnqueueLeaseExpiresAt(enqueueStartedAt);
+    const enqueueToken = crypto.randomUUID();
     const [delivery] = await database.insert(notificationDeliveries).values({
       id: crypto.randomUUID(),
       organizationId: incident.organizationId,
@@ -115,8 +118,11 @@ export async function queueIncidentNotifications(
       status: "queued",
       enqueueAttempts: 1,
       nextEnqueueAt: enqueueLeaseExpiresAt,
+      activeEnqueueToken: enqueueToken,
+      activeConsumerAttempt: 0,
     }).onConflictDoNothing().returning({
       id: notificationDeliveries.id,
+      enqueueToken: notificationDeliveries.activeEnqueueToken,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
       attempts: notificationDeliveries.attempts,
       eventType: notificationDeliveries.eventType,
@@ -230,6 +236,7 @@ export async function retryFailedNotificationEnqueues(
     }
 
     const leaseExpiresAt = notificationEnqueueLeaseExpiresAt(now);
+    const enqueueToken = crypto.randomUUID();
     const dueCondition = delivery.status === "failed"
       ? and(
         eq(notificationDeliveries.status, "failed"),
@@ -245,6 +252,8 @@ export async function retryFailedNotificationEnqueues(
       status: "queued",
       enqueueAttempts: sql`${notificationDeliveries.enqueueAttempts} + 1`,
       nextEnqueueAt: leaseExpiresAt,
+      activeEnqueueToken: enqueueToken,
+      activeConsumerAttempt: 0,
       updatedAt: now,
     }).where(and(
       eq(notificationDeliveries.id, delivery.id),
@@ -252,6 +261,7 @@ export async function retryFailedNotificationEnqueues(
       dueCondition,
     )).returning({
       id: notificationDeliveries.id,
+      enqueueToken: notificationDeliveries.activeEnqueueToken,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
       attempts: notificationDeliveries.attempts,
       eventType: notificationDeliveries.eventType,
