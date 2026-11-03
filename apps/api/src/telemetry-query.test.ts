@@ -128,6 +128,9 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("param_environmentId")).toBe("env-a");
     expect(parsed.searchParams.get("query")).toContain("event_type = 'metric'");
     expect(parsed.searchParams.get("query")).toContain("INTERVAL 15 MINUTE");
+    expect(parsed.searchParams.get("query")).toContain("quantileTDigest(0.50)(value)");
+    expect(parsed.searchParams.get("query")).toContain("quantileTDigest(0.95)(value)");
+    expect(parsed.searchParams.get("query")).toContain("JSONExtractString(attributes, 'rating')");
   });
   it("binds structured log severity as a ClickHouse query parameter", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
