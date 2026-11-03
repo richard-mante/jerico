@@ -620,3 +620,18 @@
 
 ### Next
 - Continue the remaining queue callback idempotency and Worker egress review, then return to full tenant-isolation review. Keep runtime/manual validation as the release gate.
+
+
+## 2026-11-03 — Notification callback attempt fencing
+
+- Reviewed the notification callback flow and found that callbacks were keyed only by stable delivery ID. A delayed failure from an older consumer attempt could overwrite the state of a newer attempt, and a duplicate `attempting` callback could increment the attempt count more than once.
+- Added a unique enqueue token per outbox handoff and included it in email/webhook queue messages. The Worker now includes the token and Cloudflare Queue's `message.attempts` count in each callback. The API persists the active token and consumer attempt, increments attempts only when the sequence advances, and accepts completion only for the active attempt.
+- Duplicate callbacks are idempotent; callbacks from earlier consumer attempts or superseded enqueue tokens are ignored. The API returns an active/inactive signal, and the Worker skips provider work for stale messages. Provider idempotency remains keyed by the stable delivery ID.
+- Preserved compatibility for pre-existing queue messages and old callbacks: tokenless callbacks are accepted only for rows with no active enqueue token; an old Worker encountering a token-owned message retries rather than acknowledging it. Worker validation accepts legacy tokenless email/webhook payloads.
+- Added migration `0013_notification_delivery_attempt_fencing.sql`, Drizzle schema/journal changes, API route tests, and Worker payload compatibility tests.
+- Opened and merged [PR #53](https://github.com/richard-mante/jerico/pull/53); merge commit: `6aab508a960612367c0ff310e166484811151578`. Issue #51 closed.
+- Tests, typecheck, lint, build, PostgreSQL, and queue runtime validation were not executed. The user will handle manual testing. No lockfile changes.
+- Apply migrations through `0013_notification_delivery_attempt_fencing.sql` before deployment; deploy API and Worker together.
+
+### Next
+- Continue the remaining Worker egress and queue DLQ/retention review, then run the manual validation matrix across migrations 0009–0013 and all queue retry paths.
