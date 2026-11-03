@@ -32,10 +32,10 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };
+type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; enqueueToken: string; to: string; subject: string; text: string };
 type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
 type WebhookNotificationMessage = {
-  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; url: string;
+  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; enqueueToken: string; url: string;
   secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved";
   incidentId: string; projectId: string; title: string; triggerValue: number; occurredAt: string;
 };
@@ -186,6 +186,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
   if (message.schemaVersion !== 1) return false;
   if (message.type === "notification.email") {
     return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
+      && typeof message.enqueueToken === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.enqueueToken)
       && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
       && typeof message.subject === "string" && message.subject.length >= 1 && message.subject.length <= 200
       && typeof message.text === "string" && message.text.length >= 1 && message.text.length <= 10000;
@@ -197,6 +198,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
   }
   if (message.type === "notification.webhook") {
     return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
+      && typeof message.enqueueToken === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.enqueueToken)
       && typeof message.url === "string" && isSafeWebhookUrl(message.url, blockedHost)
       && typeof message.secretCiphertext === "string" && message.secretCiphertext.length >= 32 && message.secretCiphertext.length <= 512
       && typeof message.secretIv === "string" && message.secretIv.length >= 12 && message.secretIv.length <= 64
@@ -212,7 +214,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
 
 async function postNotificationResult(
   env: WorkerEnv,
-  result: { deliveryId: string; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
+  result: { deliveryId: string; enqueueToken: string; attemptNumber: number; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
 ): Promise<void> {
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification result callback is not configured.");
@@ -239,10 +241,11 @@ async function postNotificationResult(
   }
 }
 
-async function processNotification(message: EmailNotificationMessage, env: WorkerEnv): Promise<void> {
-  await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
+async function processNotification(message: EmailNotificationMessage, env: WorkerEnv, attemptNumber: number): Promise<void> {
+  const callbackIdentity = { deliveryId: message.deliveryId, enqueueToken: message.enqueueToken, attemptNumber };
+  await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" });
+    await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "configuration_missing" });
     throw new Error("Resend email delivery is not configured.");
   }
   const controller = new AbortController();
@@ -266,18 +269,18 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
-      await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_rejected" });
+      await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "provider_rejected" });
       throw new Error("Email provider rejected the notification.");
     }
     const payload = await response.json().catch(() => ({})) as { id?: unknown };
     await postNotificationResult(env, {
-      deliveryId: message.deliveryId,
+      ...callbackIdentity,
       status: "sent",
       ...(typeof payload.id === "string" ? { providerMessageId: payload.id.slice(0, 255) } : {}),
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Email provider rejected the notification.") throw error;
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_unavailable" });
+    await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "provider_unavailable" });
     throw new Error("Email provider request failed.");
   } finally {
     clearTimeout(timeout);
@@ -357,8 +360,9 @@ async function processWebhookVerification(message: WebhookVerificationMessage, e
   } finally { clearTimeout(timeout); }
 }
 
-async function processWebhookNotification(message: WebhookNotificationMessage, env: WorkerEnv): Promise<void> {
-  await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
+async function processWebhookNotification(message: WebhookNotificationMessage, env: WorkerEnv, attemptNumber: number): Promise<void> {
+  const callbackIdentity = { deliveryId: message.deliveryId, enqueueToken: message.enqueueToken, attemptNumber };
+  await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
   try {
     await deliverWebhook({
       url: message.url,
@@ -374,10 +378,10 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
       triggerValue: message.triggerValue,
       occurredAt: message.occurredAt,
     });
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "sent" });
+    await postNotificationResult(env, { ...callbackIdentity, status: "sent" });
   } catch (error) {
     const rejected = error instanceof Error && error.message === "Webhook endpoint rejected the event.";
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
+    await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
     throw new Error(rejected ? "Webhook endpoint rejected the event." : "Webhook delivery failed.");
   }
 }
@@ -389,9 +393,9 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
       continue;
     }
     try {
-      if (message.body.type === "notification.email") await processNotification(message.body, env);
+      if (message.body.type === "notification.email") await processNotification(message.body, env, message.attempts);
       else if (message.body.type === "notification.webhook.verify") await processWebhookVerification(message.body, env);
-      else await processWebhookNotification(message.body, env);
+      else await processWebhookNotification(message.body, env, message.attempts);
       message.ack();
     } catch (error) {
       console.error("Jerico notification delivery failed", {
