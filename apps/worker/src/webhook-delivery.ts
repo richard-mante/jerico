@@ -46,9 +46,10 @@ export async function decryptWebhookSecret(ciphertext: string, ivValue: string, 
   return new Uint8Array(decrypted);
 }
 
-export async function signWebhookPayload(secret: Uint8Array, body: string): Promise<string> {
+export async function signWebhookPayload(secret: Uint8Array, body: string, timestamp: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)));
+  const signedPayload = timestamp + "." + body;
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signedPayload)));
   return "sha256=" + Array.from(signature, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -66,7 +67,8 @@ export async function deliverWebhook(input: WebhookDeliveryInput): Promise<void>
       triggerValue: input.triggerValue,
     },
   });
-  const signature = await signWebhookPayload(secret, body);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = await signWebhookPayload(secret, body, timestamp);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
@@ -79,6 +81,7 @@ export async function deliverWebhook(input: WebhookDeliveryInput): Promise<void>
         "x-jerico-event": input.eventType,
         "x-jerico-delivery": input.deliveryId,
         "x-jerico-signature": signature,
+        "x-jerico-timestamp": timestamp,
       },
       body,
     });
