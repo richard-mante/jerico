@@ -31,7 +31,8 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type NotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };\ntype ClickHouseEnv = {
+type NotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };
+type ClickHouseEnv = {
   CLICKHOUSE_URL?: string;
   CLICKHOUSE_DATABASE?: string;
   CLICKHOUSE_TABLE?: string;
@@ -269,7 +270,11 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
 
 export default {
   async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
-    if (batch.queue === "jerico-notifications") {\n      await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);\n      return;\n    }\n    if (batch.queue === "jerico-uptime-probes") {
+    if (batch.queue === "jerico-notifications") {
+      await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);
+      return;
+    }
+    if (batch.queue === "jerico-uptime-probes") {
       await processUptimeProbeBatch(batch as MessageBatch<UptimeProbeMessage>, env);
       return;
     }
