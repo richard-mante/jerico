@@ -80,7 +80,7 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [x] First project explorer UI with environment/time filters, overview cards, signal tabs, and pagination (implemented; browser validation pending).
 - [x] Event catalogue, top events, and time-series charts.
 - [x] Error grouping, latest stack details, persisted open/resolved/ignored status, and paginated occurrence drill-down (assignment, comments, notifications, and audit history remain open).
-- [x] Initial metric time-series charts, per-bucket p50/p75/p95 summaries, and browser Core Web Vitals capture with units and threshold ratings. Route performance breakdowns and validation against official field-metric calculations remain open.
+- [x] Initial metric time-series charts, per-bucket p50/p75/p95 summaries, browser Core Web Vitals capture with units/ratings, and route-level p75/p95 breakdowns. Route-template normalization and validation against official field-metric calculations remain open.
 - [x] Initial span waterfall and trace detail drill-down (trace-scoped query + paginated spans); service maps and cross-project trace search remain future work.
 - [x] Structured log explorer with severity and time filters.
 
