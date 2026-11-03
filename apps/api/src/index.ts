@@ -1297,8 +1297,15 @@ app.post("/internal/uptime-results", async (context) => {
       if (monitor.enabled && monitor.activeCheckId === result.checkId) {
         const checkedAt = new Date(result.checkedAt);
         await transaction.update(uptimeMonitors).set({
-          lastCheckedAt: checkedAt,
-          lastStatus: result.status,
+          // Keep the timestamp monotonic even if the probe Worker clock is
+          // behind a previously persisted result; the active token, not the
+          // client timestamp, decides which check owns the current state.
+          lastCheckedAt: sql`GREATEST(COALESCE(${uptimeMonitors.lastCheckedAt}, ${checkedAt}), ${checkedAt})`,
+          lastStatus: sql`CASE
+            WHEN ${uptimeMonitors.lastCheckedAt} IS NULL OR ${uptimeMonitors.lastCheckedAt} <= ${checkedAt}
+              THEN ${result.status}
+            ELSE ${uptimeMonitors.lastStatus}
+          END`,
           activeCheckId: null,
           updatedAt: new Date(),
         }).where(and(
