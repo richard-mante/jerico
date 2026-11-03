@@ -113,14 +113,14 @@ describe("ClickHouse query adapter", () => {
 
   it("aggregates metric values into tenant-scoped time buckets", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
-      name: "http.request.duration", timestamp: "2026-11-03T10:15:00.000Z", average: "125.5", minimum: "90", maximum: "180", samples: "8",
+      name: "web.vitals.lcp", timestamp: "2026-11-03T10:15:00.000Z", average: "2400", minimum: "1900", maximum: "3100", p50: "2300", p75: "2500", p95: "3000", samples: "8", unit: "ms", rating: "good",
     }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const series = await queryTelemetryMetricSeries(
       { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
       { organizationId: "org-a", projectId: "project-a", environmentId: "env-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z", bucketMinutes: 15 },
     );
-    expect(series).toEqual([{ name: "http.request.duration", points: [{ timestamp: "2026-11-03T10:15:00.000Z", average: 125.5, minimum: 90, maximum: 180, samples: 8 }] }]);
+    expect(series).toEqual([{ name: "web.vitals.lcp", points: [{ timestamp: "2026-11-03T10:15:00.000Z", average: 2400, minimum: 1900, maximum: 3100, p50: 2300, p75: 2500, p95: 3000, samples: 8, unit: "ms", rating: "good" }] }]);
     const [url] = fetchMock.mock.calls[0] as [URL];
     const parsed = new URL(url);
     expect(parsed.searchParams.get("param_organizationId")).toBe("org-a");
