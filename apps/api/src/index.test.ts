@@ -101,4 +101,25 @@ describe("project observability route authorization", () => {
     expect(mocks.select).toHaveBeenCalledTimes(2);
   });
 
+  it("rejects uptime result callbacks without the shared internal secret", async () => {
+    const response = await app.request("/internal/uptime-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-uptime-secret": "incorrect" },
+      body: "{}",
+    }, { UPTIME_RESULTS_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(401);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("validates internal uptime result payloads before touching the database", async () => {
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/uptime-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-uptime-secret": secret },
+      body: JSON.stringify({ checkId: "invalid" }),
+    }, { UPTIME_RESULTS_SECRET: secret });
+    expect(response.status).toBe(400);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
 });
