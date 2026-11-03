@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { and, eq, isNull } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { telemetryBatchSchema, type TelemetryEvent } from "@jerico/contracts";
 import { projectIngestionKeys, schema } from "@jerico/database/schema";
@@ -83,7 +83,7 @@ async function readBoundedBody(request: Request, limit: number): Promise<string 
 
 async function withCredentialDatabase<T>(
   env: Bindings,
-  callback: (database: ReturnType<typeof drizzle<typeof schema>>, connection: Client) => Promise<T>,
+  callback: (database: NodePgDatabase<typeof schema>) => Promise<T>,
 ): Promise<T> {
   const hyperdrive = env.HYPERDRIVE;
   const connectionString = hyperdrive?.connectionString ?? env.DATABASE_URL;
@@ -91,7 +91,7 @@ async function withCredentialDatabase<T>(
   const client = new Client({ connectionString });
   await client.connect();
   try {
-    return await callback(drizzle(client, { schema }), client);
+    return await callback(drizzle(client, { schema }));
   } finally {
     if (!hyperdrive) await client.end();
   }
@@ -144,6 +144,11 @@ app.post("/ingest/v1/events", async (context) => {
       }).from(projectIngestionKeys)
         .where(and(eq(projectIngestionKeys.keyHash, keyHash), isNull(projectIngestionKeys.revokedAt)))
         .limit(1);
+      if (found) {
+        await database.update(projectIngestionKeys)
+          .set({ lastUsedAt: new Date() })
+          .where(and(eq(projectIngestionKeys.id, found.id), isNull(projectIngestionKeys.revokedAt)));
+      }
       return found ?? null;
     });
 
@@ -174,12 +179,6 @@ app.post("/ingest/v1/events", async (context) => {
       environmentId: credential.environmentId,
       acceptedAt: new Date().toISOString(),
       events,
-    });
-
-    await withCredentialDatabase(context.env, async (database) => {
-      await database.update(projectIngestionKeys)
-        .set({ lastUsedAt: new Date() })
-        .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
     });
 
     return context.json({ data: { accepted: events.length, requestId } }, 202);
