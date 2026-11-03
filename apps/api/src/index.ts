@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
   createWebhookNotificationChannelSchema,
@@ -1098,16 +1098,22 @@ app.post("/internal/notification-delivery-results", async (context) => {
   const parsed = notificationDeliveryResultSchema.safeParse(body);
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
   const result = parsed.data;
-  const [updated] = await withDatabase(context.env, async (database) => database.update(notificationDeliveries).set({
-    status: result.status === "attempting" ? "queued" : result.status,
-    attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
-    providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
-    lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
-    lastAttemptAt: new Date(),
-    sentAt: result.status === "sent" ? new Date() : null,
-    updatedAt: new Date(),
-  }).where(eq(notificationDeliveries.id, result.deliveryId)).returning({ id: notificationDeliveries.id }));
-  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
+  const accepted = await withDatabase(context.env, async (database) => {
+    const [updated] = await database.update(notificationDeliveries).set({
+      status: result.status === "attempting" ? "queued" : result.status,
+      attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
+      providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
+      lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
+      lastAttemptAt: new Date(),
+      sentAt: result.status === "sent" ? new Date() : null,
+      updatedAt: new Date(),
+    }).where(and(eq(notificationDeliveries.id, result.deliveryId), ne(notificationDeliveries.status, "sent"))).returning({ id: notificationDeliveries.id });
+    if (updated) return true;
+    const [existing] = await database.select({ id: notificationDeliveries.id, status: notificationDeliveries.status })
+      .from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+    return existing?.status === "sent";
+  });
+  if (!accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
   return context.json({ data: { accepted: true } }, 202);
 });
 
