@@ -202,3 +202,13 @@
 - Created `feat/phase-4-error-groups-ui` from `main`.
 - Updated `apps/web/src/components/project-observability.tsx`: the Errors tab now calls `/telemetry/errors/groups` and renders grouped errors with occurrence counts, first/last seen timestamps, latest message, and latest event ID. Other telemetry tabs retain their existing paginated list behavior.
 - No local lint, typecheck, test, build, or browser run was available through the GitHub repository connector. API/ClickHouse integration remains unverified.
+
+
+## 2026-11-03 — Phase 4 metric time-series slice
+
+- Created `feat/phase-4-metric-series` from `main` after merging PR #10.
+- Added `queryTelemetryMetricSeries` in `apps/api/src/telemetry-query.ts`; ClickHouse aggregation is tenant/project/environment scoped, uses a server-selected fixed bucket interval (1/15/60/360 minutes), and returns average/minimum/maximum/sample count.
+- Added `GET /api/v1/projects/:projectId/telemetry/metrics/series` with the existing membership/project/environment checks, 31-day range validation, and sanitized failures.
+- Added a query-adapter unit test for metric bucketing and parameter binding (authored, not executed).
+- Updated the Metrics tab to render responsive SVG average-value charts for up to eight metric names. No charting dependency added.
+- No local lint, typecheck, tests, build, ClickHouse execution, or browser validation was run.
