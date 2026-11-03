@@ -200,3 +200,11 @@ At the end of each substantial session, update this file and append a session-lo
 - PR #17 merged the top event catalogue into `main` (merge commit `e5840289317795f84eb44e9e63a4e55963c42273`).
 - Branch `feat/phase-4-event-details` adds the latest event message and up to 4 KiB of serialized attributes to each catalogue row, shown in a collapsed details disclosure.
 - This is a latest-occurrence preview only; older occurrence history and full event detail retrieval are not included. Validation remains outstanding.
+
+
+### Phase 4 event volume charts (PR #19)
+
+- PR #18 merged latest event message/attributes into the Events catalogue (merge commit `5afe2343cf075d1260e0160437d92d4f007138af`).
+- Branch `feat/phase-4-event-series` adds tenant-scoped event count aggregation at adaptive 1/15/60/360-minute intervals and SVG charts for the top eight event names.
+- The Events tab shows time-series charts plus the catalogue and latest-event details. Counts can temporarily include duplicate queue deliveries.
+- PR #19 is the event trend visualization follow-up. Validation remains outstanding.
