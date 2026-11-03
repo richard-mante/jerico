@@ -122,3 +122,10 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 ## Continuity rules
 
 At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
+
+
+### Phase 4 follow-up — grouped errors (open PR #9)
+
+- Added a tenant-scoped error-group query adapter and `GET /api/v1/projects/:projectId/telemetry/errors/groups`.
+- Groups are derived at query time from error name + message and include occurrence count, first/last seen, latest message, and latest event ID. This is not a persisted issue fingerprint or error lifecycle system.
+- Added a query-adapter unit test for organization/project/environment parameter binding. Tests remain unexecuted; PostgreSQL/ClickHouse integration and browser validation remain outstanding.
