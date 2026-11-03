@@ -217,8 +217,8 @@ export function ProjectUptimeManager() {
         </header>
 
         <div role="status" className={checksEnabled ? "mt-6 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/[0.04] px-4 py-3 text-sm text-[#d9f36a]" : "mt-6 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] px-4 py-3 text-sm text-amber-100"}>
-          <p className="font-semibold">{checksEnabled ? "Scheduled checks enabled" : "Configuration mode"}</p>
-          <p className="mt-1 text-xs leading-5 opacity-75">{checksEnabled ? "The API scheduler is connected to the probe queue. New enabled monitors will be checked on the next scheduling cycle; the first result may take up to a minute." : "Monitor definitions and history storage are ready, but the probe queue is not configured. No endpoint is currently being checked and no uptime status is inferred."}</p>
+          <p className="font-semibold">{checksEnabled ? "Probe queue configured" : "Configuration mode"}</p>
+          <p className="mt-1 text-xs leading-5 opacity-75">{checksEnabled ? "The API scheduler can enqueue checks. The probe worker and shared callback secret must also be deployed before results appear; no uptime status is shown until a real check is stored." : "Monitor definitions and history storage are ready, but the probe queue is not configured. No endpoint is currently being checked and no uptime status is inferred."}</p>
         </div>
         {error && <p role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">{error}</p>}
         {notice && <p role="status" className="mt-5 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/5 px-4 py-3 text-sm text-[#d9f36a]">{notice}</p>}
