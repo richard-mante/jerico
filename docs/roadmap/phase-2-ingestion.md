@@ -97,12 +97,25 @@ The exact Hyperdrive ID and Rate Limiting namespace are account-specific and mus
 
 The current ingestion runtime is implemented as a Cloudflare Worker and uses the Cloudflare Queue binding. The message envelope and ClickHouse HTTP writer are narrow interfaces, but a self-hosted HTTP runtime and durable queue adapter (for example, a Docker Compose broker consumer) are **not implemented in this milestone**. Self-hosted deployment remains a release requirement and must not be represented as supported yet.
 
+## Request-level idempotency
+
+The in-progress Phase 3 request-idempotency branch adds an optional `Idempotency-Key` request header. Keys are scoped to the ingestion credential, must contain 1–128 safe ASCII characters, and are retained for 24 hours. The server hashes the canonical parsed batch, stores the trusted queue envelope and a pending/accepted state in PostgreSQL, and reserves the daily quota in the same transaction as the first idempotency record.
+
+- Reusing a key with the same payload returns HTTP 202 without reserving quota again when the prior queue send was recorded as accepted.
+- Reusing a key with a different payload returns HTTP 409.
+- If the queue send or the subsequent status update has an ambiguous outcome, the record remains pending. A retry republishes the stored envelope with the same deterministic event IDs; ClickHouse replacement can therefore collapse duplicate queue sends after background merges.
+- The SDK retains the exact batch and idempotency key after a failed request, and sends the same key/body on explicit retry.
+- A scheduled cleanup removes records after 24 hours. A pending request's quota reservation is intentionally not refunded on expiry because the queue may have accepted the message even if the status update failed; this is conservative and can consume quota until the UTC day resets.
+- Requests without an `Idempotency-Key` retain the legacy non-idempotent behavior for compatibility.
+
+This implementation is in an unmerged branch and has not yet been tested against PostgreSQL, Cloudflare Queues, or ClickHouse. Do not rely on it in production until those tests pass.
+
 ## Security and reliability limitations
 
 - Redaction covers sensitive attribute names, email addresses, bearer tokens, and JWT-like values. It is a safety layer, not a guarantee that arbitrary user data is anonymous.
 - The rate limiter is optional in local development and mandatory when `APP_ENV=production`; the Cloudflare binding must actually be provisioned.
 - Monthly plan quotas, billing metering, adaptive backpressure, sampling, and plan-based per-tenant quota tiers are not implemented yet. The current daily quota is a fixed per-project limit configured per deployment.
-- Queue delivery is at-least-once. Server-generated event IDs and ClickHouse `ReplacingMergeTree` now mitigate duplicate rows caused by queue redelivery, but replacement happens during background merges. It does not guarantee immediate uniqueness, and a client retry after an ambiguous HTTP response is treated as a new accepted event because request-level idempotency keys are not implemented.
+- Queue delivery is at-least-once. Server-generated event IDs and ClickHouse `ReplacingMergeTree` mitigate duplicate rows caused by queue redelivery, but replacement happens during background merges and does not guarantee immediate uniqueness. The in-progress request-idempotency branch also gives retries stable event IDs; it remains unmerged and unvalidated.
 - There is no dashboard query API or SDK in this milestone.
 - Database, queue, and ClickHouse integration tests and deployment validation are still required.
 
