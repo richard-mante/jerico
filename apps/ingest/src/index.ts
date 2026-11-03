@@ -255,7 +255,7 @@ app.post("/ingest/v1/events", async (context) => {
             credentialId: credential.id,
             idempotencyKey,
             requestHash,
-            envelope,
+            envelope: envelope as unknown as Record<string, unknown>,
             status: "pending",
             expiresAt,
           }).onConflictDoNothing({
