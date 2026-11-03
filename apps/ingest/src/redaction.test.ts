@@ -2,6 +2,27 @@ import { describe, expect, it } from "vitest";
 import { redactTelemetryEvent } from "./redaction";
 
 describe("telemetry redaction", () => {
+  it("redacts sensitive patterns from event names while preserving static names", () => {
+    const result = redactTelemetryEvent({
+      type: "event",
+      name: "checkout.user@example.com.token=topsecret",
+    });
+    expect(result.name).toBe("checkout.[REDACTED_EMAIL].token=[REDACTED]");
+    expect(redactTelemetryEvent({
+      type: "event",
+      name: "checkout.completed",
+    }).name).toBe("checkout.completed");
+  });
+
+  it("redacts bearer credentials and JWTs from event names", () => {
+    const result = redactTelemetryEvent({
+      type: "event",
+      name: "auth.Bearer abc.def.ghi.eyJabcdefgh.eyJpayload.signature",
+    });
+    expect(result.name).not.toContain("Bearer abc.def.ghi");
+    expect(result.name).not.toContain("eyJabcdefgh");
+  });
+
   it("redacts sensitive attribute keys and common secret patterns", () => {
     const result = redactTelemetryEvent({
       type: "error",

@@ -22,6 +22,7 @@ export function redactTelemetryEvent(event: TelemetryEvent): TelemetryEvent {
   );
   return {
     ...event,
+    name: redactText(event.name),
     ...(event.message ? { message: redactText(event.message) } : {}),
     ...(event.attributes ? { attributes } : {}),
   };
