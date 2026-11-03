@@ -176,6 +176,8 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     if (tab === "logs" && logLevel !== "all") query.set("level", logLevel);
     setLoading(true);
     setError("");
+    setErrorOccurrences({});
+    setExpandedErrorGroup(null);
     setNextCursor(null);
     void Promise.all([
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
