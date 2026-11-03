@@ -47,3 +47,22 @@ jerico.reset(); // call on sign-out/account switch
 ```
 
 Do not send email addresses, names, tokens, or other personal data as event attributes unless you have a clear lawful basis and user-facing disclosure.
+
+
+For dynamic Next.js routes, supply a route-template resolver so analytics group pages by route rather than by raw IDs:
+
+```ts
+const jerico = createBrowserClient({
+  apiKey: process.env.NEXT_PUBLIC_JERICO_PUBLIC_KEY!,
+  endpoint: process.env.NEXT_PUBLIC_JERICO_INGEST_URL!,
+  captureErrors: true,
+  captureWebVitals: true,
+  resolveRoute: (pathname) => {
+    if (/^\/users\/[^/]+$/.test(pathname)) return "/users/:userId";
+    if (/^\/orders\/[^/]+$/.test(pathname)) return "/orders/:orderId";
+    return pathname;
+  },
+});
+```
+
+The SDK also applies conservative normalization automatically for UUID, long hexadecimal, and long numeric path segments. Query strings and fragments are never included.

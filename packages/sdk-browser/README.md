@@ -25,3 +25,8 @@ The browser client keeps a random anonymous session ID in sessionStorage (with a
 Set `captureWebVitals: true` to collect browser performance metrics. The SDK observes TTFB and FCP when available, tracks LCP and CLS, and estimates INP from observed interaction durations. LCP, CLS, and INP are finalized when the page becomes hidden or is closed; delivery is best-effort. Unsupported PerformanceObserver entry types are skipped. Browser credentials can submit events, errors, and only these server-allowlisted metrics: `web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, and `web.vitals.ttfb`. Custom browser metrics, logs, and spans remain blocked. Page paths are recorded without query strings or fragments. Core Web Vitals use the pathname captured when instrumentation starts so later SPA navigation does not relabel the initial document's measurements.
 
 Configure the ingest endpoint explicitly; do not assume a hosted endpoint until your Jerico deployment provides one.
+
+
+## Route normalization
+
+Page views and Core Web Vitals use normalized pathname-only route names. By default, UUIDs, long hexadecimal IDs, and long numeric path segments are replaced with `:id`; query strings and fragments are removed, and path length is bounded. For framework routes or dynamic slugs, provide `resolveRoute(pathname)` to return your route template (for example `/users/:userId/orders/:orderId`). The resolver is optional; if it throws, the SDK falls back to the built-in normalization. Do not return personal or secret values from a custom resolver.
