@@ -28,7 +28,6 @@ describe("uptime scheduler configuration", () => {
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ checkId: claimedCheckId }));
   });
   it("rolls back the schedule and active token when queue enqueue fails", async () => {
-    const previousNextCheckAt = new Date("2026-11-03T12:00:00.000Z");
     const claimedMonitor = {
       id: "monitor-a", organizationId: "org-a", projectId: "project-a",
       url: "https://status.example.com", method: "GET", timeoutMs: 10000, expectedStatusCode: 200,
