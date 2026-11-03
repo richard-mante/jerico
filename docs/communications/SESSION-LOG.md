@@ -663,3 +663,16 @@
 
 ### Next
 - Continue the remaining cross-tenant authorization, queue retention/replay, and deployed Worker egress reviews. Keep manual runtime validation as the release gate.
+
+
+## 2026-11-03 — Uptime result fencing
+
+- Reviewed the uptime scheduler and result callback for delayed queue messages and monitor edits. Added `active_check_id` to uptime monitors and migration `0014_uptime_active_check_fencing.sql`.
+- The scheduler now creates the check ID before claiming the monitor, persists it in the same atomic claim that advances `next_check_at`, and sends that exact ID to the queue. Queue-send rollback restores the due time and clears the token only if the row still belongs to that claim.
+- The API continues to store valid stale results in check history, but only the current active check token can update monitor status. Accepted results clear the token. Monitor edits invalidate in-flight checks; public create/list/update responses omit the internal token. The current status timestamp is kept monotonic if the probe Worker clock is behind.
+- Added API and scheduler tests for current/stale/duplicate results, monitor edits, active claim identity, and queue-send rollback.
+- Merged [PR #60](https://github.com/richard-mante/jerico/pull/60); merge commit: `db98488928d6f04fc683427697a0720fa14b22d4`. Issue #59 closed.
+- GitHub combined status had no reported checks. Tests, typecheck, lint, build, and PostgreSQL/Queue runtime checks were not executed. The user will manually test. Migration 0014 is required; no lockfile changes.
+
+### Next
+- Continue the remaining tenant-isolation review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
