@@ -100,7 +100,7 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 
 ### Known product gaps
 
-- Dashboard telemetry query APIs and observability views are not implemented.
+- The first live observability explorer and tenant-scoped query API are implemented in an open PR; charting, error grouping, metric visualization, span waterfalls, and route-level integration validation remain outstanding.
 - SDK foundations are merged but not validated or production-ready.
 - Request-level idempotency is missing; client retries after ambiguous HTTP responses may create duplicate accepted batches.
 - Browser route-change instrumentation and Core Web Vitals are not implemented.
@@ -114,7 +114,7 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 1. Complete Phase 2C/3 validation and infrastructure integration.
 2. Add request-level ingestion idempotency and integration tests.
 3. Finish browser/Node SDK capabilities and package build/release strategy.
-4. Finish Phase 4 query APIs (metrics, spans, overview aggregates), then build real Observability UI (events/errors/logs/metrics/traces).
+4. Merge and validate the first Phase 4 query API/explorer slice, then add charts, error grouping, metric visualization, and trace detail.
 5. Add uptime checks, alert rules, and notification channels.
 6. Add usage metering/billing and production operational safeguards.
 7. Implement self-hosted runtime/queue adapters and Docker Compose deployment.
