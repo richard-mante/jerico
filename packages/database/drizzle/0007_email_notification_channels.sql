@@ -25,6 +25,7 @@ CREATE TABLE "notification_deliveries" (
   "project_id" text NOT NULL,
   "incident_id" text NOT NULL,
   "channel_id" text NOT NULL,
+  "target" text NOT NULL,
   "event_type" text NOT NULL,
   "status" text NOT NULL DEFAULT 'queued',
   "attempts" integer NOT NULL DEFAULT 0,
@@ -37,7 +38,6 @@ CREATE TABLE "notification_deliveries" (
   CONSTRAINT "notification_deliveries_event_type_check" CHECK ("event_type" IN ('incident.opened', 'incident.acknowledged', 'incident.resolved')),
   CONSTRAINT "notification_deliveries_status_check" CHECK ("status" IN ('queued', 'sent', 'failed')),
   CONSTRAINT "notification_deliveries_attempts_check" CHECK ("attempts" >= 0),
-  CONSTRAINT "notification_deliveries_channel_same_org_fk" FOREIGN KEY ("channel_id", "organization_id") REFERENCES "notification_channels"("id", "organization_id") ON DELETE CASCADE,
   CONSTRAINT "notification_deliveries_incident_same_project_fk" FOREIGN KEY ("incident_id", "organization_id", "project_id") REFERENCES "incidents"("id", "organization_id", "project_id") ON DELETE CASCADE
 );
 --> statement-breakpoint
