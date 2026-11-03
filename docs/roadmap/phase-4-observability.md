@@ -156,3 +156,8 @@ The Traces tab can now retrieve all spans for an individual trace independently 
 ## Browser Core Web Vitals
 
 The browser SDK can opt into `captureWebVitals: true`. It records TTFB and FCP when the browser exposes the relevant timing entries, tracks LCP and CLS, and estimates INP from interaction-duration entries. LCP, CLS, and INP are finalized when the page becomes hidden or closes, then a best-effort flush is started. Public ingestion credentials remain restricted: they may submit events, errors, and only five named metric series (`web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, `web.vitals.ttfb`). Custom browser metrics, logs, and spans remain forbidden. This is an initial native PerformanceObserver implementation; cross-browser comparison with the official `web-vitals` library and SPA route attribution remain future validation/work.
+
+
+## Metric percentiles and Core Web Vitals ratings
+
+Metric-series buckets now include average, minimum, maximum, p50, p75, p95, sample count, and the latest observed `unit` and `rating` attributes. The dashboard shows percentile summaries and units for the latest bucket. Browser Web Vitals metrics carry their unit (`ms` or `score`) and a rating using the published thresholds: LCP 2.5s/4s, INP 200ms/500ms, CLS 0.1/0.25, FCP 1.8s/3s, and TTFB 0.8s/1.8s. Percentiles are calculated across the metric samples in each bucket; they are not yet service-level percentile aggregations across request traces, and the dashboard remains limited to the top eight metric names.
