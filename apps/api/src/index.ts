@@ -1046,25 +1046,41 @@ app.post("/internal/webhook-verification-results", async (context) => {
   const result = parsed.data;
   const challengeHash = await hashVerificationToken(result.challenge);
   const now = new Date();
-  const [updated] = await withDatabase(context.env, async (database) => {
-    const [channel] = await database.select({ id: notificationChannels.id, organizationId: notificationChannels.organizationId })
-      .from(notificationChannels).where(and(
-        eq(notificationChannels.id, result.channelId),
-        eq(notificationChannels.type, "webhook"),
-        eq(notificationChannels.verificationTokenHash, challengeHash),
-        gte(notificationChannels.verificationExpiresAt, now),
-      )).limit(1);
-    if (!channel) return [];
-    return database.update(notificationChannels).set({
+  const accepted = await withDatabase(context.env, async (database) => {
+    const [channel] = await database.select({
+      id: notificationChannels.id,
+      organizationId: notificationChannels.organizationId,
+      verifiedAt: notificationChannels.verifiedAt,
+      verificationTokenHash: notificationChannels.verificationTokenHash,
+      verificationExpiresAt: notificationChannels.verificationExpiresAt,
+      lastVerificationChallengeHash: notificationChannels.lastVerificationChallengeHash,
+    }).from(notificationChannels).where(and(
+      eq(notificationChannels.id, result.channelId),
+      eq(notificationChannels.type, "webhook"),
+    )).limit(1);
+    if (!channel) return false;
+    // Queue redelivery or a lost callback response must not turn a successful
+    // verification into a retry/DLQ event after the one-time token was consumed.
+    if (channel.verifiedAt && channel.lastVerificationChallengeHash === challengeHash) return true;
+    if (channel.verifiedAt || channel.verificationTokenHash !== challengeHash
+      || !channel.verificationExpiresAt || channel.verificationExpiresAt < now) return false;
+    const [updated] = await database.update(notificationChannels).set({
       verifiedAt: result.status === "verified" ? now : null,
       verificationTokenHash: result.status === "verified" ? null : challengeHash,
-      verificationExpiresAt: result.status === "verified" ? null : undefined,
+      verificationExpiresAt: result.status === "verified" ? null : channel.verificationExpiresAt,
+      lastVerificationChallengeHash: result.status === "verified" ? challengeHash : null,
       lastVerificationErrorCode: result.status === "failed" ? result.errorCode ?? "endpoint_unavailable" : null,
       enabled: result.status === "verified",
       updatedAt: now,
-    }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, channel.organizationId))).returning({ id: notificationChannels.id });
+    }).where(and(
+      eq(notificationChannels.id, channel.id),
+      eq(notificationChannels.organizationId, channel.organizationId),
+      eq(notificationChannels.verificationTokenHash, challengeHash),
+      gte(notificationChannels.verificationExpiresAt, now),
+    )).returning({ id: notificationChannels.id });
+    return Boolean(updated);
   });
-  if (!updated) return context.json({ error: { code: "VERIFICATION_EXPIRED", message: "The webhook challenge is no longer current." } }, 409);
+  if (!accepted) return context.json({ error: { code: "VERIFICATION_EXPIRED", message: "The webhook challenge is no longer current." } }, 409);
   return context.json({ data: { accepted: true } }, 202);
 });
 
