@@ -168,3 +168,17 @@
 - Outstanding blockers: no committed `pnpm-lock.yaml`; GitHub Actions hosted runner allocation has repeatedly failed before steps execute; no disposable PostgreSQL/ClickHouse or provisioned Cloudflare resources are connected to this session.
 - Next: resolve a runnable validation path, generate the lockfile, execute all workspace checks, then add request-level ingestion idempotency and end-to-end SDK-to-ingestion tests before starting dashboard query APIs.
 
+
+
+## 2026-11-03 — Phase 4 observability query API (first slice in progress)
+
+- Created branch `feat/phase-4-observability-query-api` from current `main`. PR #8 (request-level ingestion idempotency) remains open and unmerged; this Phase 4 work is isolated from it.
+- Inspected the existing Hono API organization membership guard, PostgreSQL project/environment schema, ClickHouse telemetry table, and Worker writer shape.
+- Added `apps/api/src/telemetry-query.ts` with a ClickHouse HTTP query adapter, strict database/table identifier validation, parameterized tenant/project/environment/time/type filters, 31-day time-range validation, page-size bounds, opaque keyset cursor helpers, and safe server-side ClickHouse error handling.
+- Added authenticated API routes for project events, errors, and logs. Each route checks organization membership using the existing guard, verifies that the project belongs to that organization, validates any environment filter against the same project, and queries ClickHouse with organization + project scope.
+- Added unit tests for time range validation, page limits, cursor parsing, query parameter binding, and identifier injection rejection.
+- Added ClickHouse API Worker local environment examples and `docs/roadmap/phase-4-observability.md`.
+- Updated the implementation roadmap and current-state handover.
+- No package install, lint, typecheck, tests, build, PostgreSQL integration, ClickHouse query, or route authorization integration test was executed. GitHub Actions runner allocation remains an unresolved blocker.
+- Next: review type and SQL compatibility, add project overview aggregates plus metrics/spans query support, then wire the web dashboard to real endpoints. Do not call Phase 4 complete until the dashboard and cross-tenant integration tests pass.
+
