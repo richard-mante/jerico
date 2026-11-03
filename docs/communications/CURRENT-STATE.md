@@ -4,6 +4,7 @@
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Latest feature merge:** PR #33 — `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
+**Latest main merge:** PR #35 — `6fba375b11dd29df13fd289f18cbdbeee43a3227`  
 **Current milestone:** Phase 5E — signed webhook notifications merged; Phase 0–5 implementation is present, but validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -60,7 +61,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 
 **No successful end-to-end validation is confirmed for the repository's Phase 0–5 work.** Tests have been authored, but do not assume they pass.
 
-- CI jobs have repeatedly failed before runner allocation. Recent Phase 5E run #185 and its retry both reported `runner_id: 0`, no runner name, and no steps. This is an Actions runner startup/allocation failure, not evidence that source checks passed or failed.
+- CI jobs have repeatedly failed before runner allocation. Latest run #195 (push to main) and PR run #194 both failed before runner allocation. Run #195's job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. This is an Actions runner allocation/startup failure, not evidence that source checks passed or failed. This is an Actions runner startup/allocation failure, not evidence that source checks passed or failed.
 - No completed workspace dependency install, lint, typecheck, unit-test run, or full build has been verified.
 - No disposable PostgreSQL migration run or Better Auth/tenant integration test has been verified.
 - ClickHouse integration tests are gated and have not been observed passing against a real service.
@@ -86,7 +87,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 
 ## Outstanding work and next sequence
 
-1. **Validation foundation:** obtain a working local/CI runner, generate and commit the currently missing `pnpm-lock.yaml`, install dependencies, run lint/typecheck/tests/build, and fix all findings. The latest retried Actions run (#191) still fails before runner allocation (`runner_id: 0`, no runner name, no steps); this is not a source-check result.
+1. **Validation foundation:** obtain a working local/CI runner, generate and commit the currently missing `pnpm-lock.yaml`, install dependencies, run lint/typecheck/tests/build, and fix all findings. The latest Actions run is #195 (push to main); its job still fails before runner allocation (runner_id: 0, no runner name, no steps). The PR run #194 has the same failure. This is not a source-check result.
 2. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
 3. **Telemetry validation:** run ClickHouse integration tests and verify ingestion/query behavior, deduplication, and retention.
 4. **Phase 5 runtime validation:** exercise Cron → uptime queue → public probe → callback → PostgreSQL, and incident → notification queue → email/webhook → callback → delivery history, including retry and DLQ cases.
