@@ -11,61 +11,64 @@
 - Never commit secrets or production telemetry.
 - Run lint, type checks, tests, and builds before declaring work complete.
 
+## Validation status — implementation is not verification
+
+The implementation through Phase 5E is present on `main`, but no successful workspace validation or production runtime validation has been confirmed. Checkboxes below distinguish implemented work from work that remains unimplemented; parenthetical notes identify validation gaps.
+
+- GitHub Actions workflow exists, but jobs repeatedly fail before runner allocation (`runner_id: 0`, no runner name, no steps). This is not a passing or failing source test result.
+- The repository currently has no `pnpm-lock.yaml`; dependency resolution is therefore not pinned.
+- No successful dependency install, lint, typecheck, unit test, build, disposable PostgreSQL migration, ClickHouse integration, Cloudflare runtime, or browser test has been observed.
+- The latest retried CI job is run [#191](https://github.com/richard-mante/jerico/actions/runs/41623582387); its retry also failed before runner allocation.
+
 ## Phase 0 — Repository foundation
 - [x] Inspect repository, branch, settings, and existing files.
 - [ ] Confirm Apache-2.0 license and dependency-license compatibility.
-- [x] Configure pnpm workspace and Turborepo.
-- [x] Configure TypeScript, formatting, linting, and Vitest.
+- [x] Configure pnpm workspace and Turborepo (install not yet verified).
+- [x] Configure TypeScript, formatting, linting, and Vitest (not yet executed).
 - [x] Add environment validation and `.env.example`.
-- [x] Add CI for install, lint, typecheck, tests, and builds (runner allocation remains blocked).
+- [x] Add CI for install, lint, typecheck, tests, and builds (workflow exists; runner allocation blocked).
 - [x] Add CONTRIBUTING.md, SECURITY.md, issue templates, and PR template.
+- [ ] Generate and commit `pnpm-lock.yaml`.
 
-**Acceptance:** A clean clone installs and passes documented checks; CI runs on pull requests. This acceptance criterion is not yet met because automated validation has not completed.
-- [ ] Confirm Apache-2.0 license and dependency-license compatibility.
-- [ ] Configure pnpm workspace and Turborepo.
-- [ ] Configure TypeScript, formatting, linting, and Vitest.
-- [ ] Add environment validation and `.env.example`.
-- [ ] Add CI for install, lint, typecheck, tests, and builds.
-- [ ] Add CONTRIBUTING.md, SECURITY.md, issue templates, and PR template.
-
-**Acceptance:** A clean clone installs and passes documented checks; CI runs on pull requests.
+**Acceptance:** A clean clone installs reproducibly and passes documented checks; CI runs on pull requests. This acceptance criterion is not yet met.
 
 ## Phase 1 — Core platform
-- [ ] PostgreSQL and Drizzle setup.
-- [ ] Authentication and session lifecycle using a maintained auth library.
-- [ ] Organizations, memberships, roles, products, projects, and environments.
-- [ ] Tenant-scoped repositories and centralized authorization.
-- [ ] Hono core API, Zod validation, consistent errors, request IDs, and OpenAPI.
-- [ ] Organization, product, project, and environment endpoints.
-- [ ] Dashboard onboarding, workspace switcher, project creation, and settings.
-- [ ] Cross-tenant access tests.
+- [x] PostgreSQL and Drizzle setup (migration execution still needs validation).
+- [x] Authentication and session lifecycle using Better Auth embedded in the Hono API.
+- [x] Organizations, memberships, roles, products, projects, and environments.
+- [x] Tenant-scoped repositories and centralized authorization (cross-tenant runtime verification pending).
+- [x] Hono core API, Zod validation, consistent errors, request IDs, and API routes.
+- [x] Organization, product, project, and environment endpoints.
+- [x] Dashboard onboarding, workspace switching, project creation, and settings.
+- [x] Initial cross-tenant authorization tests authored (not yet executed).
 
-**Acceptance:** A user can register, create a workspace, create a project, and configure environments without manual database operations.
+**Acceptance:** A user can register, create a workspace, create a project, and configure environments without manual database operations. Implementation is present; the acceptance flow remains unverified until the app and disposable PostgreSQL environment are run.
 
 ## Phase 2 — Credentials and telemetry ingestion
 
 **Current milestones:** [Phase 2A — Project Ingestion Credentials](phase-2-credentials.md) and [Phase 2B — Authenticated Telemetry Ingestion](phase-2-ingestion.md) are merged. Event-level queue-redelivery deduplication is also merged. Validation and infrastructure provisioning remain pending.
-- [ ] Generate project/environment-scoped ingestion keys.
-- [ ] Store credential hashes only; show raw key once; support revocation.
-- [ ] Separate public ingestion credentials from server-only secrets.
+- [x] Generate project/environment-scoped ingestion keys (integration validation pending).
+- [x] Store credential hashes only; show raw key once; support revocation.
+- [x] Separate public ingestion credentials from server-only secrets.
 - [x] Define bounded versioned event, error, metric, log, and span contracts.
 - [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
 - [ ] Select a durable self-hosted queue and implement a queue adapter.
-- [ ] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits. (Implemented; integration validation pending.)
-- [ ] Implement queue consumers, retries, dead-letter handling, and backpressure. (Cloudflare consumer/retry/DLQ config implemented; load/backpressure validation pending.)
-- [ ] Add ingestion/processing health metrics and integration tests.
+- [x] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits (integration validation pending).
+- [x] Implement Cloudflare queue consumers, retries, and dead-letter routing (load/backpressure validation pending).
+- [ ] Select and implement a durable self-hosted queue adapter.
+- [ ] Add ingestion/processing health metrics and execute integration tests.
 
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
 
 ## Phase 3 — TypeScript SDKs
 
 See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
-- [x] Shared SDK core: bounded in-memory batching, transport, explicit flush, validation, and error reporting. Automatic retries remain disabled until request-level idempotency exists.
+- [x] Shared SDK core: bounded in-memory batching, transport, explicit flush, validation, error reporting, and request-level idempotency for safe batch retries (runtime validation pending).
 - [x] Initial browser SDK: public-key enforcement, page views, session identity, identify/reset, JS errors, and unhandled rejections.
 - [x] Initial Node SDK: secret-key enforcement, events/errors/logs/metrics/spans, explicit flush/close, and opt-in unhandled-rejection capture.
 - [ ] Validate workspace install, lint, typecheck, tests, and builds.
-- [ ] Validate request-level ingestion idempotency against PostgreSQL and Cloudflare Queues before enabling automatic retries.
-- [ ] Ensure SDK failures never crash the host application through integration tests.
+- [ ] Validate request-level ingestion idempotency against PostgreSQL and Cloudflare Queues.
+- [ ] Execute SDK host-application safety and integration tests.
 - [x] Add opt-in browser Core Web Vitals capture with a server-side allowlist for five public-key performance metrics. Route-change instrumentation and validation against the official `web-vitals` implementation remain open.
 - [ ] Add richer Node instrumentation and framework adapters.
 - [x] Add Next.js App Router and Express/Node integration examples (documentation only; sample apps not executed).

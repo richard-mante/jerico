@@ -459,3 +459,16 @@
 - Apply migrations through 0008 to disposable PostgreSQL and provision non-production Cloudflare/ClickHouse resources.
 - Exercise uptime and notification pipelines end-to-end, including webhook challenge verification, HMAC receiver validation, retry/idempotency, and DLQ behavior.
 - Then proceed to Phase 6 self-hosting implementation.
+
+
+## 2026-11-03 — Roadmap validation-status correction
+
+- Rechecked the current `main` tree and found that the implementation roadmap still duplicated Phase 0 acceptance/tasks and incorrectly showed the already implemented Phase 1 core platform as entirely unchecked.
+- Corrected Phase 0–3 checkboxes to distinguish implemented code from validation that has not been executed. Phase 1 is now recorded as implemented with PostgreSQL migration and cross-tenant runtime validation still pending.
+- Updated the roadmap to state explicitly that the repository has no `pnpm-lock.yaml`, and that the latest CI run #191 and its retry failed before runner allocation (`runner_id: 0`, no runner name, no steps). No source checks are claimed as passing or failing.
+- Clarified that request-level ingestion idempotency is implemented, while database/queue verification remains pending; added the self-hosted queue adapter as outstanding work.
+- No application code or runtime configuration was changed. No lint, typecheck, tests, build, database migration, or runtime integration test was executed.
+
+### Next
+- Resolve GitHub Actions runner allocation or establish a working local runner, then generate and commit the pnpm lockfile and run the full validation suite.
+- Continue database, ClickHouse, queue, uptime, and notification runtime validation before self-hosted deployment work.
