@@ -186,7 +186,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
   if (message.schemaVersion !== 1) return false;
   if (message.type === "notification.email") {
     return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
-      && typeof message.enqueueToken === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.enqueueToken)
+      && (message.enqueueToken === undefined || (typeof message.enqueueToken === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.enqueueToken)))
       && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
       && typeof message.subject === "string" && message.subject.length >= 1 && message.subject.length <= 200
       && typeof message.text === "string" && message.text.length >= 1 && message.text.length <= 10000;
@@ -242,7 +242,7 @@ async function postNotificationResult(
 }
 
 async function processNotification(message: EmailNotificationMessage, env: WorkerEnv, attemptNumber: number): Promise<void> {
-  const callbackIdentity = { deliveryId: message.deliveryId, enqueueToken: message.enqueueToken, attemptNumber };
+  const callbackIdentity = { deliveryId: message.deliveryId, ...(message.enqueueToken ? { enqueueToken: message.enqueueToken } : {}), attemptNumber };
   await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "configuration_missing" });
