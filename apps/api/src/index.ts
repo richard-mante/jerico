@@ -1,16 +1,18 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import {
   createEnvironmentSchema,
+  createIngestionKeySchema,
   createOrganizationSchema,
   createProductSchema,
   createProjectSchema,
 } from "@jerico/contracts";
-import { environments, member, products, projects } from "@jerico/database/schema";
+import { environments, member, products, projectIngestionKeys, projects } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
+import { createIngestionCredential } from "./ingestion-keys";
 
 type Variables = { requestId: string };
 type AppEnvironment = { Bindings: ApiBindings; Variables: Variables };
@@ -149,6 +151,102 @@ app.post("/api/v1/projects", async (context) => withOrganization(context, async 
     }
     throw error;
   }
+}));
+
+app.get("/api/v1/projects/:projectId/keys", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+
+  const rows = await database.select({
+    id: projectIngestionKeys.id,
+    name: projectIngestionKeys.name,
+    keyType: projectIngestionKeys.keyType,
+    keyPrefix: projectIngestionKeys.keyPrefix,
+    environmentId: projectIngestionKeys.environmentId,
+    environmentName: environments.name,
+    createdAt: projectIngestionKeys.createdAt,
+    lastUsedAt: projectIngestionKeys.lastUsedAt,
+    revokedAt: projectIngestionKeys.revokedAt,
+  }).from(projectIngestionKeys)
+    .leftJoin(environments, eq(projectIngestionKeys.environmentId, environments.id))
+    .where(and(eq(projectIngestionKeys.organizationId, organizationId), eq(projectIngestionKeys.projectId, projectId)))
+    .orderBy(desc(projectIngestionKeys.createdAt));
+  return context.json({ data: rows });
+}));
+
+app.post("/api/v1/projects/:projectId/keys", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
+  if (!canManageOrganizationResources(role)) {
+    return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create ingestion keys." } }, 403);
+  }
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+
+  const parsed = createIngestionKeySchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) {
+    return context.json({ error: { code: "VALIDATION_ERROR", message: "The ingestion key details are invalid.", details: parsed.error.flatten() } }, 400);
+  }
+  const [environment] = await database.select({ id: environments.id }).from(environments)
+    .where(and(
+      eq(environments.id, parsed.data.environmentId),
+      eq(environments.projectId, projectId),
+      eq(environments.organizationId, organizationId),
+    )).limit(1);
+  if (!environment) {
+    return context.json({ error: { code: "INVALID_ENVIRONMENT", message: "The environment does not belong to this project." } }, 400);
+  }
+
+  const credential = await createIngestionCredential(parsed.data.keyType);
+  const [created] = await database.insert(projectIngestionKeys).values({
+    id: crypto.randomUUID(),
+    organizationId,
+    projectId,
+    environmentId: environment.id,
+    name: parsed.data.name,
+    keyType: parsed.data.keyType,
+    keyPrefix: credential.keyPrefix,
+    keyHash: credential.keyHash,
+    createdBy: userId,
+  }).returning({
+    id: projectIngestionKeys.id,
+    name: projectIngestionKeys.name,
+    keyType: projectIngestionKeys.keyType,
+    keyPrefix: projectIngestionKeys.keyPrefix,
+    environmentId: projectIngestionKeys.environmentId,
+    createdAt: projectIngestionKeys.createdAt,
+  });
+
+  // The raw credential is returned exactly once. It is never persisted or listed.
+  return context.json({ data: { ...created, rawKey: credential.rawKey } }, 201);
+}));
+
+app.delete("/api/v1/projects/:projectId/keys/:keyId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) {
+    return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot revoke ingestion keys." } }, 403);
+  }
+  const projectId = context.req.param("projectId");
+  const keyId = context.req.param("keyId");
+  const [revoked] = await database.update(projectIngestionKeys).set({ revokedAt: new Date() })
+    .where(and(
+      eq(projectIngestionKeys.id, keyId),
+      eq(projectIngestionKeys.organizationId, organizationId),
+      eq(projectIngestionKeys.projectId, projectId),
+      isNull(projectIngestionKeys.revokedAt),
+    )).returning({ id: projectIngestionKeys.id, revokedAt: projectIngestionKeys.revokedAt });
+  if (!revoked) {
+    const [existing] = await database.select({ id: projectIngestionKeys.id, revokedAt: projectIngestionKeys.revokedAt })
+      .from(projectIngestionKeys).where(and(
+        eq(projectIngestionKeys.id, keyId),
+        eq(projectIngestionKeys.organizationId, organizationId),
+        eq(projectIngestionKeys.projectId, projectId),
+      )).limit(1);
+    if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Ingestion key not found." } }, 404);
+    return context.json({ error: { code: "KEY_ALREADY_REVOKED", message: "This ingestion key has already been revoked." } }, 409);
+  }
+  return context.json({ data: revoked });
 }));
 
 app.get("/api/v1/projects/:projectId/environments", async (context) => withOrganization(context, async (database, organizationId) => {
