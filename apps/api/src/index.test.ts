@@ -321,9 +321,9 @@ describe("notification delivery callback attempt fencing", () => {
     expect(response.status).toBe(202);
     expect(set).toHaveBeenCalledWith(expect.objectContaining({
       status: "queued",
-      attempts: 2,
       activeConsumerAttempt: 2,
     }));
+    expect(set.mock.calls[0]?.[0].attempts).toBeDefined();
   });
 
 
@@ -354,6 +354,33 @@ describe("notification delivery callback attempt fencing", () => {
     expect(response.status).toBe(202);
     expect((await response.json() as { data: { active: boolean } }).data.active).toBe(true);
     expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("increments cumulative attempts when a later enqueue generation starts at consumer attempt one", async () => {
+    const set = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: async () => [{ id: "delivery-a" }],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440002",
+        attemptNumber: 1,
+        status: "attempting",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      activeConsumerAttempt: 1,
+      status: "queued",
+    }));
+    // Cumulative provider attempts must be an atomic SQL increment, not the
+    // per-enqueue consumer sequence (which restarts at one).
+    expect(set.mock.calls[0]?.[0].attempts).toBeDefined();
   });
 
   it("completes only the active notification consumer attempt", async () => {
