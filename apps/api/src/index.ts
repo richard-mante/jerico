@@ -857,7 +857,7 @@ app.patch("/api/v1/projects/:projectId/alert-rules/:ruleId", async (context) => 
   if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
   const parsed = updateAlertRuleSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide valid alert rule fields.", details: parsed.error.flatten() } }, 400);
-  const [updated] = await database.update(alertRules).set({ ...parsed.data, consecutiveCount: 0, updatedAt: new Date() })
+  const [updated] = await database.update(alertRules).set({ ...parsed.data, consecutiveCount: 0, evaluationLeaseToken: null, evaluationLeaseExpiresAt: null, updatedAt: new Date() })
     .where(and(eq(alertRules.id, ruleId), eq(alertRules.projectId, projectId), eq(alertRules.organizationId, organizationId))).returning();
   if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Alert rule not found in this project." } }, 404);
   return context.json({ data: updated });
