@@ -45,7 +45,7 @@ app.use("*", async (context, next) => {
 
 app.use("/ingest/*", cors({
   origin: "*",
-  allowHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
+  allowHeaders: ["Authorization", "Content-Type", "X-Request-Id", "Idempotency-Key"],
   allowMethods: ["POST", "OPTIONS"],
   maxAge: 86400,
 }));
