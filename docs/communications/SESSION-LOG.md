@@ -635,3 +635,15 @@
 
 ### Next
 - Continue the remaining Worker egress and queue DLQ/retention review, then run the manual validation matrix across migrations 0009–0013 and all queue retry paths.
+
+
+## 2026-11-03 — Cumulative notification attempt count
+
+- Reviewed merged PR #53's callback fencing and found that the API assigned the cumulative `notification_deliveries.attempts` field from Cloudflare's per-message `attemptNumber`. That sequence resets when the API re-enqueues a delivery with a new enqueue token, so the cumulative count could move backwards.
+- Changed the accepted `attempting` transition to increment `attempts` atomically with SQL while keeping `activeConsumerAttempt` set to the queue's current per-enqueue attempt number. The existing conditional update still ensures duplicate callbacks do not increment the cumulative counter.
+- Added route coverage for a new enqueue generation starting at consumer attempt one.
+- Opened and merged [PR #56](https://github.com/richard-mante/jerico/pull/56); merge commit: `1eeb3426fde5266b57ef4594fa3d65679fd1317b`. Issue #55 closed.
+- Tests, typecheck, lint, build, and database/queue runtime checks were not executed. The user will handle manual testing. No migration or lockfile changes.
+
+### Next
+- Continue the Worker egress, queue DLQ/retention, and remaining tenant-isolation reviews. Keep migration and runtime validation as the release gate.
