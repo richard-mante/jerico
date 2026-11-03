@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `chore/phase-2c-validation-handover`  
+**Current work branch:** `feat/phase-2c-queue-deduplication`  
 **Current milestone:** Phase 2C — validation and infrastructure readiness
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
@@ -66,7 +66,7 @@ Database migrations have not been applied to a disposable or production PostgreS
 3. Review Drizzle schema/migration consistency and generate the required initial migration snapshot.
 4. Apply migrations to disposable PostgreSQL; add integration coverage for Better Auth, tenant isolation, credential permissions/revocation, and atomic quotas.
 5. Provision Hyperdrive, Cloudflare Queues, Rate Limiting, and ClickHouse; verify ingestion, retries, and DLQ.
-6. Add event idempotency/deduplication before relying on at-least-once queue delivery for production analytics.
+6. Validate event-level deduplication: IDs are assigned before queue publication and ClickHouse uses `ReplacingMergeTree`; query semantics and client retry behavior still need integration tests.
 
 ### Known product gaps
 
