@@ -28,7 +28,8 @@ type Bindings = {
   DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
   TELEMETRY_QUEUE?: QueueBinding;
-  INGEST_RATE_LIMITER?: RateLimitBinding;\n  INGEST_DAILY_EVENT_LIMIT?: string;
+  INGEST_RATE_LIMITER?: RateLimitBinding;
+  INGEST_DAILY_EVENT_LIMIT?: string;
 };
 type Variables = { requestId: string };
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -97,7 +98,6 @@ async function withCredentialDatabase<T>(
   }
 }
 
-
 class DailyQuotaExceeded extends Error {
   constructor(readonly retryAfter: number) {
     super("The daily event quota has been reached.");
@@ -163,7 +163,8 @@ async function releaseDailyQuota(
     ));
   });
 }
-\napp.post("/ingest/v1/events", async (context) => {
+
+app.post("/ingest/v1/events", async (context) => {
   const requestId = context.get("requestId");
   const queue = context.env.TELEMETRY_QUEUE;
   if (!queue) {
@@ -186,7 +187,7 @@ async function releaseDailyQuota(
 
   const rawKey = readBearerCredential(context.req.header("authorization"));
   if (!rawKey) {
-    return context.json({ error: { code: "INVALID_CREDENTIAL", message: "Provide a valid Jerico bearer credential." } }, 401);
+    return context.json({ error: { code: "INVALID_CREDENTIAL", message: "Provide a valid Jerico bearer credential.", requestId } }, 401);
   }
 
   const bodyText = await readBoundedBody(context.req.raw, MAX_BODY_BYTES);
@@ -208,6 +209,8 @@ async function releaseDailyQuota(
   }
 
   const keyHash = await hashPresentedCredential(rawKey);
+  let reservedUsage: { credentialId: string; usageDate: string; eventCount: number } | null = null;
+  let queueAccepted = false;
   try {
     const credential = await withCredentialDatabase(context.env, async (database) => {
       const [found] = await database.select({
@@ -231,13 +234,17 @@ async function releaseDailyQuota(
       const rate = await context.env.INGEST_RATE_LIMITER.limit({ key: credential.id });
       if (!rate.success) {
         context.header("Retry-After", "60");
-        return context.json({ error: { code: "RATE_LIMITED", message: "This credential has exceeded its ingestion rate limit.", requestId } }, 429);
+        return context.json({ error: { code: "RATE_LIMITED", message: "This credential has exceeded its ingestion request rate limit.", requestId } }, 429);
       }
     }
 
     if (credential.keyType === "public" && parsed.data.events.some((event) => !["event", "error"].includes(event.type))) {
       return context.json({ error: { code: "INSUFFICIENT_CREDENTIAL_SCOPE", message: "Public credentials may submit only events and errors. Use a server-side secret credential for logs, metrics, and spans.", requestId } }, 403);
     }
+
+    const usageDate = utcUsageDate();
+    await reserveDailyQuota(context.env, credential.id, usageDate, parsed.data.events.length);
+    reservedUsage = { credentialId: credential.id, usageDate, eventCount: parsed.data.events.length };
 
     await withCredentialDatabase(context.env, async (database) => {
       await database.update(projectIngestionKeys)
@@ -256,6 +263,7 @@ async function releaseDailyQuota(
       acceptedAt: new Date().toISOString(),
       events,
     });
+    queueAccepted = true;
 
     return context.json({ data: { accepted: events.length, requestId } }, 202);
   } catch (error) {
