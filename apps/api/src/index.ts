@@ -189,13 +189,17 @@ async function listProjectTelemetry(
       return context.json({ error: { code: "INVALID_LOG_LEVEL", message: "Log level must be debug, info, warn, error, or fatal." } }, 400);
     }
     const logLevel = levelValue as typeof validLogLevels[number] | undefined;
+    const traceIdValue = eventType === "span" ? context.req.query("traceId") : undefined;
+    if (traceIdValue !== undefined && (traceIdValue.length < 1 || traceIdValue.length > 256)) {
+      return context.json({ error: { code: "INVALID_TRACE_ID", message: "Trace ID must be between 1 and 256 characters." } }, 400);
+    }
     const cursorValue = context.req.query("cursor");
     const cursor = decodeTelemetryCursor(cursorValue);
     if (cursorValue && !cursor) return context.json({ error: { code: "INVALID_CURSOR", message: "The pagination cursor is invalid." } }, 400);
 
     try {
       const rows = await queryTelemetry<TelemetryRow>(context.env, {
-        organizationId, projectId, environmentId, ...range, limit, cursor: cursor ?? undefined, eventType, logLevel,
+        organizationId, projectId, environmentId, ...range, limit, cursor: cursor ?? undefined, eventType, logLevel, traceId: traceIdValue,
       });
       const hasMore = rows.length > limit;
       const data = rows.slice(0, limit);
