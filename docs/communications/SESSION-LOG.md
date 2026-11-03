@@ -298,3 +298,13 @@
 - Grouped-error GET now overlays persisted status (default `open`) and returns whether the current organization role can manage state.
 - Added POST status action guarded by owner/admin role; members remain read-only. Added a status selector to grouped-error cards for authorized users.
 - No migration execution, API integration tests, lint, typecheck, tests, build, or browser validation was run.
+
+
+## 2026-11-03 — Phase 4 error occurrence drill-down
+
+- Created `feat/phase-4-error-occurrences` from `main` after merging PR #20.
+- Added optional bound `errorFingerprint` filtering to the ClickHouse query adapter using the same `cityHash64(name, message)` expression as grouped errors.
+- Added authenticated `GET /api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/occurrences` with organization/project/environment checks, bounded range/limit, opaque cursor validation, and keyset pagination.
+- Added query-adapter test coverage for fingerprint parameter binding (authored, not executed).
+- Updated grouped error cards to expand and load the latest 20 occurrences with timestamp, event ID, and message. Cached occurrence data resets when the time/environment filters change.
+- No lint, typecheck, tests, build, ClickHouse execution, or browser/API integration validation was run.

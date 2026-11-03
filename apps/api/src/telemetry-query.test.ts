@@ -178,4 +178,17 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("query")).toContain("INTERVAL 15 MINUTE");
     expect(parsed.searchParams.get("query")).toContain("LIMIT 8");
   });
+  it("filters error occurrences by a bound group fingerprint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await queryTelemetry(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z", limit: 20, eventType: "error", errorFingerprint: "123456789" },
+    );
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_errorFingerprint")).toBe("123456789");
+    expect(parsed.searchParams.get("query")).toContain("cityHash64(name, message)");
+    expect(parsed.searchParams.get("query")).toContain("{errorFingerprint:String}");
+  });
 });

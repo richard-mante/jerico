@@ -111,6 +111,9 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
   const [canManageErrorGroups, setCanManageErrorGroups] = useState(false);
   const [updatingErrorGroup, setUpdatingErrorGroup] = useState<string | null>(null);
+  const [expandedErrorGroup, setExpandedErrorGroup] = useState<string | null>(null);
+  const [errorOccurrences, setErrorOccurrences] = useState<Record<string, TelemetryItem[]>>({});
+  const [loadingOccurrences, setLoadingOccurrences] = useState<string | null>(null);
   const [eventCatalogue, setEventCatalogue] = useState<EventSummary[]>([]);
   const [eventSeries, setEventSeries] = useState<EventSeries[]>([]);
   const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
@@ -173,6 +176,8 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     if (tab === "logs" && logLevel !== "all") query.set("level", logLevel);
     setLoading(true);
     setError("");
+    setErrorOccurrences({});
+    setExpandedErrorGroup(null);
     setNextCursor(null);
     void Promise.all([
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
@@ -239,6 +244,24 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     return () => controller.abort();
   }, [organizationId, session, projectId, tab, environmentId, queryWindow, logLevel]);
 
+  async function toggleErrorOccurrences(fingerprint: string) {
+    if (loadingOccurrences) return;
+    if (expandedErrorGroup === fingerprint) { setExpandedErrorGroup(null); return; }
+    setExpandedErrorGroup(fingerprint);
+    if (errorOccurrences[fingerprint] || !organizationId) return;
+    setLoadingOccurrences(fingerprint);
+    try {
+      const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to, limit: "20" });
+      if (environmentId) query.set("environmentId", environmentId);
+      const response = await fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/errors/groups/${encodeURIComponent(fingerprint)}/occurrences?${query}`, { credentials: "include", headers: { "X-Jerico-Organization-Id": organizationId } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "Could not load error occurrences.");
+      setErrorOccurrences((current) => ({ ...current, [fingerprint]: (payload.data ?? []) as TelemetryItem[] }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load error occurrences.");
+      setExpandedErrorGroup(null);
+    } finally { setLoadingOccurrences(null); }
+  }
   async function updateErrorGroupStatus(fingerprint: string, status: ErrorGroupStatus) {
     if (!organizationId || !canManageErrorGroups || updatingErrorGroup) return;
     setUpdatingErrorGroup(fingerprint);
@@ -445,6 +468,17 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                     </select>}
                   </div>
 <p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {group.latestEventId}</p>
+                  <button type="button" onClick={() => void toggleErrorOccurrences(group.fingerprint)} aria-expanded={expandedErrorGroup === group.fingerprint} className="mt-3 text-xs font-medium text-[#d9f36a] hover:text-white">
+                    {expandedErrorGroup === group.fingerprint ? "Hide occurrences" : `View ${group.occurrences.toLocaleString()} occurrences`}
+                  </button>
+                  {expandedErrorGroup === group.fingerprint && <div className="mt-3 space-y-2 rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-[#758091]">Latest 20 occurrences</p>
+                    {loadingOccurrences === group.fingerprint ? <p className="text-xs text-[#8793a3]">Loading occurrences…</p> : (errorOccurrences[group.fingerprint] ?? []).map((occurrence) => <div key={occurrence.eventId} className="border-t border-white/[0.06] pt-2 first:border-0 first:pt-0">
+                      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[10px] text-[#8793a3]">{formatTimestamp(occurrence.timestamp)}</span><span className="font-mono text-[10px] text-[#606b7a]">{occurrence.eventId}</span></div>
+                      {occurrence.message && <p className="mt-1 break-words text-xs text-[#a4adba]">{occurrence.message}</p>}
+                    </div>)}
+                    {!loadingOccurrences && (errorOccurrences[group.fingerprint] ?? []).length === 0 && <p className="text-xs text-[#8793a3]">No occurrences found in this time range.</p>}
+                  </div>}
                   {group.latestStack && <details className="mt-3 rounded-lg border border-white/[0.07] bg-black/15 p-3">
                     <summary className="cursor-pointer text-xs font-medium text-[#aab4c2]">View stack trace</summary>
                     <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-5 text-[#929eae]">{group.latestStack}</pre>

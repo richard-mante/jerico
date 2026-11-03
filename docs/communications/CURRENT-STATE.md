@@ -216,3 +216,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-error-lifecycle` adds a PostgreSQL state table for project/fingerprint status (`open`, `resolved`, `ignored`), merges state into grouped-error responses, and adds owner/admin-only status updates.
 - Members can read status but cannot change it. No assignment, comments, notifications, or audit trail are included.
 - PR #20 is the error lifecycle follow-up. Migration `0004_project_error_group_states.sql` and runtime integration are not validated.
+
+
+### Phase 4 error occurrence drill-down (PR #21)
+
+- PR #20 merged persisted error lifecycle state into `main` (merge commit `97cf65478d232308fbaa031bff77a1c3c46aba26`).
+- Branch `feat/phase-4-error-occurrences` adds a tenant-scoped, cursor-paginated endpoint filtered by the same error-group fingerprint and an expandable latest-20 occurrence list in the Errors tab.
+- Occurrence UI currently shows timestamp, event ID, and message; per-occurrence stack/attributes and UI pagination remain open.
+- PR #21 is the occurrence drill-down follow-up. Validation remains outstanding.

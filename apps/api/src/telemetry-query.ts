@@ -18,6 +18,7 @@ export type TelemetryQuery = {
   cursor?: TelemetryCursor;
   eventType?: "event" | "error" | "log" | "metric" | "span";
   logLevel?: "debug" | "info" | "warn" | "error" | "fatal";
+  errorFingerprint?: string;
 };
 
 export type TelemetryRow = {
@@ -102,6 +103,7 @@ export async function queryTelemetry<T>(
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
   if (input.eventType) filters.push("event_type = {eventType:String}");
   if (input.logLevel) filters.push("coalesce(nullIf(JSONExtractString(attributes, 'level'), ''), 'info') = {logLevel:String}");
+  if (input.errorFingerprint) filters.push("toString(cityHash64(name, message)) = {errorFingerprint:String}");
   if (input.cursor) {
     filters.push("(timestamp, event_id) < (parseDateTime64BestEffort({cursorTimestamp:String}, 3, 'UTC'), {cursorEventId:String})");
   }
@@ -119,6 +121,7 @@ export async function queryTelemetry<T>(
   if (input.environmentId) params.param_environmentId = input.environmentId;
   if (input.eventType) params.param_eventType = input.eventType;
   if (input.logLevel) params.param_logLevel = input.logLevel;
+  if (input.errorFingerprint) params.param_errorFingerprint = input.errorFingerprint;
   if (input.cursor) {
     params.param_cursorTimestamp = input.cursor.timestamp;
     params.param_cursorEventId = input.cursor.eventId;

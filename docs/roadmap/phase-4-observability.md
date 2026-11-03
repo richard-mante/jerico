@@ -121,3 +121,8 @@ The API exposes `GET /api/v1/projects/:projectId/telemetry/events/series`, aggre
 ## Error group lifecycle
 
 Error group status is persisted in PostgreSQL per project/fingerprint with `open`, `resolved`, and `ignored` states. The authenticated group query merges saved status into ClickHouse-derived groups; groups without a state default to `open`. `POST /api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/status` allows only organization owners/admins to update status. Members can read but cannot change lifecycle state. This is a lightweight state overlay: occurrence counts and grouping remain query-time in ClickHouse, and there is no assignment, comments, notifications, or audit history yet.
+
+
+## Error occurrence drill-down
+
+The API exposes `GET /api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/occurrences` with the same tenant/project/environment/time-range checks and opaque keyset pagination as other telemetry lists. The fingerprint filter is bound as a ClickHouse parameter and matches the same `cityHash64(name, message)` grouping key used by the catalogue. The Errors tab can expand a group to load the latest 20 occurrences with timestamps, event IDs, and messages. The first UI slice does not yet expose occurrence pagination or full per-occurrence stack/attribute details.
