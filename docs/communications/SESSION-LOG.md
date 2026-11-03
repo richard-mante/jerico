@@ -250,3 +250,13 @@
 - Added tests for parent/child correlation, duration metadata, idempotent end, and error status (authored, not executed).
 - Updated Node SDK usage documentation and Phase 4 handover.
 - No lint, typecheck, tests, build, or runtime validation was run.
+
+
+## 2026-11-03 — Carry forward request idempotency onto current main
+
+- Reviewed open PR #8 and confirmed it was not mergeable against the current mainline after later SDK/observability changes. Kept the original PR open while carrying its implementation onto a fresh branch from current `main`.
+- Added the credential-scoped idempotency table and migration `0003_project_ingestion_requests.sql`, canonical request hashing, deterministic event IDs, persisted pending/accepted queue envelopes, 24-hour expiry, and 15-minute scheduled cleanup.
+- Updated the ingestion Worker to accept `Idempotency-Key`, replay accepted requests without a second quota reservation, reject same-key/different-payload requests, and re-publish pending envelopes with stable event IDs.
+- Updated SDK core to attach one idempotency key to each batch and reuse the exact body/key on explicit retry while preserving later merged structured logging and span helpers.
+- Added/updated SDK and ingestion helper tests and updated Phase 2/3 docs. Tests remain authored but unexecuted.
+- No local dependency install, lint, typecheck, tests, build, PostgreSQL migration, Cloudflare Queue, or ClickHouse integration validation was run.
