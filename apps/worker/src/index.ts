@@ -100,7 +100,9 @@ export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryM
     method: "POST",
     headers,
     signal: AbortSignal.timeout(10_000),
-    body: rows.map((row) => JSON.stringify(row)).join("\n") + "\n",
+    body: rows.map((row) => JSON.stringify(row)).join("
+") + "
+",
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 1000);
@@ -545,9 +547,13 @@ export default {
   async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
     if (batch.queue === "jerico-notifications-dlq") {
       await processNotificationDeadLetterBatch(batch as MessageBatch<NotificationMessage>, env);
-      return;\n    }\n    if (batch.queue === "jerico-uptime-probes-dlq") {
+      return;
+    }
+    if (batch.queue === "jerico-uptime-probes-dlq") {
       await processUptimeDeadLetterBatch(batch as MessageBatch<UptimeProbeMessage>, env);
-      return;\n    }\n    if (batch.queue === "jerico-notifications") {
+      return;
+    }
+    if (batch.queue === "jerico-notifications") {
       await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);
       return;
     }
