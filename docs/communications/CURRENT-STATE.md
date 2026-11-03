@@ -96,7 +96,7 @@ Files added/updated:
 - `apps/api/.dev.vars.example`
 - `docs/roadmap/phase-4-observability.md`
 
-The API also exposes metrics and spans list routes plus a project overview aggregate for counts by telemetry type and latest event time. The tests are authored but not executed. PostgreSQL/ClickHouse integration, query performance, and route-level tenant isolation tests remain outstanding. The dashboard UI is not part of this first slice.
+The API also exposes metrics and spans list routes plus a project overview aggregate for counts by telemetry type and latest event time. A first web explorer is implemented at `/dashboard/projects/:projectId/observability`, with overview cards, organization/environment/time filters, signal tabs, cursor pagination, and loading/empty/error states. Charts, error grouping, metric visualization, and span waterfalls remain future work. The tests are authored but not executed. PostgreSQL/ClickHouse integration, query performance, and route-level tenant isolation tests remain outstanding.
 
 ### Known product gaps
 
