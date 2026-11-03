@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #43 — `e48c9095f2f15fcca83c5bd2228fd207dd53f288`  
-**Latest main merge:** PR #43 — `e48c9095f2f15fcca83c5bd2228fd207dd53f288`  
-**Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
+**Latest feature merge:** PR #44 — `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`  
+**Latest main merge:** PR #44 — `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`  
+**Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -42,9 +42,9 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5C — alert rules and incidents | #31 | Merged |
 | Phase 5D — verified email notifications | #32 | Merged |
 | Phase 5E — signed webhook notifications | #33 | Merged |
-| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases | #39, #41, #43 | Merged |
+| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, current-row uptime scheduling | #39, #41, #43, #44 | Merged |
 
-Latest reliability milestone: [PR #43 — prevent overlapping alert rule evaluations](https://github.com/richard-mante/jerico/pull/43). Merge commit: `e48c9095f2f15fcca83c5bd2228fd207dd53f288`.
+Latest reliability milestone: [PR #44 — use current uptime monitor settings when scheduling](https://github.com/richard-mante/jerico/pull/44). Merge commit: `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`.
 
 ### Phase 5 notification capabilities
 
@@ -106,11 +106,15 @@ Merged PR #41. Notification deliveries now persist enqueue-attempt count and nex
 
 ### 2026-11-03 source-level review update
 
-Reviewed the current Worker probe/webhook delivery paths, API notification callbacks and channel lifecycle, database constraints, telemetry query construction, and auth setup. No confirmed exploitable issue was established from source inspection alone. In particular, the public-only Worker fetch compatibility flag remains configured, redirect handling is explicit, webhook secrets are AES-GCM encrypted at rest, and internal callbacks use bounded payload parsing plus shared-secret authentication. These are source observations, not deployed SSRF certification or runtime verification. Remaining review/validation items include deployed Workerd egress behavior, retry/DLQ semantics under callback outages, uptime-scheduler concurrency, tenant isolation against a live PostgreSQL instance, and ClickHouse query timeout/resource-limit behavior.
+Reviewed the current Worker probe/webhook delivery paths, API notification callbacks and channel lifecycle, database constraints, telemetry query construction, and auth setup. No confirmed exploitable issue was established from source inspection alone. In particular, the public-only Worker fetch compatibility flag remains configured, redirect handling is explicit, webhook secrets are AES-GCM encrypted at rest, and internal callbacks use bounded payload parsing plus shared-secret authentication. These are source observations, not deployed SSRF certification or runtime verification. Remaining review/validation items include deployed Workerd egress behavior, retry/DLQ semantics under callback outages, tenant isolation against a live PostgreSQL instance, and ClickHouse query timeout/resource-limit behavior.
 
 ### 2026-11-03 ClickHouse request-bound update
 
 Merged PR #39. All API telemetry query operations now apply ClickHouse `max_execution_time=8` and a 10-second client request timeout. Worker telemetry inserts use the same server-side execution bound and a 10-second client request timeout. Focused tests assert the configured limits. This is an implementation-level safeguard only: tests were authored but not executed, and ClickHouse integration/runtime behavior remains unverified.
+
+### 2026-11-03 uptime scheduler claim reconciliation
+
+Merged PR #44. The scheduler discovers due monitor IDs only, atomically claims each row, and builds the probe payload from the current row returned by that claim. The next check time is calculated using the interval on the claimed database row, avoiding stale URL/method/timeout/interval values when a monitor is edited concurrently. Failed-enqueue rollback is conditional on the exact claimed schedule timestamp, so it cannot overwrite a newer schedule. No migration was needed. Tests and runtime concurrency checks were not executed; manual validation remains outstanding.
 
 ### 2026-11-03 alert evaluation lease hardening
 
