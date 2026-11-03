@@ -464,3 +464,28 @@ export async function queryTelemetryRoutePerformance(
   }
   return Array.from(grouped, ([path, metrics]) => ({ path, metrics }));
 }
+
+
+export async function queryTelemetryErrorCount(
+  env: TelemetryQueryBindings,
+  input: { organizationId: string; projectId: string; from: string; to: string },
+): Promise<number> {
+  if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
+  const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
+  const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
+  const query = `SELECT count() AS total FROM ${database}.${table} WHERE organization_id = {organizationId:String} AND project_id = {projectId:String} AND event_type = 'error' AND timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC') AND timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC') FORMAT JSON`;
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("param_organizationId", input.organizationId);
+  url.searchParams.set("param_projectId", input.projectId);
+  url.searchParams.set("param_from", input.from);
+  url.searchParams.set("param_to", input.to);
+  const headers = new Headers();
+  if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
+  else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`ClickHouse alert evaluation failed with status ${response.status}.`);
+  const result = await response.json() as { data?: Array<{ total?: string | number }> };
+  if (!Array.isArray(result.data) || !result.data[0]) throw new Error("ClickHouse returned an invalid alert evaluation result.");
+  return Number(result.data[0].total ?? 0);
+}
