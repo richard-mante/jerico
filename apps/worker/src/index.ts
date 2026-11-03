@@ -1,4 +1,5 @@
 type TelemetryEvent = {
+  eventId: string;
   type: "event" | "error" | "log" | "metric" | "span";
   name: string;
   timestamp?: string;
@@ -31,6 +32,7 @@ export function escapeIdentifier(value: string): string {
 }
 export function toRow(message: TelemetryMessage, event: TelemetryEvent) {
   return {
+    event_id: event.eventId,
     timestamp: event.timestamp ?? message.acceptedAt,
     accepted_at: message.acceptedAt,
     organization_id: message.organizationId,
