@@ -676,3 +676,24 @@
 
 ### Next
 - Continue the remaining tenant-isolation review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
+
+
+## 2026-11-03 — Notification channel deletion fencing
+
+- The tenant-scope review found no confirmed cross-organization API data leak in the reviewed route and schema paths. It did reveal that queued notification payloads carry destination details and could still be delivered after their channel was deleted or disabled.
+- Added channel preflight to the notification `attempting` callback. It verifies the delivery's channel exists, is enabled, is verified, and belongs to the delivery's organization. Unavailable channels are marked `failed / channel_unavailable`, the active enqueue token is cleared, and the Worker receives an inactive result and skips provider delivery.
+- Channel deletion now runs in a transaction that invalidates failed retries and queued deliveries that have not started, scoped to the same channel and organization. Already in-flight attempts may finish; sent delivery history remains unchanged. Legacy tokenless callbacks cannot revive channel-unavailable rows.
+- Added API coverage for active channel attempts, deleted/disabled/unverified channels, legacy tokenless messages, and channel deletion.
+- Merged [PR #62](https://github.com/richard-mante/jerico/pull/62); merge commit: `1cd95919aa0c97a11028fac3eeedb26a4ef8ba47`. Issue #61 closed.
+- Tests, typecheck, lint, build, and PostgreSQL/Queue runtime checks were not executed. The user will manually test. No migration or lockfile changes.
+
+## 2026-11-03 — ClickHouse read-time deduplication
+
+- Reviewed the ClickHouse telemetry table definition: it is a ReplacingMergeTree keyed by organization, project, environment, timestamp, event type, and stable event ID. Queue delivery is at-least-once; duplicate inserts can remain visible to ordinary SELECT queries until background merges complete.
+- Added `FINAL` to all 10 ClickHouse table reads across base event queries, overview, error groups, metric/event series (including nested top-name subqueries), event catalogue, route performance, and alert error counts. Existing query bounds and tenant filters remain intact.
+- Added a query-family assertion and duplicate event/error/metric rows to the integration fixture to verify read-time deduplication. Documented the additional read cost for the retained 7/30-day dataset.
+- Merged [PR #64](https://github.com/richard-mante/jerico/pull/64); merge commit: `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`. Issue #63 closed.
+- Tests, typecheck, lint, build, and live ClickHouse integration were not executed. The user will manually test. No migration or lockfile changes.
+
+### Next
+- Continue source-level review of ingestion credential scoping, deployed Worker egress, and queue retention/replay. Manual runtime validation remains the release gate.
