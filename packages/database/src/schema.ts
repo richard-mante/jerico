@@ -356,5 +356,7 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   uniqueIndex("notification_deliveries_incident_channel_event_unique").on(t.incidentId, t.channelId, t.eventType),
   index("notification_deliveries_org_created_idx").on(t.organizationId, t.createdAt),
   index("notification_deliveries_status_idx").on(t.status, t.createdAt),
+  index("notification_deliveries_enqueue_retry_idx").on(t.status, t.lastErrorCode, t.nextEnqueueAt),
+  index("notification_deliveries_outbox_lease_idx").on(t.status, t.enqueuedAt, t.nextEnqueueAt),
 ]);
 export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, notificationChannels, notificationDeliveries };
