@@ -20,7 +20,7 @@ type TelemetryItem = {
 type EventPoint = { timestamp: string; occurrences: number };
 type EventSeries = { name: string; points: EventPoint[] };
 type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string; latestMessage: string; latestAttributes: string };
-type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
+type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; p50: number; p75: number; p95: number; samples: number; unit: string; rating: string };
 type MetricSeries = { name: string; points: MetricPoint[] };
 type ErrorGroupStatus = "open" | "resolved" | "ignored";
 type ErrorGroup = {
@@ -482,10 +482,11 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 const values = series.points.map((point) => point.average);
                 const min = Math.min(...values);
                 const max = Math.max(...values);
+                const ratingClass = latest?.rating === "good" ? "border-[#d9f36a]/30 text-[#d9f36a]" : latest?.rating === "needs-improvement" ? "border-amber-300/30 text-amber-200" : latest?.rating === "poor" ? "border-rose-300/30 text-rose-200" : "border-white/10 text-[#8791a0]";
                 return <article key={series.name} className="min-w-0 rounded-xl border border-white/10 bg-black/10 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0"><h3 className="truncate text-sm font-semibold">{series.name}</h3><p className="mt-1 text-[10px] text-[#758091]">{series.points.length} time buckets · {series.points.reduce((sum, point) => sum + point.samples, 0).toLocaleString()} samples</p></div>
-                    {latest && <div className="text-right"><p className="text-lg font-semibold tabular-nums">{latest.average.toLocaleString(undefined, { maximumFractionDigits: 3 })}</p><p className="text-[10px] text-[#758091]">Latest average</p></div>}
+                    {latest && <div className="text-right"><p className="text-lg font-semibold tabular-nums">{latest.average.toLocaleString(undefined, { maximumFractionDigits: 3 })}{latest.unit ? ` ${latest.unit}` : ""}</p><p className="text-[10px] text-[#758091]">Latest average</p>{latest.rating && <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ratingClass}`}>{latest.rating.replace("-", " ")}</span>}</div>}
                   </div>
                   <svg viewBox="0 0 640 160" role="img" aria-label={`${series.name} average metric values over time`} className="mt-4 h-32 w-full overflow-visible">
                     <line x1="12" y1="144" x2="628" y2="144" stroke="currentColor" opacity=".15" />
@@ -493,6 +494,11 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                     <polyline points={metricLine(series.points)} fill="none" stroke="#d9f36a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <div className="flex justify-between text-[10px] text-[#758091]"><span>Min average: {min.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span><span>Max average: {max.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span></div>
+                  {latest && <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg border border-white/[0.06] bg-black/10 p-3">
+                    <div><p className="text-[9px] uppercase tracking-wider text-[#667181]">P50</p><p className="mt-1 text-xs font-semibold tabular-nums">{latest.p50.toLocaleString(undefined, { maximumFractionDigits: 3 })}{latest.unit ? ` ${latest.unit}` : ""}</p></div>
+                    <div><p className="text-[9px] uppercase tracking-wider text-[#667181]">P75</p><p className="mt-1 text-xs font-semibold tabular-nums">{latest.p75.toLocaleString(undefined, { maximumFractionDigits: 3 })}{latest.unit ? ` ${latest.unit}` : ""}</p></div>
+                    <div><p className="text-[9px] uppercase tracking-wider text-[#667181]">P95</p><p className="mt-1 text-xs font-semibold tabular-nums">{latest.p95.toLocaleString(undefined, { maximumFractionDigits: 3 })}{latest.unit ? ` ${latest.unit}` : ""}</p></div>
+                  </div>}
                   {latest && <p className="mt-2 text-[10px] text-[#606b7a]">{formatTimestamp(series.points[0].timestamp)} — {formatTimestamp(latest.timestamp)}</p>}
                 </article>;
               })}
