@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #44 — `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`  
-**Latest main merge:** PR #44 — `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`  
+**Latest feature merge:** PR #46 — `a5f722d981c621b1edef49c015a4f93e8807fa03`  
+**Latest main merge:** PR #46 — `a5f722d981c621b1edef49c015a4f93e8807fa03`  
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, current-row uptime scheduling | #39, #41, #43, #44 | Merged |
 
-Latest reliability milestone: [PR #44 — use current uptime monitor settings when scheduling](https://github.com/richard-mante/jerico/pull/44). Merge commit: `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`.
+Latest reliability milestone: [PR #46 — fence in-flight alert evaluations when rules change](https://github.com/richard-mante/jerico/pull/46). Merge commit: `a5f722d981c621b1edef49c015a4f93e8807fa03`.
 
 ### Phase 5 notification capabilities
 
@@ -111,6 +111,10 @@ Reviewed the current Worker probe/webhook delivery paths, API notification callb
 ### 2026-11-03 ClickHouse request-bound update
 
 Merged PR #39. All API telemetry query operations now apply ClickHouse `max_execution_time=8` and a 10-second client request timeout. Worker telemetry inserts use the same server-side execution bound and a 10-second client request timeout. Focused tests assert the configured limits. This is an implementation-level safeguard only: tests were authored but not executed, and ClickHouse integration/runtime behavior remains unverified.
+
+### 2026-11-03 notification verification and alert edit race fixes
+
+Merged PR #45 and PR #46. Email verification now consumes a matching, unexpired token hash in one conditional database update, preventing a link invalidated by a concurrent resend from verifying the channel. Resend updates are explicitly organization-scoped. Alert-rule edits now clear the current evaluation lease token and expiry along with resetting the consecutive count, fencing out an evaluator still using the old configuration. Focused route tests were added but not executed; manual concurrency validation remains outstanding.
 
 ### 2026-11-03 uptime scheduler claim reconciliation
 
