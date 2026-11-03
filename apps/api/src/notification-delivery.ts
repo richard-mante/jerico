@@ -224,6 +224,7 @@ export async function retryFailedNotificationEnqueues(
         eq(notificationDeliveries.id, delivery.id),
         eq(notificationDeliveries.status, delivery.status),
         eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
+        eq(notificationDeliveries.attempts, delivery.attempts),
       ));
       continue;
     }
