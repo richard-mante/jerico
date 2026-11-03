@@ -334,7 +334,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 </article>;
               })}
             </div>
-: tab === "metrics" && metricSeries.length ? (
+          ) : tab === "metrics" && metricSeries.length ? (
             <div className="grid gap-4 p-4 md:grid-cols-2">
               {metricSeries.map((series) => {
                 const latest = series.points[series.points.length - 1];
