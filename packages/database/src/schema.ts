@@ -1,4 +1,4 @@
-import { boolean, check, foreignKey, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -154,4 +154,15 @@ export const projectIngestionKeys = pgTable("project_ingestion_keys", {
   index("project_ingestion_keys_active_idx").on(t.projectId, t.revokedAt),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys };
+export const projectIngestionUsage = pgTable("project_ingestion_usage", {
+  credentialId: text("credential_id").notNull().references(() => projectIngestionKeys.id, { onDelete: "cascade" }),
+  usageDate: date("usage_date", { mode: "string" }).notNull(),
+  eventCount: integer("event_count").notNull().default(0),
+  updatedAt: updatedAt(),
+}, (t) => [
+  primaryKey({ name: "project_ingestion_usage_pk", columns: [t.credentialId, t.usageDate] }),
+  check("project_ingestion_usage_event_count_check", sql`${t.eventCount} >= 0`),
+  index("project_ingestion_usage_date_idx").on(t.usageDate),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage };
