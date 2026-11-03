@@ -3,7 +3,24 @@
 **Goal:** Ship a standalone observability product first, while building the shared foundation for the wider Founder OS.
 
 ## Delivery rules
-- [ ] Inspect existing files before editing; preserve repository work.
+- Inspect existing files before editing; preserve repository work.
+- Work in small, reviewable phases.
+- Every feature needs tests, documentation, and acceptance criteria.
+- Do not create placeholder screens that imply functionality exists.
+- Keep self-hosting viable throughout development.
+- Never commit secrets or production telemetry.
+- Run lint, type checks, tests, and builds before declaring work complete.
+
+## Phase 0 — Repository foundation
+- [x] Inspect repository, branch, settings, and existing files.
+- [ ] Confirm Apache-2.0 license and dependency-license compatibility.
+- [x] Configure pnpm workspace and Turborepo.
+- [x] Configure TypeScript, formatting, linting, and Vitest.
+- [x] Add environment validation and `.env.example`.
+- [x] Add CI for install, lint, typecheck, tests, and builds (runner allocation remains blocked).
+- [x] Add CONTRIBUTING.md, SECURITY.md, issue templates, and PR template.
+
+**Acceptance:** A clean clone installs and passes documented checks; CI runs on pull requests. This acceptance criterion is not yet met because automated validation has not completed.
 - [ ] Confirm Apache-2.0 license and dependency-license compatibility.
 - [ ] Configure pnpm workspace and Turborepo.
 - [ ] Configure TypeScript, formatting, linting, and Vitest.
