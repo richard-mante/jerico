@@ -181,7 +181,7 @@ export function isValidNotificationMessage(value: unknown): value is Notificatio
 
 async function postNotificationResult(
   env: WorkerEnv,
-  result: { deliveryId: string; status: "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
+  result: { deliveryId: string; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
 ): Promise<void> {
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification result callback is not configured.");
