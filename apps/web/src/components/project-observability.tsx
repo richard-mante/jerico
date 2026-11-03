@@ -195,6 +195,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setNextCursor(null);
       } else if (tab === "metrics") {
         setMetricSeries((listPayload.data ?? []) as MetricSeries[]);
+        setEventSeries([]);
         setErrorGroups([]);
         setEventCatalogue([]);
         setRows([]);
@@ -210,6 +211,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setRows((listPayload.data ?? []) as TelemetryItem[]);
         setErrorGroups([]);
         setEventCatalogue([]);
+        setEventSeries([]);
         setMetricSeries([]);
         setNextCursor(listPayload.pagination?.nextCursor ?? null);
       }
