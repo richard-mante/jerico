@@ -87,6 +87,7 @@ See [Phase 4 query API plan](phase-4-observability.md).
 **Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization.
 
 ## Phase 5 — Uptime, alerts, incidents
+See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Project-scoped uptime monitor CRUD and check-history storage/API (configuration only; scheduled probes and state transitions remain open).
 - [ ] SSRF protections: block private/loopback/link-local/metadata destinations, validate DNS and redirects, bound response size and redirect count.
 - [ ] Alert rules for error rate/count, uptime, and response time.
