@@ -131,3 +131,18 @@ The API exposes `GET /api/v1/projects/:projectId/telemetry/errors/groups/:finger
 ## Route authorization test slice
 
 `apps/api/src/index.test.ts` now exercises the Hono routes with mocked session/database adapters: unauthenticated requests are rejected before tenant data access, organization members cannot mutate error-group status, a project outside the active organization returns 404, and an owner can update status. These are route-level authorization tests with mocked persistence, not PostgreSQL integration tests. ClickHouse SQL still requires execution against a real ClickHouse instance.
+
+
+## ClickHouse integration validation harness
+
+A gated integration suite now exercises the actual ClickHouse SQL for overview counts, grouped errors and latest stack extraction, fingerprint occurrence filtering, event catalogue/details, event time series, metric aggregation, and structured log severity. It creates a unique temporary table and drops it after the suite. The test is skipped unless `CLICKHOUSE_TEST_URL` is set.
+
+Local run:
+
+```bash
+docker compose -f docker-compose.integration.yml up -d --wait
+CLICKHOUSE_TEST_URL=http://127.0.0.1:8123 CLICKHOUSE_TEST_DATABASE=jerico CLICKHOUSE_TEST_USERNAME=jerico CLICKHOUSE_TEST_PASSWORD=jerico_test pnpm --filter @jerico/api test:integration
+docker compose -f docker-compose.integration.yml down -v
+```
+
+CI now provisions the same ClickHouse service and runs the integration suite. The repository's hosted runner allocation issue has prevented confirming this job so far; the suite is authored and wired into CI but has not been observed passing.
