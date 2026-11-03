@@ -123,7 +123,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
           </div>)}
           {!channels.length && <p className="py-5 text-sm text-[#737b89]">No notification channels configured.</p>}
         </div>
-      </> : <p className="mt-5 text-xs text-[#737b89]">Only organization owners and admins can manage notification email channels. Recent delivery history remains visible below.</p>}
+      </> : <p className="mt-5 text-xs text-[#737b89]">Only organization owners and admins can manage notification channels. Recent delivery history remains visible below.</p>}
       <div className="mt-6 border-t border-white/10 pt-5">
         <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent deliveries</h3><span className="text-xs text-[#737b89]">Latest 25</span></div>
         <div className="mt-3 divide-y divide-white/10">
