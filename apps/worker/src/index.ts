@@ -358,6 +358,13 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
   }
 }
 
+export function buildNotificationDeadLetterResult(message: EmailNotificationMessage | WebhookNotificationMessage) {
+  return {
+    deliveryId: message.deliveryId,
+    ...(message.enqueueToken ? { enqueueToken: message.enqueueToken } : {}),
+  };
+}
+
 async function postNotificationDeadLetterResult(
   env: WorkerEnv,
   message: EmailNotificationMessage | WebhookNotificationMessage,
@@ -378,10 +385,7 @@ async function postNotificationDeadLetterResult(
         "content-type": "application/json",
         "x-jerico-notification-secret": env.NOTIFICATION_DELIVERY_SECRET,
       },
-      body: JSON.stringify({
-        deliveryId: message.deliveryId,
-        ...(message.enqueueToken ? { enqueueToken: message.enqueueToken } : {}),
-      }),
+      body: JSON.stringify(buildNotificationDeadLetterResult(message)),
     });
     await response.body?.cancel().catch(() => undefined);
     if (!response.ok) throw new Error("Notification dead-letter callback rejected with status " + response.status + ".");
