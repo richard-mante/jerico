@@ -177,3 +177,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-sdk-span-context` adds `startSpan()` and `withSpan()` to the core/Node SDK. Root spans generate trace IDs; nested spans accept parent context and record parent IDs. Duration and ok/error status are captured automatically.
 - Browser SDK explicitly blocks these server-only span helpers. Context propagation remains explicit; no framework/async-local integration is included.
 - PR #15 is the trace SDK follow-up. Validation remains outstanding.
+
+
+### Request-level ingestion idempotency (PR #16)
+
+- The older PR #8 was not mergeable against the current `main` because its SDK and documentation changes overlapped later merged work. Its implementation has been carried forward onto `feat/phase-3-request-idempotency-mainline`.
+- Adds credential-scoped idempotency records, canonical payload hashing, deterministic event IDs, pending/accepted queue envelopes, 24-hour expiry, scheduled cleanup, and SDK batch key/body reuse on explicit retry.
+- Daily quota is reserved atomically with the first idempotency record. Pending quota is conservatively not refunded at expiry because queue acceptance may be ambiguous.
+- PR #16 is the rebased mainline implementation. No local install/lint/typecheck/tests/build, PostgreSQL migration, Cloudflare Queue, or ClickHouse integration test has been run.

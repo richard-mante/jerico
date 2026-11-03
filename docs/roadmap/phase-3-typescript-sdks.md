@@ -48,3 +48,8 @@ These examples are documentation only; they have not yet been run in sample appl
 5. Add richer Node instrumentation and framework adapters.
 6. Add Astro/React examples and execute all sample apps.
 7. Add OpenTelemetry-compatible export/ingestion and package build/release workflows.
+
+
+## Request-level batch idempotency
+
+The SDK core now generates one UUID idempotency key per batch and reuses the exact key and request body when an explicit `flush()` retries a failed batch. This is safe only when paired with the ingestion service's `Idempotency-Key` implementation and migration. Automatic retries remain disabled; buffers remain memory-only.

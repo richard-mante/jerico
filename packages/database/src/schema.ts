@@ -1,4 +1,4 @@
-import { boolean, check, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -165,4 +165,19 @@ export const projectIngestionUsage = pgTable("project_ingestion_usage", {
   index("project_ingestion_usage_date_idx").on(t.usageDate),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage };
+export const projectIngestionRequests = pgTable("project_ingestion_requests", {
+  id: text("id").primaryKey(),
+  credentialId: text("credential_id").notNull().references(() => projectIngestionKeys.id, { onDelete: "cascade" }),
+  idempotencyKey: text("idempotency_key").notNull(),
+  requestHash: text("request_hash").notNull(),
+  envelope: jsonb("envelope").$type<Record<string, unknown>>().notNull(),
+  status: text("status").notNull().default("pending"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  check("project_ingestion_requests_status_check", sql`${t.status} IN ('pending', 'accepted')`),
+  uniqueIndex("project_ingestion_requests_credential_key_unique").on(t.credentialId, t.idempotencyKey),
+  index("project_ingestion_requests_expires_at_idx").on(t.expiresAt),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests };
