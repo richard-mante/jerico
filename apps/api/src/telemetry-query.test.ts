@@ -62,6 +62,23 @@ describe("ClickHouse query adapter", () => {
     expect(new Headers(init.headers).get("authorization")).toBe("Bearer test-token");
   });
 
+  it("queries project overview counts with the same tenant and environment filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
+      total: "12", events: "5", errors: "2", logs: "3", metrics: "1", spans: "1", lastEventAt: "2026-11-03T11:00:00.000Z",
+    }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await queryTelemetryOverview(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", environmentId: "env-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z" },
+    );
+    expect(result).toEqual({
+      total: 12, events: 5, errors: 2, logs: 3, metrics: 1, spans: 1, lastEventAt: "2026-11-03T11:00:00.000Z",
+    });
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    expect(new URL(url).searchParams.get("param_organizationId")).toBe("org-a");
+    expect(new URL(url).searchParams.get("param_environmentId")).toBe("env-a");
+  });
+
   it("rejects unsafe ClickHouse identifiers before fetching", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
