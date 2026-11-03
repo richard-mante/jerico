@@ -145,3 +145,6 @@
 - Follow-up Phase 3 hardening: added client-side payload bounds matching the ingestion contract (event names, attribute keys/values, and messages); isolated user-supplied SDK error callbacks so they cannot crash the host application.
 - Added browser anonymous session IDs stored in `sessionStorage` with an in-memory fallback, plus explicit `identify()` and `reset()` APIs. User identity is never collected automatically.
 - Updated browser SDK and Phase 3 documentation. These additions are still unvalidated because package installation and automated checks have not run.
+
+
+- CI follow-up for PR #6: run #82 (ID `41562084344`) completed as failure before runner assignment. The job response again reports `steps: null` and no downloadable logs. This is not evidence of a source-level failure, and no SDK checks have run.
