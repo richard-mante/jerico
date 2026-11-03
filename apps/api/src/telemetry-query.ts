@@ -303,7 +303,7 @@ export async function queryTelemetryMetricSeries(
   return Array.from(grouped, ([name, points]) => ({ name, points }));
 }
 
-export type TelemetryEventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string };
+export type TelemetryEventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string; latestMessage: string; latestAttributes: string };
 
 export async function queryTelemetryEventCatalogue(
   env: TelemetryQueryBindings,
@@ -320,7 +320,7 @@ export async function queryTelemetryEventCatalogue(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT name, count() AS occurrences, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY occurrences DESC, max(timestamp) DESC LIMIT 100 FORMAT JSON`;
+  const query = `SELECT name, count() AS occurrences, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId, argMax(message, (timestamp, event_id)) AS latestMessage, substring(argMax(attributes, (timestamp, event_id)), 1, 4096) AS latestAttributes FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY occurrences DESC, max(timestamp) DESC LIMIT 100 FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -342,5 +342,7 @@ export async function queryTelemetryEventCatalogue(
     occurrences: Number(row.occurrences ?? 0),
     lastSeen: String(row.lastSeen),
     latestEventId: String(row.latestEventId),
+    latestMessage: String(row.latestMessage ?? ""),
+    latestAttributes: String(row.latestAttributes ?? ""),
   }));
 }
