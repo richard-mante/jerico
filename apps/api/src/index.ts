@@ -829,7 +829,13 @@ app.delete("/api/v1/notification-channels/:channelId", async (context) => withOr
     }).where(and(
       eq(notificationDeliveries.channelId, channelId),
       eq(notificationDeliveries.organizationId, organizationId),
-      ne(notificationDeliveries.status, "sent"),
+      or(
+        eq(notificationDeliveries.status, "failed"),
+        and(
+          eq(notificationDeliveries.status, "queued"),
+          eq(notificationDeliveries.activeConsumerAttempt, 0),
+        ),
+      ),
     ));
     const [row] = await transaction.delete(notificationChannels).where(and(
       eq(notificationChannels.id, channelId),
