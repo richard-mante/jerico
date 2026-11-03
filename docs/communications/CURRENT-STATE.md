@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `main` (no active feature branch)  
-**Current milestone:** Phase 3 — TypeScript SDK foundation merged; validation and ingestion integration pending
+**Current work branch:** `feat/phase-3-request-idempotency`  
+**Current milestone:** Phase 3 request-level ingestion idempotency in progress; Phase 3 SDK foundation merged
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -63,7 +63,7 @@ Includes:
 - `@jerico/sdk-node`: secret-key enforcement, telemetry methods, and opt-in unhandled rejection capture.
 - Next.js and Express integration examples, package tests, and privacy/delivery documentation.
 
-The SDK requires an explicit endpoint. Browser keys are restricted to events/errors; Node uses secret keys for all supported telemetry types. Automatic retries remain disabled because request-level idempotency is not implemented. Buffers are memory-only and packages remain private pending validation/build/release strategy.
+The SDK requires an explicit endpoint. Browser keys are restricted to events/errors; Node uses secret keys for all supported telemetry types. The merged SDK currently has automatic retries disabled. An in-progress branch adds a stable idempotency key per SDK batch and server-side request records, but it is not merged or validated. Buffers remain memory-only and packages remain private pending validation/build/release strategy.
 
 ## Validation and infrastructure readiness — outstanding
 
@@ -87,7 +87,7 @@ No migrations have been applied to a disposable or production PostgreSQL instanc
 
 - Dashboard telemetry query APIs and observability views are not implemented.
 - SDK foundations are merged but not validated or production-ready.
-- Request-level idempotency is missing; client retries after ambiguous HTTP responses may create duplicate accepted batches.
+- Request-level idempotency is being implemented on `feat/phase-3-request-idempotency`; until merged and tested, clients must assume retries can create duplicate accepted batches.
 - Browser route-change instrumentation and Core Web Vitals are not implemented.
 - OpenTelemetry integrations, SDK package build/release workflow, and public package publishing are not implemented.
 - Alerts, notification channels, and full uptime monitoring are not implemented.
@@ -97,7 +97,7 @@ No migrations have been applied to a disposable or production PostgreSQL instanc
 ## Next milestones
 
 1. Complete Phase 2C/3 validation and infrastructure integration.
-2. Add request-level ingestion idempotency and integration tests.
+2. Finish and validate the request-level ingestion idempotency branch; add integration tests.
 3. Finish browser/Node SDK capabilities and package build/release strategy.
 4. Build tenant-safe dashboard query APIs and Observability UI (events/errors/logs/metrics/traces).
 5. Add uptime checks, alert rules, and notification channels.
