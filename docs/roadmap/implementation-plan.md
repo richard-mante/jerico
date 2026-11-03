@@ -81,7 +81,7 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [ ] Event catalogue, top events, and time-series charts.
 - [x] First query-time error grouping endpoint (name + message fingerprint, occurrence count, first/last seen); persisted issue identity, stack traces, occurrence history, resolve/ignore actions remain open.
 - [ ] Metric charts, Core Web Vitals, route performance, and percentiles.
-- [ ] Span waterfall and trace detail views.
+- [x] Initial span waterfall and trace detail drill-down (trace-scoped query + paginated spans); service maps and cross-project trace search remain future work.
 - [ ] Structured log explorer with severity and time filters.
 
 **Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization.

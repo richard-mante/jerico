@@ -324,3 +324,14 @@
 - Added `docker-compose.integration.yml` with a local ClickHouse service and `@jerico/api` `test:integration` script.
 - Updated CI to provision ClickHouse and run the integration suite.
 - The integration suite is authored and wired but not executed here. No local Docker, lint, typecheck, unit tests, build, or successful CI result has been observed.
+
+
+## 2026-11-03 — Phase 4 trace detail drill-down
+
+- Confirmed PR #9 had already been merged into `main` (merge commit `1918f231ea1feb976de87ecf419bb41c9bbb971e`).
+- Created `feat/phase-4-trace-detail` from current `main`.
+- Extended the telemetry query contract with an optional trace ID filter. The ClickHouse query uses a bound `traceId` parameter against `JSONExtractString(attributes, 'traceId')`.
+- Extended the authenticated project spans list route to validate trace IDs (1–256 characters) and pass the filter through without bypassing existing project/environment authorization, time range, and cursor pagination.
+- Added a query-adapter unit test and a gated ClickHouse integration test for retrieving spans for one trace.
+- Updated the Traces tab with a trace-detail action, paginated detail rows, span IDs/parent indicators, timestamps, messages, and durations.
+- No lint, typecheck, unit tests, build, ClickHouse integration, route integration, or browser validation was run. The feature is in an open PR and must not be treated as verified.

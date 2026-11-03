@@ -114,6 +114,9 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [expandedErrorGroup, setExpandedErrorGroup] = useState<string | null>(null);
   const [errorOccurrences, setErrorOccurrences] = useState<Record<string, TelemetryItem[]>>({});
   const [loadingOccurrences, setLoadingOccurrences] = useState<string | null>(null);
+  const [traceDetails, setTraceDetails] = useState<Record<string, TelemetryItem[]>>({});
+  const [traceDetailCursors, setTraceDetailCursors] = useState<Record<string, string | null>>({});
+  const [loadingTraceId, setLoadingTraceId] = useState<string | null>(null);
   const [eventCatalogue, setEventCatalogue] = useState<EventSummary[]>([]);
   const [eventSeries, setEventSeries] = useState<EventSeries[]>([]);
   const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
@@ -178,6 +181,8 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     setError("");
     setErrorOccurrences({});
     setExpandedErrorGroup(null);
+    setTraceDetails({});
+    setTraceDetailCursors({});
     setNextCursor(null);
     void Promise.all([
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
@@ -262,6 +267,30 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       setExpandedErrorGroup(null);
     } finally { setLoadingOccurrences(null); }
   }
+  async function loadTraceDetails(traceId: string, cursor?: string) {
+    if (!organizationId || loadingTraceId) return;
+    setLoadingTraceId(traceId);
+    setError("");
+    try {
+      const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to, limit: "100", traceId });
+      if (environmentId) query.set("environmentId", environmentId);
+      if (cursor) query.set("cursor", cursor);
+      const response = await fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/spans?${query}`, {
+        credentials: "include",
+        headers: { "X-Jerico-Organization-Id": organizationId },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "Could not load trace details.");
+      const items = (payload.data ?? []) as TelemetryItem[];
+      setTraceDetails((current) => ({ ...current, [traceId]: cursor ? [...(current[traceId] ?? []), ...items] : items }));
+      setTraceDetailCursors((current) => ({ ...current, [traceId]: payload.pagination?.nextCursor ?? null }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load trace details.");
+    } finally {
+      setLoadingTraceId(null);
+    }
+  }
+
   async function updateErrorGroupStatus(fingerprint: string, status: ErrorGroupStatus) {
     if (!organizationId || !canManageErrorGroups || updatingErrorGroup) return;
     setUpdatingErrorGroup(fingerprint);
@@ -367,7 +396,10 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 return <article key={group.traceId ?? group.spans[0].eventId} className="overflow-hidden rounded-xl border border-white/10 bg-black/10">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3">
                     <div><p className="text-xs font-semibold">{group.traceId ? ("Trace " + group.traceId.slice(0, 18)) : "Standalone span"}</p><p className="mt-1 text-[10px] text-[#758091]">{group.spans.length} {group.spans.length === 1 ? "span" : "spans"} · {Math.round(duration).toLocaleString()} ms total window</p></div>
-                    <span className="text-[10px] text-[#758091]">{formatTimestamp(new Date(start).toISOString())}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-[#758091]">{formatTimestamp(new Date(start).toISOString())}</span>
+                      {group.traceId && <button type="button" onClick={() => void loadTraceDetails(group.traceId!)} disabled={loadingTraceId !== null} className="rounded-lg border border-white/10 px-3 py-1.5 text-[10px] font-medium text-[#d9f36a] hover:bg-white/[0.05] disabled:opacity-50">{loadingTraceId === group.traceId ? "Loading…" : traceDetails[group.traceId] ? "Refresh trace details" : "Load trace details"}</button>}
+                    </div>
                   </div>
                   <div className="space-y-3 p-4">
                     {group.spans.map((span) => {
@@ -385,6 +417,19 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                         <p className="text-right text-[10px] tabular-nums text-[#a7b0bd]">{spanDuration.toLocaleString(undefined, { maximumFractionDigits: 2 })} ms</p>
                       </div>;
                     })}
+                    {group.traceId && traceDetails[group.traceId] && <section className="mt-5 border-t border-white/[0.07] pt-4">
+                      <div className="mb-3 flex items-center justify-between gap-3"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-[#8994a4]">Trace detail · {traceDetails[group.traceId].length} spans loaded</h4>{traceDetailCursors[group.traceId] && <button type="button" onClick={() => void loadTraceDetails(group.traceId!, traceDetailCursors[group.traceId] ?? undefined)} disabled={loadingTraceId !== null} className="text-[10px] font-medium text-[#d9f36a] disabled:opacity-50">{loadingTraceId === group.traceId ? "Loading…" : "Load more spans"}</button>}</div>
+                      <div className="divide-y divide-white/[0.05] rounded-lg border border-white/[0.06]">
+                        {traceDetails[group.traceId].map((detail) => {
+                          const metadata = spanMetadata(detail);
+                          return <div key={detail.eventId} className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_180px_80px] sm:items-center">
+                            <div className="min-w-0"><p className="truncate text-xs font-medium">{metadata.parentSpanId ? "↳ " : ""}{detail.name}</p><p className="mt-1 truncate font-mono text-[10px] text-[#667181]">{metadata.spanId ?? detail.eventId}</p>{detail.message && <p className="mt-1 break-words text-[10px] text-[#8791a0]">{detail.message}</p>}</div>
+                            <time className="text-[10px] text-[#758091]">{formatTimestamp(detail.timestamp)}</time>
+                            <span className="text-right text-[10px] tabular-nums text-[#a7b0bd]">{Math.max(0, detail.value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} ms</span>
+                          </div>;
+                        })}
+                      </div>
+                    </section>}
                   </div>
                 </article>;
               })}
