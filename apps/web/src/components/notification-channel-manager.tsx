@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-type Channel = { id: string; type: string; target: string; verifiedAt: string | null; enabled: boolean; createdAt: string };
+type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; lastVerificationErrorCode: string | null; createdAt: string };
 type Delivery = { id: string; incidentId: string; target: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -16,6 +16,8 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
   const [canManageChannels, setCanManageChannels] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [email, setEmail] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [signingSecret, setSigningSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -59,11 +61,25 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       setError(cause instanceof Error ? cause.message : "Could not add notification email.");
     } finally { setBusy(false); }
   }
+  async function addWebhook(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError(""); setNotice(""); setSigningSecret("");
+    try {
+      const payload = await request("/api/v1/notification-channels/webhook", {
+        method: "POST", body: JSON.stringify({ url: webhookUrl.trim() }),
+      });
+      setWebhookUrl("");
+      setSigningSecret(payload.data.signingSecret as string);
+      setNotice("Webhook created. Copy its signing secret now; it cannot be retrieved again.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not add webhook endpoint.");
+    } finally { setBusy(false); }
+  }
   async function resend(channel: Channel) {
     setBusy(true); setError(""); setNotice("");
     try {
       await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}/resend-verification`, { method: "POST" });
-      setNotice("A new verification email has been sent.");
+      setNotice(channel.type === "webhook" ? "A new verification challenge has been queued." : "A new verification email has been sent.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not resend verification email.");
     } finally { setBusy(false); }
@@ -73,7 +89,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
     setBusy(true); setError(""); setNotice("");
     try {
       await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, { method: "DELETE" });
-      setNotice("Notification email removed."); await refresh();
+      setNotice("Notification channel removed."); await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not remove notification email.");
     } finally { setBusy(false); }
@@ -81,7 +97,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
-      <div><h2 className="font-semibold">Notification delivery</h2><p className="mt-1 text-xs text-[#737b89]">Verified email channels receive incident opened, acknowledged, and resolved updates.</p></div>
+      <div><h2 className="font-semibold">Notification delivery</h2><p className="mt-1 text-xs text-[#737b89]">Verified email and webhook channels receive incident opened, acknowledged, and resolved updates.</p></div>
       {error && <p role="alert" className="mt-4 text-xs text-red-300">{error}</p>}
       {notice && <p role="status" className="mt-4 text-xs text-[#d9f36a]">{notice}</p>}
       {canManageChannels ? <>
@@ -89,12 +105,23 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
           <input type="email" required maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ops@yourcompany.com" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3 text-sm outline-none focus:border-[#d9f36a]/60" />
           <button disabled={busy || !organizationId} className="rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Working…" : "Add email"}</button>
         </form>
+        <form onSubmit={addWebhook} className="mt-3 flex flex-wrap gap-2">
+          <input type="url" required maxLength={2048} value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} placeholder="https://your-service.com/jerico/webhook" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3 text-sm outline-none focus:border-[#d9f36a]/60" />
+          <button disabled={busy || !organizationId} className="rounded-xl border border-white/15 px-4 py-3 text-sm font-medium text-[#e3e7ef] disabled:opacity-50">{busy ? "Working…" : "Add webhook"}</button>
+        </form>
+        <p className="mt-2 text-[11px] leading-5 text-[#737b89]">Webhook endpoints must use public HTTPS on port 443. To verify, accept a POST challenge and return the same challenge in a JSON response.</p>
+        {signingSecret && <div className="mt-4 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/5 p-4">
+          <p className="text-xs font-semibold text-[#d9f36a]">Copy your webhook signing secret now</p>
+          <code className="mt-2 block break-all text-xs text-[#e3e7ef]">{signingSecret}</code>
+          <button type="button" onClick={() => void navigator.clipboard.writeText(signingSecret)} className="mt-3 rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Copy secret</button>
+          <p className="mt-2 text-[11px] text-[#929aaa]">Jerico stores this encrypted and will not display it again.</p>
+        </div>}
         <div className="mt-4 divide-y divide-white/10">
           {channels.map((channel) => <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div><p className="text-sm">{channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}</p></div>
+            <div><p className="text-sm">{channel.type === "webhook" ? "Webhook" : "Email"} · {channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}{channel.lastVerificationErrorCode ? " · " + channel.lastVerificationErrorCode : ""}</p></div>
             <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
           </div>)}
-          {!channels.length && <p className="py-5 text-sm text-[#737b89]">No email channels configured.</p>}
+          {!channels.length && <p className="py-5 text-sm text-[#737b89]">No notification channels configured.</p>}
         </div>
       </> : <p className="mt-5 text-xs text-[#737b89]">Only organization owners and admins can manage notification email channels. Recent delivery history remains visible below.</p>}
       <div className="mt-6 border-t border-white/10 pt-5">
