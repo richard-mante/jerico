@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Main HEAD:** `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
+**Latest feature merge:** PR #33 — `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
 **Current milestone:** Phase 5E — signed webhook notifications merged; Phase 0–5 implementation is present, but validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
