@@ -1,4 +1,5 @@
-import { boolean, foreignKey, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
@@ -138,12 +139,14 @@ export const projectIngestionKeys = pgTable("project_ingestion_keys", {
   name: text("name").notNull(),
   keyType: text("key_type").notNull(),
   keyPrefix: text("key_prefix").notNull(),
-  keyHash: text("key_hash").notNull().unique(),
+  keyHash: text("key_hash").notNull(),
   createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "cascade" }),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => [
+  check("project_ingestion_keys_key_type_check", sql`${t.keyType} IN ('public', 'secret')`),
+  uniqueIndex("project_ingestion_keys_hash_unique").on(t.keyHash),
   foreignKey({ name: "project_ingestion_keys_project_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
   foreignKey({ name: "project_ingestion_keys_environment_fk", columns: [t.projectId, t.environmentId], foreignColumns: [environments.projectId, environments.id] }).onDelete("cascade"),
   index("project_ingestion_keys_project_idx").on(t.organizationId, t.projectId),
