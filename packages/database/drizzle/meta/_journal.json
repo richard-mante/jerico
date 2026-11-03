@@ -43,6 +43,13 @@
       "when": 1793701200000,
       "tag": "0005_uptime_monitors",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793701500000,
+      "tag": "0006_alert_rules_and_incidents",
+      "breakpoints": true
     }
   ]
 }
