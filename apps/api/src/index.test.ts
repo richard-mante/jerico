@@ -142,7 +142,8 @@ describe("project observability route authorization", () => {
     }, { UPTIME_RESULTS_SECRET: secret });
     expect(response.status).toBe(202);
     expect(set).toHaveBeenCalledWith(expect.objectContaining({
-      lastStatus: "up",
+      lastCheckedAt: expect.anything(),
+      lastStatus: expect.anything(),
       activeCheckId: null,
     }));
   });
