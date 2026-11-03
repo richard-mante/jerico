@@ -9,3 +9,6 @@ CLICKHOUSE_PASSWORD=
 API_URL=https://your-jerico-api.workers.dev
 # Must match apps/api UPTIME_RESULTS_SECRET
 UPTIME_RESULTS_SECRET=replace-with-a-long-random-secret
+
+# Exact workers.dev hostname of this probe Worker; it is blocked as a probe target
+PROBE_WORKER_HOST=jerico-worker.your-account.workers.dev
