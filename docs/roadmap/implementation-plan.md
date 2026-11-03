@@ -73,7 +73,10 @@ See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
 **Acceptance:** Example apps send telemetry to a local deployment and the data is queryable.
 
 ## Phase 4 — Observability dashboard
-- [ ] Tenant-safe query APIs for events, errors, logs, metrics, and traces.
+See [Phase 4 query API plan](phase-4-observability.md).
+- [x] First tenant-safe query API slice for events, errors, and logs (implemented; tests and PostgreSQL/ClickHouse integration validation pending).
+- [ ] Project overview aggregates, metrics, and trace queries.
+- [ ] Tenant-safe query APIs for metrics and traces.
 - [ ] Project overview with time range and environment filters.
 - [ ] Event explorer, event catalogue, top events, and time-series.
 - [ ] Error grouping, stack traces, occurrence history, resolve/ignore actions.
