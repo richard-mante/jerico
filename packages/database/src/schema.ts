@@ -335,6 +335,8 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   eventType: text("event_type").notNull(),
   status: text("status").notNull().default("queued"),
   attempts: integer("attempts").notNull().default(0),
+  enqueueAttempts: integer("enqueue_attempts").notNull().default(1),
+  nextEnqueueAt: timestamp("next_enqueue_at", { withTimezone: true }),
   providerMessageId: text("provider_message_id"),
   lastErrorCode: text("last_error_code"),
   lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),

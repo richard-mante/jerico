@@ -64,6 +64,13 @@
       "when": 1793702100000,
       "tag": "0008_webhook_notification_channels",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793702400000,
+      "tag": "0009_notification_enqueue_retries",
+      "breakpoints": true
     }
   ]
 }

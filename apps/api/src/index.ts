@@ -25,7 +25,7 @@ import { withDatabase, type ApiBindings, type JericoDatabase } from "./database"
 import { createIngestionCredential } from "./ingestion-keys";
 import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
 import { evaluateAlertRules } from "./alert-evaluator";
-import { safelyQueueIncidentNotifications } from "./notification-delivery";
+import { retryFailedNotificationEnqueues, safelyQueueIncidentNotifications } from "./notification-delivery";
 import { sendEmail } from "./email";
 import { encryptWebhookSecret } from "./webhook-crypto";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
@@ -1194,6 +1194,9 @@ export default {
     }));
     context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
       console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
+    }));
+    context.waitUntil(retryFailedNotificationEnqueues(env, new Date()).catch((error) => {
+      console.error("Jerico notification enqueue reconciliation failed", error instanceof Error ? error.message : String(error));
     }));
     if (controller.cron === "0 3 * * *") {
       context.waitUntil(pruneUptimeCheckHistory(env).catch((error) => {
