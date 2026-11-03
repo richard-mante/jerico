@@ -148,11 +148,6 @@ app.post("/ingest/v1/events", async (context) => {
       }).from(projectIngestionKeys)
         .where(and(eq(projectIngestionKeys.keyHash, keyHash), isNull(projectIngestionKeys.revokedAt)))
         .limit(1);
-      if (found) {
-        await database.update(projectIngestionKeys)
-          .set({ lastUsedAt: new Date() })
-          .where(and(eq(projectIngestionKeys.id, found.id), isNull(projectIngestionKeys.revokedAt)));
-      }
       return found ?? null;
     });
 
@@ -172,6 +167,12 @@ app.post("/ingest/v1/events", async (context) => {
     if (credential.keyType === "public" && parsed.data.events.some((event) => !["event", "error"].includes(event.type))) {
       return context.json({ error: { code: "INSUFFICIENT_CREDENTIAL_SCOPE", message: "Public credentials may submit only events and errors. Use a server-side secret credential for logs, metrics, and spans.", requestId } }, 403);
     }
+
+    await withCredentialDatabase(context.env, async (database) => {
+      await database.update(projectIngestionKeys)
+        .set({ lastUsedAt: new Date() })
+        .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
+    });
 
     const events = parsed.data.events.map(redactTelemetryEvent);
     await queue.send({
