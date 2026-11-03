@@ -130,7 +130,6 @@ export async function queueIncidentNotifications(
         status: "failed",
         lastErrorCode: "configuration_missing",
         nextEnqueueAt: null,
-        enqueuedAt: new Date(),
         updatedAt: new Date(),
       }).where(and(eq(notificationDeliveries.id, delivery.id), eq(notificationDeliveries.status, "queued")));
       continue;
@@ -279,6 +278,7 @@ export async function retryFailedNotificationEnqueues(
       await env.NOTIFICATIONS.send(message);
       await database.update(notificationDeliveries).set({
         nextEnqueueAt: null,
+        enqueuedAt: new Date(),
         updatedAt: new Date(),
       }).where(and(
         eq(notificationDeliveries.id, claimed.id),
