@@ -79,7 +79,7 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [x] Project overview aggregates (implemented; query validation pending).
 - [x] First project explorer UI with environment/time filters, overview cards, signal tabs, and pagination (implemented; browser validation pending).
 - [x] Event catalogue, top events, and time-series charts.
-- [x] Error grouping, latest stack details, persisted open/resolved/ignored status, and paginated occurrence drill-down (assignment, comments, notifications, and audit history remain open).
+- [x] Error grouping, latest stack details, persisted open/resolved/ignored status, and paginated occurrence drill-down (assignment, comments, and audit history remain open; incident notifications are implemented in Phase 5D/5E).
 - [x] Initial metric time-series charts, per-bucket p50/p75/p95 summaries, browser Core Web Vitals capture with units/ratings, route-level p75/p95 breakdowns, and default/custom route-template normalization. Validation against official field-metric calculations remains open.
 - [x] Initial span waterfall and trace detail drill-down (trace-scoped query + paginated spans); service maps and cross-project trace search remain future work.
 - [x] Structured log explorer with severity and time filters.
@@ -91,7 +91,7 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Project-scoped uptime monitor CRUD, check-history storage/API, scheduled queue dispatch, bounded public probes, and idempotent result persistence (Cloudflare provisioning/runtime validation pending).
 - [x] Initial SSRF controls: reject IP literals/internal hostnames/unsafe ports, use public-only Worker fetch egress, manually revalidate up to three redirects, bound timeout, and cancel response bodies. DNS/private egress assumptions require deployed Workerd verification; `global_fetch_strictly_public` and an exact self-host block are configured, and the probe Worker must remain workers.dev-only with no VPC binding.
 - [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration and scheduled evaluation (runtime validation pending).
-- [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notifications and audit history remain open).
+- [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notification delivery is implemented in Phase 5D/5E; incident audit history remains open).
 - [x] Verified email notification channels, Resend delivery through a Cloudflare Queue, retry/DLQ wiring, and delivery history (provider/runtime validation pending).
 - [x] Signed webhook channels with endpoint verification, timestamped HMAC-SHA256 delivery, retries, and delivery history (implementation and tests authored; execution/runtime validation pending).
 
