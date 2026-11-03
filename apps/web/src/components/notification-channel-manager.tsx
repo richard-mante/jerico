@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 type Channel = { id: string; type: string; target: string; verifiedAt: string | null; enabled: boolean; createdAt: string };
-type Delivery = { id: string; incidentId: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
+type Delivery = { id: string; incidentId: string; target: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
 function formatDate(value: string | null) {
   if (!value) return "—";
   const date = new Date(value);
@@ -97,7 +97,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
         <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent deliveries</h3><span className="text-xs text-[#737b89]">Latest 25</span></div>
         <div className="mt-3 divide-y divide-white/10">
           {deliveries.map((delivery) => <div key={delivery.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div><p className="text-xs font-medium">{delivery.eventType.replaceAll(".", " ")}</p><p className="mt-1 text-[11px] text-[#737b89]">{formatDate(delivery.createdAt)} · {delivery.attempts} attempt{delivery.attempts === 1 ? "" : "s"}</p>{delivery.lastErrorCode && <p className="mt-1 text-[11px] text-red-300">{delivery.lastErrorCode}</p>}</div>
+            <div><p className="text-xs font-medium">{delivery.eventType.replaceAll(".", " ")}</p><p className="mt-1 text-[11px] text-[#737b89]">{delivery.target}</p><p className="mt-1 text-[11px] text-[#737b89]">{formatDate(delivery.createdAt)} · {delivery.attempts} attempt{delivery.attempts === 1 ? "" : "s"}</p>{delivery.lastErrorCode && <p className="mt-1 text-[11px] text-red-300">{delivery.lastErrorCode}</p>}</div>
             <span className={`rounded-full px-2 py-1 text-[10px] ${delivery.status === "sent" ? "bg-[#d9f36a]/10 text-[#d9f36a]" : delivery.status === "failed" ? "bg-red-400/10 text-red-300" : "bg-white/10 text-[#929aaa]"}`}>{delivery.status}</span>
           </div>)}
           {!deliveries.length && <p className="py-5 text-sm text-[#737b89]">No notification deliveries yet.</p>}
