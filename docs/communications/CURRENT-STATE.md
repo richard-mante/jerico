@@ -325,3 +325,13 @@ At the end of each substantial session, update this file and append a session-lo
 - Breaches open or update one active incident; recovery automatically resolves it. Missing uptime check data is treated as unknown and does not clear an incident.
 - Added a project Alerts & Incidents UI and dashboard link, plus contract, query adapter, evaluator helper, and mocked tenant/role tests.
 - Notifications, escalation, incident assignment/comments/audit history, full database integration, migrations, and deployment verification remain outstanding. No lint, typecheck, tests, build, or browser validation has been run.
+
+### Phase 5D — verified email notifications (PR in progress)
+
+- Added migration 0007 for organization email channels and incident notification delivery history. Delivery rows retain a recipient snapshot so removing a channel does not erase history.
+- Added owner/admin-only email channel management, one-time verification tokens (256-bit random, SHA-256 hash at rest, 24-hour expiry), resend, and removal.
+- Incident opened, acknowledged, and resolved events enqueue one delivery per verified channel. A unique incident/channel/event index prevents duplicate delivery records.
+- Added a Cloudflare notifications queue consumer that sends through Resend using the delivery ID as an idempotency key, reports safe outcomes through a shared-secret internal callback, and retries failures with a DLQ configured for five retries.
+- Added an Alerts & Incidents UI section for verified email channels and recent delivery history, plus a verification landing page.
+- Required provisioning: jerico-notifications, jerico-notifications-dlq, matching NOTIFICATION_DELIVERY_SECRET on API/Worker, and RESEND_API_KEY + EMAIL_FROM on both. Migration 0007 must be applied.
+- Tests are authored but not executed. No lint, typecheck, unit tests, build, migration, Resend delivery, Cloudflare queue, callback, or browser validation has run. Webhook channels remain outstanding.
