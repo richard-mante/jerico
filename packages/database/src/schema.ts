@@ -180,4 +180,19 @@ export const projectIngestionRequests = pgTable("project_ingestion_requests", {
   index("project_ingestion_requests_expires_at_idx").on(t.expiresAt),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests };
+
+export const projectErrorGroupStates = pgTable("project_error_group_states", {
+  organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  projectId: text("project_id").notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  status: text("status").notNull().default("open"),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  primaryKey({ name: "project_error_group_states_pk", columns: [t.projectId, t.fingerprint] }),
+  check("project_error_group_states_status_check", sql`${t.status} IN ('open', 'resolved', 'ignored')`),
+  foreignKey({ name: "project_error_group_states_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }),
+  index("project_error_group_states_org_project_idx").on(t.organizationId, t.projectId),
+]);
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates };
