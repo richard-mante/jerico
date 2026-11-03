@@ -30,7 +30,7 @@ export function validateProbeUrl(value: string): URL | null {
   if (url.hostname.startsWith("[") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname)) return null;
   const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
   if (!hostname.includes(".") || BLOCKED_HOSTS.has(hostname)) return null;
-  if ([".localhost", ".local", ".internal", ".home.arpa", ".test", ".invalid", ".example", ".onion"].some((suffix) => hostname.endsWith(suffix))) return null;
+  if ([".localhost", ".local", ".internal", ".home.arpa", ".lan", ".corp", ".home", ".intranet", ".private", ".arpa", ".test", ".invalid", ".example", ".onion"].some((suffix) => hostname.endsWith(suffix))) return null;
   if (!ALLOWED_PORTS.has(url.port)) return null;
   url.hash = "";
   return url;
@@ -55,6 +55,7 @@ export async function probeEndpoint(
       const response = await fetcher(currentUrl, {
         method: input.method,
         redirect: "manual",
+        cache: "no-store",
         signal: controller.signal,
         headers: {
           accept: "*/*",
@@ -66,7 +67,8 @@ export async function probeEndpoint(
         const location = response.headers.get("location");
         await response.body?.cancel().catch(() => undefined);
         if (!location || redirectCount === 3) return failed("redirect_limit", elapsed);
-        const nextUrl = validateProbeUrl(new URL(location, currentUrl).toString());
+        let nextUrl: URL | null = null;
+        try { nextUrl = validateProbeUrl(new URL(location, currentUrl).toString()); } catch { /* Invalid Location header. */ }
         if (!nextUrl) return failed("unsafe_redirect", elapsed);
         currentUrl = nextUrl;
         continue;
