@@ -183,13 +183,19 @@ async function listProjectTelemetry(
     if (!range) return context.json({ error: { code: "INVALID_TIME_RANGE", message: "Provide a valid time range no longer than 31 days and not in the future." } }, 400);
     const limit = parseQueryLimit(context.req.query("limit"));
     if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
+    const levelValue = eventType === "log" ? context.req.query("level") : undefined;
+    const validLogLevels = ["debug", "info", "warn", "error", "fatal"] as const;
+    if (levelValue && !validLogLevels.includes(levelValue as typeof validLogLevels[number])) {
+      return context.json({ error: { code: "INVALID_LOG_LEVEL", message: "Log level must be debug, info, warn, error, or fatal." } }, 400);
+    }
+    const logLevel = levelValue as typeof validLogLevels[number] | undefined;
     const cursorValue = context.req.query("cursor");
     const cursor = decodeTelemetryCursor(cursorValue);
     if (cursorValue && !cursor) return context.json({ error: { code: "INVALID_CURSOR", message: "The pagination cursor is invalid." } }, 400);
 
     try {
       const rows = await queryTelemetry<TelemetryRow>(context.env, {
-        organizationId, projectId, environmentId, ...range, limit, cursor: cursor ?? undefined, eventType,
+        organizationId, projectId, environmentId, ...range, limit, cursor: cursor ?? undefined, eventType, logLevel,
       });
       const hasMore = rows.length > limit;
       const data = rows.slice(0, limit);
@@ -201,7 +207,7 @@ async function listProjectTelemetry(
           hasMore,
           nextCursor: hasMore && last ? encodeTelemetryCursor({ timestamp: last.timestamp, eventId: last.eventId }) : null,
         },
-        filters: { from: range.from, to: range.to, environmentId: environmentId ?? null, eventType },
+        filters: { from: range.from, to: range.to, environmentId: environmentId ?? null, eventType, logLevel: logLevel ?? null },
       });
     } catch (error) {
       console.error("Jerico telemetry query failed", {
