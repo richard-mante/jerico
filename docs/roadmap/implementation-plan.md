@@ -60,10 +60,11 @@
 ## Phase 3 — TypeScript SDKs
 
 See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
-- [x] Shared SDK core: bounded in-memory batching, transport, explicit flush, validation, and error reporting. Automatic retries remain disabled until request-level idempotency exists.
+- [x] Shared SDK core: bounded in-memory batching, transport, explicit flush, validation, and error reporting. Current merged version keeps automatic retries disabled; the request-idempotency branch adds stable batch keys for explicit retries.
 - [x] Initial browser SDK: public-key enforcement, page views, session identity, identify/reset, JS errors, and unhandled rejections.
 - [x] Initial Node SDK: secret-key enforcement, events/errors/logs/metrics/spans, explicit flush/close, and opt-in unhandled-rejection capture.
 - [ ] Validate workspace install, lint, typecheck, tests, and builds.
+- [ ] Merge and integration-test request-level ingestion idempotency before enabling automatic retries.
 - [ ] Ensure SDK failures never crash the host application through integration tests.
 - [ ] Add route-change instrumentation and Core Web Vitals (requires a deliberate public-key metric permission decision).
 - [ ] Add richer Node instrumentation and framework adapters.
