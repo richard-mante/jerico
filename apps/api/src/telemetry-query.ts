@@ -346,3 +346,48 @@ export async function queryTelemetryEventCatalogue(
     latestAttributes: String(row.latestAttributes ?? ""),
   }));
 }
+
+export type TelemetryEventPoint = { timestamp: string; occurrences: number };
+export type TelemetryEventSeries = { name: string; points: TelemetryEventPoint[] };
+
+export async function queryTelemetryEventSeries(
+  env: TelemetryQueryBindings,
+  input: Omit<TelemetryQuery, "limit" | "cursor" | "eventType" | "logLevel"> & { bucketMinutes: 1 | 15 | 60 | 360 },
+): Promise<TelemetryEventSeries[]> {
+  if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
+  const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
+  const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
+  const filters = [
+    "organization_id = {organizationId:String}",
+    "project_id = {projectId:String}",
+    "event_type = 'event'",
+    "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+    "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
+  ];
+  if (input.environmentId) filters.push("environment_id = {environmentId:String}");
+  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, count() AS occurrences FROM ${database}.${table} WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("param_organizationId", input.organizationId);
+  url.searchParams.set("param_projectId", input.projectId);
+  url.searchParams.set("param_from", input.from);
+  url.searchParams.set("param_to", input.to);
+  if (input.environmentId) url.searchParams.set("param_environmentId", input.environmentId);
+  const headers = new Headers();
+  if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
+  else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
+    headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`ClickHouse event-series query failed with status ${response.status}.`);
+  const result = await response.json() as { data?: Array<Record<string, unknown>> };
+  if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid event-series result.");
+  const grouped = new Map<string, TelemetryEventPoint[]>();
+  for (const row of result.data) {
+    const name = String(row.name ?? "Unnamed event");
+    const points = grouped.get(name) ?? [];
+    points.push({ timestamp: String(row.timestamp), occurrences: Number(row.occurrences ?? 0) });
+    grouped.set(name, points);
+  }
+  return Array.from(grouped, ([name, points]) => ({ name, points }));
+}

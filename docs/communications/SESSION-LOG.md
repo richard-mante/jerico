@@ -279,3 +279,13 @@
 - Updated the Events tab to reveal the latest message/attributes in a collapsed, scrollable text disclosure; response size is bounded and content is rendered as text.
 - Added query-adapter fixture/assertion coverage (authored, not executed).
 - No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.
+
+
+## 2026-11-03 — Phase 4 event volume charts
+
+- Created `feat/phase-4-event-series` from `main` after merging PR #18.
+- Added `queryTelemetryEventSeries` and authenticated `GET /api/v1/projects/:projectId/telemetry/events/series`, using verified tenant/project/environment filters and adaptive fixed buckets of 1, 15, 60, or 360 minutes.
+- Bounded the event series query to the top eight event names and 1,200 bucket rows.
+- Updated the Events tab to fetch and display responsive SVG event-volume charts alongside the catalogue and latest-event details.
+- Added query-adapter unit coverage for event count aggregation and tenant/environment parameter binding (authored, not executed).
+- No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.

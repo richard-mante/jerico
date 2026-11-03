@@ -17,6 +17,8 @@ type TelemetryItem = {
   value: number | null;
   attributes: string;
 };
+type EventPoint = { timestamp: string; occurrences: number };
+type EventSeries = { name: string; points: EventPoint[] };
 type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string; latestMessage: string; latestAttributes: string };
 type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
 type MetricSeries = { name: string; points: MetricPoint[] };
@@ -79,6 +81,18 @@ function spanMetadata(row: TelemetryItem): SpanMetadata {
     return { traceId: typeof value.traceId === "string" ? value.traceId : undefined, spanId: typeof value.spanId === "string" ? value.spanId : undefined, parentSpanId: typeof value.parentSpanId === "string" ? value.parentSpanId : undefined };
   } catch { return {}; }
 }
+function eventLine(points: EventPoint[]) {
+  if (!points.length) return "";
+  const values = points.map((point) => point.occurrences);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = max - min || 1;
+  return points.map((point, index) => {
+    const x = points.length === 1 ? 320 : 12 + (index / (points.length - 1)) * 616;
+    const y = 144 - ((point.occurrences - min) / spread) * 128;
+    return `${x},${y}`;
+  }).join(" ");
+}
 export function ProjectObservability({ initialOrganizationId }: { initialOrganizationId: string }) {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -94,6 +108,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [rows, setRows] = useState<TelemetryItem[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
   const [eventCatalogue, setEventCatalogue] = useState<EventSummary[]>([]);
+  const [eventSeries, setEventSeries] = useState<EventSeries[]>([]);
   const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -162,26 +177,32 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab === "errors" ? "errors/groups" : tab === "metrics" ? "metrics/series" : tab === "events" ? "events/catalogue" : tab}?${query}&limit=50`, {
         credentials: "include", headers, signal: controller.signal,
       }),
-    ]).then(async ([overviewResponse, listResponse]) => {
+      tab === "events" ? fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/events/series?${query}`, { credentials: "include", headers, signal: controller.signal }) : Promise.resolve(null),
+    ]).then(async ([overviewResponse, listResponse, seriesResponse]) => {
       const overviewPayload = await overviewResponse.json();
       const listPayload = await listResponse.json();
+      const seriesPayload = seriesResponse ? await seriesResponse.json() : { data: [] };
       if (!overviewResponse.ok) throw new Error(overviewPayload.error?.message ?? "Could not load project overview.");
       if (!listResponse.ok) throw new Error(listPayload.error?.message ?? "Could not load telemetry.");
+      if (seriesResponse && !seriesResponse.ok) throw new Error(seriesPayload.error?.message ?? "Could not load event time series.");
       setOverview(overviewPayload.data as Overview);
       if (tab === "errors") {
         setErrorGroups((listPayload.data ?? []) as ErrorGroup[]);
         setEventCatalogue([]);
+        setEventSeries([]);
         setMetricSeries([]);
         setRows([]);
         setNextCursor(null);
       } else if (tab === "metrics") {
         setMetricSeries((listPayload.data ?? []) as MetricSeries[]);
+        setEventSeries([]);
         setErrorGroups([]);
         setEventCatalogue([]);
         setRows([]);
         setNextCursor(null);
       } else if (tab === "events") {
         setEventCatalogue((listPayload.data ?? []) as EventSummary[]);
+        setEventSeries((seriesPayload.data ?? []) as EventSeries[]);
         setErrorGroups([]);
         setMetricSeries([]);
         setRows([]);
@@ -190,6 +211,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setRows((listPayload.data ?? []) as TelemetryItem[]);
         setErrorGroups([]);
         setEventCatalogue([]);
+        setEventSeries([]);
         setMetricSeries([]);
         setNextCursor(listPayload.pagination?.nextCursor ?? null);
       }
@@ -198,6 +220,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setRows([]);
         setErrorGroups([]);
         setEventCatalogue([]);
+        setEventSeries([]);
         setMetricSeries([]);
         setOverview(emptyOverview);
         setError(cause instanceof Error ? cause.message : "Could not load telemetry.");
@@ -324,7 +347,22 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
               </article>)}
             </div>
           ) : tab === "events" && eventCatalogue.length ? (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="space-y-4 p-4">
+              {eventSeries.length > 0 && <div className="grid gap-4 md:grid-cols-2">
+                {eventSeries.map((series) => {
+                  const total = series.points.reduce((sum, point) => sum + point.occurrences, 0);
+                  const peak = Math.max(0, ...series.points.map((point) => point.occurrences));
+                  return <article key={series.name} className="min-w-0 rounded-xl border border-white/10 bg-black/10 p-4">
+                    <div className="flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-sm font-semibold">{series.name}</h3><p className="mt-1 text-[10px] text-[#758091]">{series.points.length} time buckets · {total.toLocaleString()} occurrences</p></div><span className="text-right text-lg font-semibold tabular-nums">{peak.toLocaleString()}<span className="block text-[10px] font-normal text-[#758091]">Peak bucket</span></span></div>
+                    <svg viewBox="0 0 640 160" role="img" aria-label={`${series.name} event occurrences over time`} className="mt-4 h-32 w-full">
+                      <line x1="12" y1="144" x2="628" y2="144" stroke="currentColor" opacity=".15" />
+                      <polyline points={eventLine(series.points)} fill="none" stroke="#d9f36a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {series.points.length > 0 && <p className="text-[10px] text-[#758091]">{formatTimestamp(series.points[0].timestamp)} — {formatTimestamp(series.points[series.points.length - 1].timestamp)}</p>}
+                  </article>;
+                })}
+              </div>}
+              <div className="divide-y divide-white/[0.06]">
               {eventCatalogue.map((event) => {
                 const maxCount = Math.max(1, ...eventCatalogue.map((item) => item.occurrences));
                 const width = Math.max(2, (event.occurrences / maxCount) * 100);
@@ -339,6 +377,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                   <div className="text-xs text-[#8791a0] sm:text-right"><span className="text-[#626e7d]">Last seen</span><p className="mt-1">{formatTimestamp(event.lastSeen)}</p></div>
                 </article>;
               })}
+              </div>
             </div>
           ) : tab === "metrics" && metricSeries.length ? (
             <div className="grid gap-4 p-4 md:grid-cols-2">
