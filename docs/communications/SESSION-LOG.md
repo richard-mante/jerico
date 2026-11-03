@@ -168,3 +168,17 @@
 - Outstanding blockers: no committed `pnpm-lock.yaml`; GitHub Actions hosted runner allocation has repeatedly failed before steps execute; no disposable PostgreSQL/ClickHouse or provisioned Cloudflare resources are connected to this session.
 - Next: resolve a runnable validation path, generate the lockfile, execute all workspace checks, then add request-level ingestion idempotency and end-to-end SDK-to-ingestion tests before starting dashboard query APIs.
 
+
+
+## 2026-11-03 — Phase 3 request-level ingestion idempotency (in progress)
+
+- Created `feat/phase-3-request-idempotency` from the merged `main` branch.
+- Added the `project_ingestion_requests` PostgreSQL/Drizzle table and migration `0003_project_ingestion_requests.sql`, with a unique credential/idempotency-key constraint, canonical request hash, persisted trusted queue envelope, pending/accepted state, and 24-hour expiry.
+- Added canonical JSON hashing, safe idempotency-key validation, and deterministic event IDs derived from credential, key, request hash, and event position.
+- Updated ingestion to accept an optional `Idempotency-Key`; the first request atomically records the idempotency envelope and reserves daily quota. Same-key/same-payload retries reuse the envelope; same-key/different-payload requests return 409. Pending requests are re-published with stable event IDs after ambiguous queue outcomes.
+- Added a 15-minute scheduled cleanup for expired idempotency records. Pending quota is deliberately not refunded on expiry because queue acceptance may have succeeded even if the database status update failed; this conservative trade-off is documented.
+- Updated the SDK core to generate one idempotency key per batch and retain the same key and exact body across explicit retries. Added a unit assertion for key/body stability and helper tests for canonical hashes, deterministic IDs, and header validation.
+- Added `Idempotency-Key` to ingestion CORS allowed headers so browser SDK preflight requests can send it.
+- This is an in-progress branch, not yet merged. No local dependency installation, lint, typecheck, tests, build, PostgreSQL migration, Cloudflare queue test, or ClickHouse integration test was executed. GitHub Actions runner allocation remains an unresolved blocker.
+- Next: review the full diff and type-level interactions, update integration examples, open a PR, then ask for local validation output before considering the reliability change production-ready.
+
