@@ -386,7 +386,9 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
       continue;
     }
     try {
-      if (message.body.type === "notification.email") await processNotification(message.body, env);\n      else if (message.body.type === "notification.webhook.verify") await processWebhookVerification(message.body, env);\n      else await processWebhookNotification(message.body, env);
+      if (message.body.type === "notification.email") await processNotification(message.body, env);
+      else if (message.body.type === "notification.webhook.verify") await processWebhookVerification(message.body, env);
+      else await processWebhookNotification(message.body, env);
       message.ack();
     } catch (error) {
       console.error("Jerico notification delivery failed", {
