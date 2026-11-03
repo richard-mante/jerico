@@ -952,7 +952,24 @@ app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOr
   const [project] = await database.select({ id: projects.id }).from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
   if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
-  const data = await database.select().from(uptimeMonitors)
+  const data = await database.select({
+    id: uptimeMonitors.id,
+    organizationId: uptimeMonitors.organizationId,
+    projectId: uptimeMonitors.projectId,
+    name: uptimeMonitors.name,
+    url: uptimeMonitors.url,
+    method: uptimeMonitors.method,
+    intervalSeconds: uptimeMonitors.intervalSeconds,
+    timeoutMs: uptimeMonitors.timeoutMs,
+    expectedStatusCode: uptimeMonitors.expectedStatusCode,
+    enabled: uptimeMonitors.enabled,
+    nextCheckAt: uptimeMonitors.nextCheckAt,
+    lastCheckedAt: uptimeMonitors.lastCheckedAt,
+    lastStatus: uptimeMonitors.lastStatus,
+    createdBy: uptimeMonitors.createdBy,
+    createdAt: uptimeMonitors.createdAt,
+    updatedAt: uptimeMonitors.updatedAt,
+  }).from(uptimeMonitors)
     .where(and(eq(uptimeMonitors.organizationId, organizationId), eq(uptimeMonitors.projectId, projectId)))
     .orderBy(desc(uptimeMonitors.createdAt));
   return context.json({ data, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
@@ -993,7 +1010,24 @@ app.patch("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (conte
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide valid uptime monitor fields.", details: parsed.error.flatten() } }, 400);
   const [updated] = await database.update(uptimeMonitors).set({ ...parsed.data, activeCheckId: null, updatedAt: new Date() })
     .where(and(eq(uptimeMonitors.id, monitorId), eq(uptimeMonitors.projectId, projectId), eq(uptimeMonitors.organizationId, organizationId)))
-    .returning();
+    .returning({
+      id: uptimeMonitors.id,
+      organizationId: uptimeMonitors.organizationId,
+      projectId: uptimeMonitors.projectId,
+      name: uptimeMonitors.name,
+      url: uptimeMonitors.url,
+      method: uptimeMonitors.method,
+      intervalSeconds: uptimeMonitors.intervalSeconds,
+      timeoutMs: uptimeMonitors.timeoutMs,
+      expectedStatusCode: uptimeMonitors.expectedStatusCode,
+      enabled: uptimeMonitors.enabled,
+      nextCheckAt: uptimeMonitors.nextCheckAt,
+      lastCheckedAt: uptimeMonitors.lastCheckedAt,
+      lastStatus: uptimeMonitors.lastStatus,
+      createdBy: uptimeMonitors.createdBy,
+      createdAt: uptimeMonitors.createdAt,
+      updatedAt: uptimeMonitors.updatedAt,
+    });
   if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
   return context.json({ data: updated, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
