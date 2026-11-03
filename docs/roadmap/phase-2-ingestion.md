@@ -1,6 +1,6 @@
 # Phase 2B — Authenticated Telemetry Ingestion
 
-**Status:** Implementation committed on the Phase 2A feature branch; validation and infrastructure provisioning pending.  
+**Status:** Implementation merged to `main` in PR #3; validation and infrastructure provisioning pending.  
 **Endpoint:** `POST /ingest/v1/events`  
 **Queue:** Cloudflare Queues (`jerico-telemetry`)  
 **Analytics store:** ClickHouse (`jerico.telemetry_events`)
