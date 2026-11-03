@@ -80,6 +80,7 @@ export function ProjectUptimeManager() {
 
   async function refresh() {
     if (!organizationId || !projectId) return;
+    setError("");
     const payload = await request(`/api/v1/projects/${encodeURIComponent(projectId)}/uptime-monitors`);
     setMonitors((payload.data ?? []) as UptimeMonitor[]);
     setChecksEnabled(Boolean(payload.checksEnabled));
