@@ -8,7 +8,7 @@ import { projectIngestionKeys, schema } from "@jerico/database/schema";
 import { hashPresentedCredential, readBearerCredential } from "./credentials";
 import { redactTelemetryEvent } from "./redaction";
 
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = 96 * 1024;
 const MAX_BATCH_EVENTS = 100;
 
 type QueueMessage = {
@@ -106,7 +106,11 @@ app.post("/ingest/v1/events", async (context) => {
 
   const contentLength = Number(context.req.header("content-length") ?? 0);
   if (contentLength > MAX_BODY_BYTES) {
-    return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body exceeds 256 KiB.", requestId } }, 413);
+    return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body exceeds 96 KiB.", requestId } }, 413);
+  }
+
+  if (context.env.APP_ENV === "production" && !context.env.INGEST_RATE_LIMITER) {
+    return context.json({ error: { code: "INGESTION_NOT_CONFIGURED", message: "The production ingestion rate limiter is not configured.", requestId } }, 503);
   }
 
   const rawKey = readBearerCredential(context.req.header("authorization"));
