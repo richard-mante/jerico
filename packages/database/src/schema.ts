@@ -243,6 +243,7 @@ export const uptimeCheckResults = pgTable("uptime_check_results", {
   foreignKey({ name: "uptime_check_results_monitor_same_project_fk", columns: [t.monitorId, t.organizationId, t.projectId], foreignColumns: [uptimeMonitors.id, uptimeMonitors.organizationId, uptimeMonitors.projectId] }).onDelete("cascade"),
   index("uptime_check_results_monitor_checked_idx").on(t.monitorId, t.checkedAt),
   index("uptime_check_results_project_checked_idx").on(t.organizationId, t.projectId, t.checkedAt),
+  index("uptime_check_results_checked_idx").on(t.checkedAt),
 ]);
 
 export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults };
