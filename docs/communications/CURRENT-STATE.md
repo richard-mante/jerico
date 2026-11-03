@@ -51,7 +51,9 @@ Includes:
 - Per-project daily event quota (default 100,000 events per UTC day) with transactional reservation and refund when queue publication fails.
 - Cloudflare Queue producer/consumer, ClickHouse HTTP JSONEachRow writer, retry/DLQ configuration, and initial ClickHouse retention schema.
 
-## Phase 2C — Validation and infrastructure readiness (current)
+PR #5 merged to `main` as `b6515688db8dc9e688e70b52635019848ed0967c`. It assigns server-generated event IDs before queue publication and uses ClickHouse `ReplacingMergeTree` to mitigate duplicates from queue redelivery. This is eventual deduplication during background merges, not strict immediate uniqueness. Existing ClickHouse tables require a deliberate migration/rebuild; rerunning the initial `CREATE TABLE IF NOT EXISTS` will not change an existing table engine.
+
+## Phase 2C — Validation and infrastructure readiness (ongoing)
 
 **No automated checks are currently confirmed passing.** The repository has no committed `pnpm-lock.yaml`; dependency installation, lint, typecheck, tests, builds, and PostgreSQL integration tests remain outstanding.
 
@@ -75,6 +77,15 @@ Database migrations have not been applied to a disposable or production PostgreS
 - Alerts, notification channels, and full uptime monitoring are not implemented.
 - Monthly plan tiers, billing metering, adaptive backpressure, and configurable retention are not implemented.
 - A self-hosted durable queue/runtime adapter and Docker Compose deployment are not implemented. The current ingestion runtime is Cloudflare-specific; do not claim self-hosted ingestion support yet.
+
+## Phase 3 — TypeScript SDK foundation (current)
+
+Branch `feat/phase-3-typescript-sdk-foundation` introduces three workspace packages:
+- `@jerico/sdk-core`: bounded in-memory queue, batch transport, explicit flush/close, metrics/logs/spans/events/errors, and error reporting.
+- `@jerico/sdk-browser`: public-key-only browser client, page-view capture, window errors, and unhandled promise rejections.
+- `@jerico/sdk-node`: secret-key-only Node client, telemetry methods, and opt-in unhandled-rejection capture.
+
+The SDK requires an explicit ingestion endpoint; no hosted Jerico endpoint is assumed. Failed batches remain in memory for explicit flush. Automatic retries are intentionally disabled because the ingestion API does not yet support request-level idempotency and retrying ambiguous requests could duplicate accepted events. These packages are not yet validated by install/typecheck/tests/build and are not production-ready. Browser session/identity APIs, Core Web Vitals, OpenTelemetry integrations, examples, and published package release remain outstanding.
 
 ## Next milestones after Phase 2C
 
