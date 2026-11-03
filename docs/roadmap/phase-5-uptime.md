@@ -147,7 +147,7 @@ The API Cron Trigger evaluates enabled rules every minute. Error-count rules req
 - The API publishes delivery jobs to the jerico-notifications Cloudflare Queue.
 - The Worker sends email through Resend and reports the result to an internal API callback protected by a separate shared secret.
 - Resend requests use the delivery ID as an idempotency key so queue redelivery does not intentionally create duplicate emails.
-- Queue retries are configured for five attempts with a dead-letter queue. Delivery history records status, callback attempt count, provider message ID, safe error code, and timestamps.
+- Queue retries are configured for five attempts with a dead-letter queue. Delivery history records status, worker attempt count, provider message ID, safe error code, and timestamps.
 - The dashboard exposes channel verification state and the latest 25 delivery records.
 
 ### Configuration and provisioning
