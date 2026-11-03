@@ -96,7 +96,7 @@ Files added/updated:
 - `apps/api/.dev.vars.example`
 - `docs/roadmap/phase-4-observability.md`
 
-The tests are authored but not executed. PostgreSQL/ClickHouse integration, query performance, and route-level tenant isolation tests remain outstanding. Metrics, spans, project overview aggregates, and the dashboard UI are not part of this first slice.
+The API also exposes metrics and spans list routes plus a project overview aggregate for counts by telemetry type and latest event time. The tests are authored but not executed. PostgreSQL/ClickHouse integration, query performance, and route-level tenant isolation tests remain outstanding. The dashboard UI is not part of this first slice.
 
 ### Known product gaps
 
