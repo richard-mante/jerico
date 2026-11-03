@@ -74,7 +74,7 @@ Latest reliability milestone: [PR #64 — deduplicate ClickHouse telemetry reads
 
 Before exercising the notification pipeline in a non-production environment:
 
-1. Apply migrations through `0013_notification_delivery_attempt_fencing.sql` (includes notification enqueue retry migration 0009, alert evaluation lease migration 0010, channel organization FK migration 0011, and outbox lease migration 0012).
+1. Apply migrations through `0014_uptime_active_check_fencing.sql` (includes notification enqueue retry migration 0009, alert evaluation lease migration 0010, channel organization FK migration 0011, and outbox lease migration 0012).
 2. Provision `jerico-uptime-probes`, `jerico-uptime-probes-dlq`, `jerico-notifications`, and `jerico-notifications-dlq`.
 3. Configure matching `UPTIME_RESULTS_SECRET` on API and Worker.
 4. Configure matching `NOTIFICATION_DELIVERY_SECRET` on API and Worker.
