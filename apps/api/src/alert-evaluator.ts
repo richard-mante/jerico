@@ -1,17 +1,17 @@
-import { and, eq, gte, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, or } from "drizzle-orm";
 import { alertRules, incidents, uptimeCheckResults } from "@jerico/database/schema";
 import { withDatabase, type ApiBindings } from "./database";
 import { queryTelemetryErrorCount, type TelemetryQueryBindings } from "./telemetry-query";
 
 type AlertEnvironment = ApiBindings & TelemetryQueryBindings;
 
-function percentile95(values: number[]): number | null {
+export function percentile95(values: number[]): number | null {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)];
 }
 
-function isBreaching(value: number, comparison: string, threshold: number) {
+export function isBreaching(value: number, comparison: string, threshold: number) {
   return comparison === "gt" ? value > threshold : value >= threshold;
 }
 
@@ -34,17 +34,22 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
             to: now.toISOString(),
           });
         } else {
-          const checks = await database.select({
-            status: uptimeCheckResults.status,
-            responseTimeMs: uptimeCheckResults.responseTimeMs,
-          }).from(uptimeCheckResults).where(and(
+          const filters = and(
             eq(uptimeCheckResults.organizationId, rule.organizationId),
             eq(uptimeCheckResults.projectId, rule.projectId),
             gte(uptimeCheckResults.checkedAt, from),
             lte(uptimeCheckResults.checkedAt, now),
-          ));
-          if (rule.metric === "uptime_down") value = checks.length ? checks.filter((check) => check.status === "down").length : null;
-          else value = percentile95(checks.flatMap((check) => check.responseTimeMs === null ? [] : [check.responseTimeMs]));
+          );
+          if (rule.metric === "uptime_down") {
+            const [total] = await database.select({ value: count() }).from(uptimeCheckResults).where(filters);
+            const [down] = await database.select({ value: count() }).from(uptimeCheckResults).where(and(filters, eq(uptimeCheckResults.status, "down")));
+            value = Number(total?.value ?? 0) > 0 ? Number(down?.value ?? 0) : null;
+          } else {
+            const checks = await database.select({ responseTimeMs: uptimeCheckResults.responseTimeMs })
+              .from(uptimeCheckResults).where(filters)
+              .orderBy(desc(uptimeCheckResults.checkedAt)).limit(10000);
+            value = percentile95(checks.flatMap((check) => check.responseTimeMs === null ? [] : [check.responseTimeMs]));
+          }
         }
       } catch (error) {
         console.error("Jerico alert rule evaluation failed", {
