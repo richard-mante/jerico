@@ -240,3 +240,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-clickhouse-integration-tests` adds a gated real-ClickHouse query integration suite, a Docker Compose ClickHouse service, an API integration-test script, and CI service wiring.
 - The suite covers overview, error groups/stack, fingerprint occurrences, event catalogue/details/series, metric aggregation, and structured log severity.
 - The suite has not been executed successfully in this environment; CI runner allocation remains unresolved.
+
+
+### Phase 4 trace detail drill-down (open PR)
+
+- Added a trace ID filter to the authenticated spans query. The trace ID is bound as a ClickHouse parameter; organization/project/environment/time-range checks and cursor pagination remain in force.
+- Added a dashboard action to load a trace independently of the initial project-wide span page, render its span details, and load subsequent pages.
+- Added query-adapter unit coverage and a gated real-ClickHouse integration case for trace-scoped retrieval. Tests are authored but not executed.
+- This is a trace detail list, not a service map or cross-project trace search. No lint, typecheck, tests, build, ClickHouse integration, or browser validation has run for this slice.
