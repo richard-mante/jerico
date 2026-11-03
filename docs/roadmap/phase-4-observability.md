@@ -161,3 +161,8 @@ The browser SDK can opt into `captureWebVitals: true`. It records TTFB and FCP w
 ## Metric percentiles and Core Web Vitals ratings
 
 Metric-series buckets now include average, minimum, maximum, p50, p75, p95, sample count, and the latest observed `unit` and `rating` attributes. The dashboard shows percentile summaries and units for the latest bucket. Browser Web Vitals metrics carry their unit (`ms` or `score`) and a rating using the published thresholds: LCP 2.5s/4s, INP 200ms/500ms, CLS 0.1/0.25, FCP 1.8s/3s, and TTFB 0.8s/1.8s. Percentiles are calculated across the metric samples in each bucket; they are not yet service-level percentile aggregations across request traces, and the dashboard remains limited to the top eight metric names.
+
+
+## Route-level Core Web Vitals
+
+The API exposes `GET /api/v1/projects/:projectId/telemetry/metrics/routes`, scoped by the authenticated organization, verified project, optional verified environment, and bounded time range. It aggregates only the five public Web Vitals metric names by the pathname captured when browser instrumentation starts. Each route/metric pair includes sample count, p75, p95, unit, and the latest sample's rating. Results are capped at 100 route/metric pairs. The Metrics tab displays per-route Core Web Vitals cards. Paths are pathnames only; query strings and fragments are not collected. This is not route-template normalization, and dynamic IDs in pathnames may create high-cardinality routes; applications should avoid adding sensitive identifiers to URL path segments.
