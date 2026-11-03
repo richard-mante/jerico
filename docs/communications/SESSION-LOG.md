@@ -500,3 +500,17 @@
 ### Next
 - Investigate/restore GitHub-hosted runner allocation in repository/account Actions settings, or use a reachable local runner.
 - Once a runner can execute, generate and commit pnpm-lock.yaml, then run the full validation sequence. Keep Phase 6 implementation blocked until validation findings are addressed.
+
+
+## 2026-11-03 — CI runner investigation and lockfile ownership
+
+- Confirmed PR #36 is merged; current `main` is `ada0632e14441dde3140c273311f85332ebfbd24`. There are no open pull requests.
+- Rechecked latest Actions run [#198](https://github.com/richard-mante/jerico/actions/runs/41628640738). Its only job is failed with `runner_id: 0`, no runner name, and `steps: null`; fetching the job log returns `BlobNotFound`. No workflow step ran, so this is not evidence of a source-code test failure.
+- The user will generate and commit `pnpm-lock.yaml`. This workstream will not fabricate, generate, or modify the lockfile. Dependency installation and source validation remain pending until the lockfile is present and a runner/networked environment can execute the checks.
+- Reviewed the current uptime probe, webhook delivery, Worker queue consumer, and Wrangler configuration at source level. The public-only fetch compatibility flag is present; redirects are disabled for webhook deliveries and manually revalidated for uptime probes. This is a source inspection only, not a runtime SSRF/security certification.
+- No application code or runtime configuration was changed. No install, lint, typecheck, tests, build, migration, or live delivery was executed.
+
+### Next
+- Continue the source-level security review and document concrete findings before changing security-sensitive code.
+- Once the user commits the lockfile and GitHub allocates a runner (or a reachable local environment is available), run the full validation suite and address failures.
+- Keep Phase 6 release implementation behind the existing validation gate; do not start Docker/queue adapter implementation without the prerequisite validation and measured adapter decision.
