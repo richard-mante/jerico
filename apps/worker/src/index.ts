@@ -58,6 +58,20 @@ type WorkerEnv = ClickHouseEnv & {
   WEBHOOK_ENCRYPTION_KEY?: string;
 };
 
+export function buildUptimeDeadLetterResult(message: UptimeProbeMessage, checkedAt = new Date().toISOString()) {
+  return {
+    checkId: message.checkId,
+    monitorId: message.monitorId,
+    organizationId: message.organizationId,
+    projectId: message.projectId,
+    status: "down" as const,
+    statusCode: null,
+    responseTimeMs: null,
+    errorCode: "network_error" as const,
+    checkedAt,
+  };
+}
+
 export function escapeIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) throw new Error("Invalid ClickHouse identifier.");
   return value;
@@ -180,17 +194,7 @@ async function processUptimeDeadLetterBatch(batch: MessageBatch<UptimeProbeMessa
             "content-type": "application/json",
             "x-jerico-uptime-secret": env.UPTIME_RESULTS_SECRET,
           },
-          body: JSON.stringify({
-            checkId: body.checkId,
-            monitorId: body.monitorId,
-            organizationId: body.organizationId,
-            projectId: body.projectId,
-            status: "down",
-            statusCode: null,
-            responseTimeMs: null,
-            errorCode: "network_error",
-            checkedAt: new Date().toISOString(),
-          }),
+          body: JSON.stringify(buildUptimeDeadLetterResult(body)),
         });
         await response.body?.cancel().catch(() => undefined);
         if (!response.ok) throw new Error("Uptime dead-letter callback rejected with status " + response.status + ".");
