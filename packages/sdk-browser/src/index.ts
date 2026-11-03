@@ -1,4 +1,4 @@
-import { JericoClient, type JericoClientOptions, type LogLevel, type TelemetryValue } from "@jerico/sdk-core";
+import { JericoClient, type JericoClientOptions, type LogLevel, type SpanContext, type TelemetryValue } from "@jerico/sdk-core";
 
 export type BrowserJericoOptions = JericoClientOptions & {
   capturePageViews?: boolean;
@@ -95,6 +95,14 @@ export class BrowserJericoClient extends JericoClient {
     throw new Error("Browser credentials cannot submit spans; use a secret key from a trusted server.");
   }
 
+  override startSpan(_name: string, _attributes?: Record<string, TelemetryValue>, _parentContext?: SpanContext): never {
+    throw new Error("Browser credentials cannot submit spans; use a secret key from a trusted server.");
+  }
+
+  override withSpan<T>(_name: string, _operation: (context: SpanContext) => Promise<T> | T, _attributes?: Record<string, TelemetryValue>, _parentContext?: SpanContext): Promise<T> {
+    throw new Error("Browser credentials cannot submit spans; use a secret key from a trusted server.");
+  }
+
   capturePageView(attributes?: Record<string, TelemetryValue>): boolean {
     return this.track("page.view", {
       path: window.location.pathname,
@@ -114,4 +122,4 @@ export function createBrowserClient(options: BrowserJericoOptions): BrowserJeric
   return new BrowserJericoClient(options);
 }
 
-export type { LogLevel, TelemetryValue } from "@jerico/sdk-core";
+export type { LogLevel, SpanContext, SpanHandle, TelemetryValue } from "@jerico/sdk-core";
