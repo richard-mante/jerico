@@ -20,11 +20,7 @@ export type JericoClientOptions = {
 };
 
 export class JericoHttpError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly retryAfterSeconds?: number,
-  ) {
+  constructor(message: string, public readonly status: number, public readonly retryAfterSeconds?: number) {
     super(message);
     this.name = "JericoHttpError";
   }
@@ -38,9 +34,9 @@ export class JericoClient {
   private queue: TelemetryEvent[] = [];
   private timer: ReturnType<typeof setInterval> | undefined;
   private inFlight: Promise<void> | undefined;
-  private closed = false;
-  private timerBlocked = false;
   private inFlightCount = 0;
+  private timerBlocked = false;
+  private closed = false;
   private readonly fetcher: typeof fetch;
   private readonly endpoint: string;
   private readonly maxBatchSize: number;
@@ -48,7 +44,10 @@ export class JericoClient {
 
   constructor(private readonly options: JericoClientOptions) {
     if (!options.apiKey.trim()) throw new Error("A Jerico ingestion API key is required.");
-    this.endpoint = (options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, "");
+    let endpoint: URL;
+    try { endpoint = new URL(options.endpoint); } catch { throw new Error("A valid absolute ingestion endpoint is required."); }
+    if (endpoint.protocol !== "https:" && endpoint.protocol !== "http:") throw new Error("The ingestion endpoint must use HTTP or HTTPS.");
+    this.endpoint = options.endpoint.replace(/\/$/, "");
     this.maxBatchSize = options.maxBatchSize ?? DEFAULT_BATCH_SIZE;
     this.maxQueueSize = options.maxQueueSize ?? DEFAULT_QUEUE_SIZE;
     if (!Number.isInteger(this.maxBatchSize) || this.maxBatchSize < 1 || this.maxBatchSize > 100) {
@@ -59,7 +58,9 @@ export class JericoClient {
     }
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     const interval = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL;
-    if (interval > 0) this.timer = setInterval(() => {\n      if (!this.timerBlocked) void this.flushBatch().catch(this.reportError);\n    }, interval);
+    if (interval > 0) this.timer = setInterval(() => {
+      if (!this.timerBlocked) void this.flushBatch().catch(this.reportError);
+    }, interval);
   }
 
   track(name: string, attributes?: Record<string, TelemetryValue>): boolean {
@@ -97,14 +98,22 @@ export class JericoClient {
       return false;
     }
     this.queue.push({ ...event, timestamp: new Date().toISOString() });
-    if (this.queue.length >= this.maxBatchSize) void this.flush().catch(this.reportError);
+    if (!this.timerBlocked && this.queue.length >= this.maxBatchSize) {
+      void this.flushBatch().catch(this.reportError);
+    }
     return true;
   }
 
   async flush(): Promise<void> {
+    this.timerBlocked = false;
+    while (this.queue.length > 0 || this.inFlight) await this.flushBatch();
+  }
+
+  private async flushBatch(): Promise<void> {
     if (this.inFlight) return this.inFlight;
     if (this.queue.length === 0) return;
     const batch = this.queue.splice(0, this.maxBatchSize);
+    this.inFlightCount = batch.length;
     this.inFlight = (async () => {
       try {
         const response = await this.fetcher(`${this.endpoint}/ingest/v1/events`, {
@@ -124,9 +133,11 @@ export class JericoClient {
           );
         }
       } catch (error) {
-        this.queue = [...batch, ...this.queue].slice(0, this.maxQueueSize);
+        this.queue = [...batch, ...this.queue];
+        this.timerBlocked = true;
         throw error;
       } finally {
+        this.inFlightCount = 0;
         this.inFlight = undefined;
       }
     })();
