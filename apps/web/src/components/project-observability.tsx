@@ -22,6 +22,8 @@ type EventSeries = { name: string; points: EventPoint[] };
 type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string; latestMessage: string; latestAttributes: string };
 type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; p50: number; p75: number; p95: number; samples: number; unit: string; rating: string };
 type MetricSeries = { name: string; points: MetricPoint[] };
+type RouteMetric = { name: string; samples: number; p75: number; p95: number; unit: string; rating: string };
+type RoutePerformance = { path: string; metrics: RouteMetric[] };
 type ErrorGroupStatus = "open" | "resolved" | "ignored";
 type ErrorGroup = {
   fingerprint: string;
@@ -120,6 +122,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [eventCatalogue, setEventCatalogue] = useState<EventSummary[]>([]);
   const [eventSeries, setEventSeries] = useState<EventSeries[]>([]);
   const [metricSeries, setMetricSeries] = useState<MetricSeries[]>([]);
+  const [routePerformance, setRoutePerformance] = useState<RoutePerformance[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -192,13 +195,16 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         credentials: "include", headers, signal: controller.signal,
       }),
       tab === "events" ? fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/events/series?${query}`, { credentials: "include", headers, signal: controller.signal }) : Promise.resolve(null),
-    ]).then(async ([overviewResponse, listResponse, seriesResponse]) => {
+      tab === "metrics" ? fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/metrics/routes?${query}`, { credentials: "include", headers, signal: controller.signal }) : Promise.resolve(null),
+    ]).then(async ([overviewResponse, listResponse, seriesResponse, routeResponse]) => {
       const overviewPayload = await overviewResponse.json();
       const listPayload = await listResponse.json();
       const seriesPayload = seriesResponse ? await seriesResponse.json() : { data: [] };
+      const routePayload = routeResponse ? await routeResponse.json() : { data: [] };
       if (!overviewResponse.ok) throw new Error(overviewPayload.error?.message ?? "Could not load project overview.");
       if (!listResponse.ok) throw new Error(listPayload.error?.message ?? "Could not load telemetry.");
       if (seriesResponse && !seriesResponse.ok) throw new Error(seriesPayload.error?.message ?? "Could not load event time series.");
+      if (routeResponse && !routeResponse.ok) throw new Error(routePayload.error?.message ?? "Could not load route performance.");
       setOverview(overviewPayload.data as Overview);
       if (tab === "errors") {
         setErrorGroups((listPayload.data ?? []) as ErrorGroup[]);
@@ -206,10 +212,12 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setEventCatalogue([]);
         setEventSeries([]);
         setMetricSeries([]);
+        setRoutePerformance([]);
         setRows([]);
         setNextCursor(null);
       } else if (tab === "metrics") {
         setMetricSeries((listPayload.data ?? []) as MetricSeries[]);
+        setRoutePerformance((routePayload.data ?? []) as RoutePerformance[]);
         setEventSeries([]);
         setErrorGroups([]);
         setCanManageErrorGroups(false);
@@ -240,6 +248,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setEventCatalogue([]);
         setEventSeries([]);
         setMetricSeries([]);
+        setRoutePerformance([]);
         setOverview(emptyOverview);
         setError(cause instanceof Error ? cause.message : "Could not load telemetry.");
       }
@@ -502,6 +511,24 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                   {latest && <p className="mt-2 text-[10px] text-[#606b7a]">{formatTimestamp(series.points[0].timestamp)} — {formatTimestamp(latest.timestamp)}</p>}
                 </article>;
               })}
+              {routePerformance.length > 0 && <section className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/10">
+                <div className="border-b border-white/[0.07] px-4 py-4"><h3 className="text-sm font-semibold">Route performance</h3><p className="mt-1 text-[10px] text-[#758091]">Core Web Vitals by page · p75 and p95 across captured samples</p></div>
+                <div className="divide-y divide-white/[0.06]">
+                  {routePerformance.map((route) => <article key={route.path} className="space-y-3 px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2"><p className="break-all font-mono text-xs font-semibold">{route.path}</p><span className="text-[10px] text-[#758091]">{route.metrics.reduce((sum, metric) => sum + metric.samples, 0).toLocaleString()} samples</span></div>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      {route.metrics.map((metric) => {
+                        const ratingClass = metric.rating === "good" ? "text-[#d9f36a]" : metric.rating === "needs-improvement" ? "text-amber-200" : metric.rating === "poor" ? "text-rose-200" : "text-[#8791a0]";
+                        return <div key={metric.name} className="rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                          <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-semibold uppercase tracking-wider text-[#9aa5b4]">{metric.name.replace("web.vitals.", "")}</p>{metric.rating && <span className={`text-[9px] font-semibold uppercase ${ratingClass}`}>{metric.rating.replace("-", " ")}</span>}</div>
+                          <div className="mt-2 grid grid-cols-2 gap-2"><div><p className="text-[9px] text-[#667181]">P75</p><p className="mt-1 text-sm font-semibold tabular-nums">{metric.p75.toLocaleString(undefined, { maximumFractionDigits: 3 })} {metric.unit}</p></div><div><p className="text-[9px] text-[#667181]">P95</p><p className="mt-1 text-sm font-semibold tabular-nums">{metric.p95.toLocaleString(undefined, { maximumFractionDigits: 3 })} {metric.unit}</p></div></div>
+                          <p className="mt-2 text-[9px] text-[#667181]">{metric.samples.toLocaleString()} samples</p>
+                        </div>;
+                      })}
+                    </div>
+                  </article>)}
+                </div>
+              </section>}
             </div>
           ) : tab === "errors" && errorGroups.length ? (
             <div className="divide-y divide-white/[0.06]">
