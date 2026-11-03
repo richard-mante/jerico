@@ -53,3 +53,8 @@ These examples are documentation only; they have not yet been run in sample appl
 ## Request-level batch idempotency
 
 The SDK core now generates one UUID idempotency key per batch and reuses the exact key and request body when an explicit `flush()` retries a failed batch. This is safe only when paired with the ingestion service's `Idempotency-Key` implementation and migration. Automatic retries remain disabled; buffers remain memory-only.
+
+
+## Core Web Vitals ratings
+
+When `captureWebVitals: true`, the browser SDK attaches a unit (`ms` for time-based metrics, `score` for CLS) and a rating. Thresholds are LCP 2500/4000 ms, INP 200/500 ms, CLS 0.1/0.25, FCP 1800/3000 ms, and TTFB 800/1800 ms for good/needs-improvement boundaries. These ratings are based on the captured page values; field aggregation and official-library equivalence still require validation.

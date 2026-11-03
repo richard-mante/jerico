@@ -1,5 +1,5 @@
 import { JericoClient, type JericoClientOptions, type LogLevel, type SpanContext, type TelemetryValue } from "@jerico/sdk-core";
-import { isPublicWebVitalMetric } from "./web-vitals";
+import { isPublicWebVitalMetric, rateWebVital } from "./web-vitals";
 
 export type BrowserJericoOptions = JericoClientOptions & {
   capturePageViews?: boolean;
@@ -179,7 +179,9 @@ export class BrowserJericoClient extends JericoClient {
 
   private recordWebVital(name: string, value: number, attributes?: Record<string, TelemetryValue>): boolean {
     if (!isPublicWebVitalMetric(name)) return false;
-    return super.metric(name, value, { ...attributes, source: "browser-web-vitals", path: window.location.pathname });
+    const unit = name === "web.vitals.cls" ? "score" : "ms";
+    const rating = rateWebVital(name, value);
+    return super.metric(name, value, { ...attributes, unit, ...(rating ? { rating } : {}), source: "browser-web-vitals", path: window.location.pathname });
   }
 
   private flushWebVitals(): void {

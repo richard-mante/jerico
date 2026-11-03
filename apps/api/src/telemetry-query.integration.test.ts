@@ -54,8 +54,8 @@ describe.skipIf(!testUrl)("ClickHouse telemetry query integration", () => {
       { event_id: "error-1", timestamp: timestamp(-15000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-3", event_type: "error", name: "TypeError", message: "Cannot read property", value: null, attributes: JSON.stringify({ stack: "TypeError: first stack" }) },
       { event_id: "error-2", timestamp: timestamp(-10000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-4", event_type: "error", name: "TypeError", message: "Cannot read property", value: null, attributes: JSON.stringify({ stack: "TypeError: latest stack" }) },
       { event_id: "log-1", timestamp: timestamp(-9000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-5", event_type: "log", name: "api.request", message: "Slow request", value: null, attributes: JSON.stringify({ level: "warn" }) },
-      { event_id: "metric-1", timestamp: timestamp(-8000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-6", event_type: "metric", name: "http.request.duration", message: "", value: 100, attributes: "{}" },
-      { event_id: "metric-2", timestamp: timestamp(-7000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-7", event_type: "metric", name: "http.request.duration", message: "", value: 101, attributes: "{}" },
+      { event_id: "metric-1", timestamp: timestamp(-8000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-6", event_type: "metric", name: "http.request.duration", message: "", value: 100, attributes: JSON.stringify({ unit: "ms", rating: "good" }) },
+      { event_id: "metric-2", timestamp: timestamp(-7000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-7", event_type: "metric", name: "http.request.duration", message: "", value: 101, attributes: JSON.stringify({ unit: "ms", rating: "good" }) },
       { event_id: "span-1", timestamp: timestamp(-6000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-8", event_type: "span", name: "http.request", message: "", value: 20, attributes: JSON.stringify({ traceId: "trace-1", spanId: "span-1" }) },
     ];
     await execute("INSERT INTO " + database + "." + table + " FORMAT JSONEachRow", rows.map((row) => JSON.stringify(row)).join("\n"));
@@ -85,7 +85,10 @@ describe.skipIf(!testUrl)("ClickHouse telemetry query integration", () => {
 
   it("runs metric aggregation and structured log filters against ClickHouse", async () => {
     const metrics = await queryTelemetryMetricSeries(bindings, { organizationId, projectId, environmentId, from, to, bucketMinutes: 15 });
-    expect(metrics.find((item) => item.name === "http.request.duration")?.points[0]).toMatchObject({ average: 100.5, minimum: 100, maximum: 101, samples: 2 });
+    expect(metrics.find((item) => item.name === "http.request.duration")?.points[0]).toMatchObject({ average: 100.5, minimum: 100, maximum: 101, samples: 2, unit: "ms", rating: "good" });
+    const percentilePoint = metrics.find((item) => item.name === "http.request.duration")?.points[0];
+    expect(percentilePoint?.p50).toBeGreaterThanOrEqual(100);
+    expect(percentilePoint?.p95).toBeLessThanOrEqual(101);
     const logs = await queryTelemetry(bindings, { organizationId, projectId, environmentId, from, to, limit: 20, eventType: "log", logLevel: "warn" });
     expect(logs).toHaveLength(1);
     expect(logs[0].name).toBe("api.request");

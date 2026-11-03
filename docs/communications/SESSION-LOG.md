@@ -346,3 +346,13 @@
 - Updated the ingestion Worker to accept public-key metric events only for the exact allowlisted `web.vitals.*` names. Public custom metrics, logs, and spans remain denied.
 - Added pure allowlist tests for the browser SDK and ingestion service, plus README, Next.js example, Phase 3/4 roadmap, and handover updates.
 - No lint, typecheck, tests, build, browser run, or ClickHouse integration was executed. The native INP/CLS calculations need validation against the official `web-vitals` library and across browser support matrices.
+
+
+## 2026-11-03 — Core Web Vitals metric dashboard
+
+- Confirmed PR #25 merged into `main` (merge commit `9b11f9d477d9101ebcb17e838f350af4bca95b16`).
+- Created `feat/core-web-vitals-dashboard` from current `main`.
+- Added standard good/needs-improvement/poor thresholds for LCP, INP, CLS, FCP, and TTFB in the browser SDK. Captured Web Vitals now carry `unit` and `rating` attributes.
+- Extended ClickHouse metric buckets with p50, p75, p95, unit, and rating metadata; updated API response mapping and dashboard metric cards.
+- Updated unit and gated ClickHouse integration test fixtures/assertions, SDK README, and Phase 3/4 documentation.
+- No lint, typecheck, unit tests, build, ClickHouse integration, or browser validation was run. Percentile SQL and actual browser metric distributions still require runtime verification.

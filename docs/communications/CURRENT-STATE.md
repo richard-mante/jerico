@@ -262,3 +262,11 @@ At the end of each substantial session, update this file and append a session-lo
 - It observes TTFB, FCP, LCP, CLS session windows, and an INP estimate. Metrics are recorded internally; browser callers still cannot submit arbitrary custom metrics.
 - Public-key ingestion permits only five exact `web.vitals.*` metric names alongside events/errors. Custom metrics, logs, and spans remain restricted to secret credentials.
 - Added allowlist tests for the SDK and ingestion helper. No lint, typecheck, unit tests, build, integration test, or browser test has been run. INP/CLS behavior still needs comparison against the official `web-vitals` library.
+
+
+### Core Web Vitals dashboard — current open work
+
+- Branch `feat/core-web-vitals-dashboard` adds per-bucket p50/p75/p95 aggregation to the metric-series query and returns unit/rating metadata from metric attributes.
+- Metrics cards show latest average with unit, latest rating, and p50/p75/p95 summaries.
+- Browser Web Vitals SDK metrics now attach `ms`/ `score` units and good/needs-improvement/poor ratings using the standard thresholds.
+- Added unit and gated ClickHouse integration assertions for percentiles and metadata. No tests, lint, typecheck, build, ClickHouse integration, or browser validation has been run.
