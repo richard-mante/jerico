@@ -234,8 +234,10 @@ async function postNotificationResult(
       },
       body: JSON.stringify(result),
     });
-    await response.body?.cancel().catch(() => undefined);
-    if (!response.ok) throw new Error("Notification result callback rejected.");
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error("Notification result callback rejected.");
+    }
     const payload = await response.json().catch(() => null) as { data?: { active?: boolean } } | null;
     return payload?.data?.active !== false;
   } finally {
