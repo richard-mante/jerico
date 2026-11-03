@@ -352,6 +352,7 @@ describe("notification delivery callback attempt fencing", () => {
       }),
     }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
     expect(response.status).toBe(202);
+    expect((await response.json() as { data: { active: boolean } }).data.active).toBe(true);
     expect(mocks.select).toHaveBeenCalledTimes(1);
   });
 
@@ -402,6 +403,7 @@ describe("notification delivery callback attempt fencing", () => {
       }),
     }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
     expect(response.status).toBe(202);
+    expect((await response.json() as { data: { active: boolean } }).data.active).toBe(false);
     expect(mocks.select).toHaveBeenCalledTimes(1);
   });
 
