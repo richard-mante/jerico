@@ -71,6 +71,13 @@
       "when": 1793702400000,
       "tag": "0009_notification_enqueue_retries",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793702700000,
+      "tag": "0010_alert_evaluation_leases",
+      "breakpoints": true
     }
   ]
 }
