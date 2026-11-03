@@ -11,7 +11,7 @@ export type TelemetryEvent = {
 
 export type JericoClientOptions = {
   apiKey: string;
-  endpoint?: string;
+  endpoint: string;
   flushIntervalMs?: number;
   maxBatchSize?: number;
   maxQueueSize?: number;
@@ -30,7 +30,6 @@ export class JericoHttpError extends Error {
   }
 }
 
-const DEFAULT_ENDPOINT = "https://ingest.jerico.dev";
 const DEFAULT_FLUSH_INTERVAL = 10_000;
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_QUEUE_SIZE = 5_000;
@@ -40,6 +39,8 @@ export class JericoClient {
   private timer: ReturnType<typeof setInterval> | undefined;
   private inFlight: Promise<void> | undefined;
   private closed = false;
+  private timerBlocked = false;
+  private inFlightCount = 0;
   private readonly fetcher: typeof fetch;
   private readonly endpoint: string;
   private readonly maxBatchSize: number;
@@ -58,7 +59,7 @@ export class JericoClient {
     }
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     const interval = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL;
-    if (interval > 0) this.timer = setInterval(() => { void this.flush().catch(this.reportError); }, interval);
+    if (interval > 0) this.timer = setInterval(() => {\n      if (!this.timerBlocked) void this.flushBatch().catch(this.reportError);\n    }, interval);
   }
 
   track(name: string, attributes?: Record<string, TelemetryValue>): boolean {
@@ -91,7 +92,7 @@ export class JericoClient {
   private enqueue(event: Omit<TelemetryEvent, "timestamp">): boolean {
     if (this.closed) throw new Error("This Jerico client has been closed.");
     if (!event.name.trim()) throw new Error("Telemetry event name cannot be empty.");
-    if (this.queue.length >= this.maxQueueSize) {
+    if (this.queue.length + this.inFlightCount >= this.maxQueueSize) {
       this.reportError(new Error("Jerico telemetry queue is full; the new event was dropped."));
       return false;
     }
