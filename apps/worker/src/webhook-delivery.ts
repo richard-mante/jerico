@@ -26,8 +26,8 @@ export function isSafeWebhookUrl(value: string, blockedHost?: string): boolean {
     if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || url.search || url.hash) return false;
     if (!host.includes(".") || host.length > 253 || host.startsWith("[") || host.includes(":")) return false;
     if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(host)) return false;
-    if (["localhost", "metadata.google.internal"].includes(host)) return false;
-    if ([".localhost", ".local", ".internal", ".test", ".invalid", ".example", ".home.arpa"].some((suffix) => host.endsWith(suffix))) return false;
+    if (["localhost", "metadata", "metadata.google.internal", "metadata.azure.internal", "instance-data"].includes(host)) return false;
+    if ([".localhost", ".local", ".internal", ".test", ".invalid", ".example", ".home.arpa", ".lan", ".corp", ".home", ".intranet", ".private", ".arpa", ".onion"].some((suffix) => host.endsWith(suffix))) return false;
     if (blockedHost && host === blockedHost.toLowerCase()) return false;
     return true;
   } catch {
