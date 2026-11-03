@@ -91,4 +91,14 @@ describe("project observability route authorization", () => {
     expect(mocks.select).toHaveBeenCalledTimes(2);
   });
 
+  it("does not expose uptime monitors for a project outside the active organization", async () => {
+    setSelectResults([{ role: "member" }], []);
+    const response = await app.request("/api/v1/projects/project-from-org-b/uptime-monitors", {
+      method: "GET",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+    expect(response.status).toBe(404);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
 });
