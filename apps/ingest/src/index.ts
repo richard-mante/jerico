@@ -313,7 +313,7 @@ app.post("/ingest/v1/events", async (context) => {
         return context.json({ error: { code: "IDEMPOTENCY_KEY_EXPIRED", message: "This idempotency key has expired. Create a new key for a new request.", requestId } }, 409);
       }
       if (reservation.kind === "accepted") {
-        return context.json({ data: { accepted: reservation.envelope.events.length, requestId: reservation.envelope.requestId, idempotent: true } }, 202);
+        return context.json({ data: { accepted: reservation.envelope.events.length, requestId, idempotent: true } }, 202);
       }
 
       // Pending records are re-published on retry. Stable event IDs ensure an
@@ -323,7 +323,7 @@ app.post("/ingest/v1/events", async (context) => {
         await database.update(projectIngestionRequests).set({ status: "accepted" })
           .where(eq(projectIngestionRequests.id, reservation.id));
       });
-      return context.json({ data: { accepted: reservation.envelope.events.length, requestId: reservation.envelope.requestId, idempotent: reservation.kind === "pending" } }, 202);
+      return context.json({ data: { accepted: reservation.envelope.events.length, requestId, idempotent: true } }, 202);
     }
 
     await reserveDailyQuota(context.env, credential.projectId, usageDate, events.length);
@@ -365,4 +365,17 @@ app.onError((error, context) => {
   return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed.", requestId: context.get("requestId") } }, 500);
 });
 
-export default app;
+async function purgeExpiredIdempotencyRequests(env: Bindings): Promise<void> {
+  await withCredentialDatabase(env, async (database) => {
+    await database.delete(projectIngestionRequests)
+      .where(lt(projectIngestionRequests.expiresAt, new Date()));
+  });
+}
+
+export default {
+  fetch: (request: Request, env: Bindings, executionContext: ExecutionContext) =>
+    app.fetch(request, env, executionContext),
+  scheduled: (_controller: ScheduledController, env: Bindings, executionContext: ExecutionContext) => {
+    executionContext.waitUntil(purgeExpiredIdempotencyRequests(env));
+  },
+};
