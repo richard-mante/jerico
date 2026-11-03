@@ -12,3 +12,9 @@ UPTIME_RESULTS_SECRET=replace-with-a-long-random-secret
 
 # Exact workers.dev hostname of this probe Worker; it is blocked as a probe target
 PROBE_WORKER_HOST=jerico-worker.your-account.workers.dev
+
+# Resend credentials for incident email delivery
+RESEND_API_KEY=
+EMAIL_FROM=Jerico <no-reply@example.com>
+# Must match apps/api NOTIFICATION_DELIVERY_SECRET
+NOTIFICATION_DELIVERY_SECRET=replace-with-a-long-random-secret
