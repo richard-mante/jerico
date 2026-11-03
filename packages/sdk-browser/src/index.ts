@@ -1,6 +1,6 @@
 import { JericoClient, type JericoClientOptions, type LogLevel, type SpanContext, type TelemetryValue } from "@jerico/sdk-core";
 import { isPublicWebVitalMetric, rateWebVital } from "./web-vitals";
-import { normalizeRoutePath } from "./route-path";
+import { resolveRoutePath } from "./route-path";
 
 export type BrowserJericoOptions = JericoClientOptions & {
   capturePageViews?: boolean;
@@ -127,14 +127,7 @@ export class BrowserJericoClient extends JericoClient {
   }
 
   private currentRoutePath(): string {
-    const pathname = window.location.pathname;
-    try {
-      const resolved = this.routeResolver?.(pathname);
-      if (typeof resolved === "string" && resolved.trim()) return normalizeRoutePath(resolved);
-    } catch {
-      // Fall back to conservative path normalization if the app resolver throws.
-    }
-    return normalizeRoutePath(pathname);
+    return resolveRoutePath(window.location.pathname, this.routeResolver);
   }
 
   private observePerformance(type: string, callback: (entries: PerformanceEntry[]) => void): void {
