@@ -125,6 +125,7 @@ export const environments = pgTable("environments", {
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("environments_project_slug_unique").on(t.projectId, t.slug),
+  uniqueIndex("environments_project_id_id_unique").on(t.projectId, t.id),
   index("environments_organization_project_idx").on(t.organizationId, t.projectId),
   foreignKey({ name: "environments_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
 ]);
