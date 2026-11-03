@@ -4,5 +4,11 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-02",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["* * * * *"] },
+  "queues": {
+    "producers": [
+      { "binding": "UPTIME_PROBES", "queue": "jerico-uptime-probes" }
+    ]
+  }
 }
