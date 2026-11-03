@@ -2,6 +2,19 @@
   "version": "7",
   "dialect": "postgresql",
   "entries": [
-    { "idx": 0, "version": "7", "when": 1793629000000, "tag": "0000_jerico_identity_and_projects", "breakpoints": true }
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793629000000,
+      "tag": "0000_jerico_identity_and_projects",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793700000000,
+      "tag": "0001_project_ingestion_keys",
+      "breakpoints": true
+    }
   ]
 }
