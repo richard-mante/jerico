@@ -966,8 +966,8 @@ app.post("/internal/notification-delivery-results", async (context) => {
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
   const result = parsed.data;
   const [updated] = await withDatabase(context.env, async (database) => database.update(notificationDeliveries).set({
-    status: result.status,
-    attempts: sql`${notificationDeliveries.attempts} + 1`,
+    status: result.status === "attempting" ? "queued" : result.status,
+    attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
     providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
     lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
     lastAttemptAt: new Date(),
