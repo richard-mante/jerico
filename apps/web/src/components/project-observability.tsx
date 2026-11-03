@@ -207,7 +207,7 @@ export function ProjectObservability() {
           </div>
           {loading ? <div className="px-5 py-16 text-center text-sm text-[#8f98a7]">Loading telemetry…</div> : rows.length ? (
             <div className="divide-y divide-white/[0.06]">
-              {rows.map((row) => <article key={row.eventId} className="grid gap-2 px-5 py-4 sm:grid-cols-[190px_110px_minmax(0,1fr)] sm:items-start">
+              {rows.map((row, index) => <article key={`${row.eventId}-${index}`} className="grid gap-2 px-5 py-4 sm:grid-cols-[190px_110px_minmax(0,1fr)] sm:items-start">
                 <time className="text-xs text-[#8791a0]">{formatTimestamp(row.timestamp)}</time>
                 <span className="w-fit rounded-md border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-[#b4bdca]">{row.eventType}</span>
                 <div className="min-w-0"><p className="truncate text-sm font-medium">{row.name}</p>{row.message && <p className="mt-1 break-words text-xs leading-5 text-[#8f98a7]">{row.message}</p>}<p className="mt-1 font-mono text-[10px] text-[#606b7a]">{row.eventId}</p></div>
