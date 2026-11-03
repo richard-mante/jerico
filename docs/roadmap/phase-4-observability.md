@@ -166,3 +166,8 @@ Metric-series buckets now include average, minimum, maximum, p50, p75, p95, samp
 ## Route-level Core Web Vitals
 
 The API exposes `GET /api/v1/projects/:projectId/telemetry/metrics/routes`, scoped by the authenticated organization, verified project, optional verified environment, and bounded time range. It aggregates only the five public Web Vitals metric names by the pathname captured when browser instrumentation starts. Each route/metric pair includes sample count, p75, p95, unit, and the latest sample's rating. Results are capped at 100 route/metric pairs. The Metrics tab displays per-route Core Web Vitals cards. Paths are pathnames only; query strings and fragments are not collected. This is not route-template normalization, and dynamic IDs in pathnames may create high-cardinality routes; applications should avoid adding sensitive identifiers to URL path segments.
+
+
+## Route-template normalization
+
+The browser SDK normalizes UUID, long hexadecimal, and long numeric path segments to `:id` by default, removes query strings/fragments, and bounds path length. Applications can provide `resolveRoute(pathname)` to map framework-specific dynamic routes to stable templates. The resolver runs locally in the browser and its result is normalized before telemetry is queued. If it throws, built-in normalization is used. This reduces common high-cardinality route patterns but cannot infer arbitrary dynamic slugs; applications should supply templates where needed.
