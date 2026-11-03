@@ -17,6 +17,24 @@ type TelemetryMessage = {
   acceptedAt: string;
   events: TelemetryEvent[];
 };
+import { probeEndpoint } from "./uptime-probe";
+
+type UptimeProbeMessage = {
+  schemaVersion: 1;
+  type: "uptime.probe";
+  checkId: string;
+  monitorId: string;
+  organizationId: string;
+  projectId: string;
+  url: string;
+  method: "GET" | "HEAD";
+  timeoutMs: number;
+  expectedStatusCode: number;
+};
+type WorkerEnv = ClickHouseEnv & {
+  API_URL?: string;
+  UPTIME_RESULTS_SECRET?: string;
+};
 type ClickHouseEnv = {
   CLICKHOUSE_URL?: string;
   CLICKHOUSE_DATABASE?: string;
@@ -73,10 +91,67 @@ export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryM
   }
 }
 
+async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): Promise<void> {
+  if (!env.API_URL || !env.UPTIME_RESULTS_SECRET || env.UPTIME_RESULTS_SECRET.length < 32) {
+    throw new Error("Uptime result callback is not configured.");
+  }
+  const apiUrl = new URL("/internal/uptime-results", env.API_URL);
+  if (apiUrl.protocol !== "https:") throw new Error("Uptime result callback must use HTTPS.");
+  const result = await probeEndpoint({
+    url: message.url,
+    method: message.method,
+    timeoutMs: message.timeoutMs,
+    expectedStatusCode: message.expectedStatusCode,
+  });
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    redirect: "error",
+    headers: {
+      "content-type": "application/json",
+      "x-jerico-uptime-secret": env.UPTIME_RESULTS_SECRET,
+    },
+    body: JSON.stringify({
+      checkId: message.checkId,
+      monitorId: message.monitorId,
+      organizationId: message.organizationId,
+      projectId: message.projectId,
+      ...result,
+      checkedAt: new Date().toISOString(),
+    }),
+  });
+  if (!response.ok) throw new Error("Uptime result callback rejected with status " + response.status + ".");
+}
+
+async function processUptimeProbeBatch(batch: MessageBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
+  for (const message of batch.messages) {
+    const body = message.body;
+    if (body?.schemaVersion !== 1 || body.type !== "uptime.probe" || typeof body.checkId !== "string" || typeof body.monitorId !== "string") {
+      message.ack();
+      continue;
+    }
+    try {
+      await processUptimeProbe(body, env);
+      message.ack();
+    } catch (error) {
+      console.error("Jerico uptime probe processing failed", {
+        checkId: body.checkId,
+        monitorId: body.monitorId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      message.retry({ delaySeconds: 30 });
+    }
+  }
+}
+
 export default {
-  async queue(batch: MessageBatch<TelemetryMessage>, env: ClickHouseEnv): Promise<void> {
+  async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
+    if (batch.queue === "jerico-uptime-probes") {
+      await processUptimeProbeBatch(batch as MessageBatch<UptimeProbeMessage>, env);
+      return;
+    }
+    const telemetryBatch = batch as MessageBatch<TelemetryMessage>;
     const valid: Message<TelemetryMessage>[] = [];
-    for (const message of batch.messages) {
+    for (const message of telemetryBatch.messages) {
       if (message.body?.schemaVersion !== 1 || !Array.isArray(message.body.events)) {
         message.ack();
       } else {
