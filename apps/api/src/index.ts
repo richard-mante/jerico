@@ -729,8 +729,6 @@ app.post("/api/v1/notification-channels/webhook", async (context) => withOrganiz
       challenge,
     });
   } catch (error) {
-    await database.update(notificationChannels).set({ lastVerificationErrorCode: "queue_unavailable", updatedAt: new Date() })
-      .where(and(eq(notificationChannels.id, channelId), eq(notificationChannels.organizationId, organizationId)));
     await database.delete(notificationChannels).where(and(
       eq(notificationChannels.id, channelId),
       eq(notificationChannels.organizationId, organizationId),
