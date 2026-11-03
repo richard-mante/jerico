@@ -169,6 +169,26 @@ describe("notification channel authorization", () => {
     expect(response.status).toBe(403);
     expect(mocks.insert).not.toHaveBeenCalled();
   });
+  it("does not allow organization members to create webhook channels", async () => {
+    setSelectResults([{ role: "member" }]);
+    const response = await app.request("/api/v1/notification-channels/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ url: "https://hooks.example.com/jerico" }),
+    });
+    expect(response.status).toBe(403);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+  it("rejects invalid webhook targets before encryption or persistence", async () => {
+    setSelectResults([{ role: "owner" }]);
+    const response = await app.request("/api/v1/notification-channels/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ url: "http://127.0.0.1/hook" }),
+    }, { NOTIFICATIONS: { send: vi.fn() } });
+    expect(response.status).toBe(400);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it("rejects invalid verification tokens before querying the database", async () => {
     const response = await app.request("/api/v1/notification-channels/verify", {
       method: "POST",
