@@ -82,7 +82,7 @@ Database migrations have not been applied to a disposable or production PostgreS
 
 Branch `feat/phase-3-typescript-sdk-foundation` introduces three workspace packages:
 - `@jerico/sdk-core`: bounded in-memory queue, batch transport, explicit flush/close, metrics/logs/spans/events/errors, and error reporting.
-- `@jerico/sdk-browser`: public-key-only browser client, page-view capture, window errors, and unhandled promise rejections.
+- `@jerico/sdk-browser`: public-key-only browser client, anonymous session IDs, explicit identify/reset, page-view capture, window errors, and unhandled promise rejections.
 - `@jerico/sdk-node`: secret-key-only Node client, telemetry methods, and opt-in unhandled-rejection capture.
 
 The SDK requires an explicit ingestion endpoint; no hosted Jerico endpoint is assumed. Failed batches remain in memory for explicit flush. Automatic retries are intentionally disabled because the ingestion API does not yet support request-level idempotency and retrying ambiguous requests could duplicate accepted events. These packages are not yet validated by install/typecheck/tests/build and are not production-ready. Browser session/identity APIs, Core Web Vitals, OpenTelemetry integrations, examples, and published package release remain outstanding.
