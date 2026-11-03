@@ -18,7 +18,7 @@ The implementation through Phase 5E is present on `main`, but no successful work
 - GitHub Actions workflow exists, but jobs repeatedly fail before runner allocation (`runner_id: 0`, no runner name, no steps). This is not a passing or failing source test result.
 - The repository currently has no `pnpm-lock.yaml`; dependency resolution is therefore not pinned.
 - No successful dependency install, lint, typecheck, unit test, build, disposable PostgreSQL migration, ClickHouse integration, Cloudflare runtime, or browser test has been observed.
-- The latest retried CI job is run [#191](https://github.com/richard-mante/jerico/actions/runs/41623582387); its retry also failed before runner allocation.
+- The latest CI run is [#195](https://github.com/richard-mante/jerico/actions/runs/41625755295) (push to main); the corresponding PR run [#194](https://github.com/richard-mante/jerico/actions/runs/41625736379) failed the same way. Run #195 uses the standard ubuntu-24.04 label but reports runner_id: 0, no runner name, and no steps. Both failures occur before workflow execution.
 
 ## Phase 0 — Repository foundation
 - [x] Inspect repository, branch, settings, and existing files.
