@@ -129,4 +129,25 @@ export const environments = pgTable("environments", {
   foreignKey({ name: "environments_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments };
+export const projectIngestionKeys = pgTable("project_ingestion_keys", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  environmentId: text("environment_id").notNull(),
+  name: text("name").notNull(),
+  keyType: text("key_type").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull().unique(),
+  createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "cascade" }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  foreignKey({ name: "project_ingestion_keys_project_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
+  foreignKey({ name: "project_ingestion_keys_environment_fk", columns: [t.projectId, t.environmentId], foreignColumns: [environments.projectId, environments.id] }).onDelete("cascade"),
+  index("project_ingestion_keys_project_idx").on(t.organizationId, t.projectId),
+  index("project_ingestion_keys_environment_idx").on(t.environmentId),
+  index("project_ingestion_keys_active_idx").on(t.projectId, t.revokedAt),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys };
