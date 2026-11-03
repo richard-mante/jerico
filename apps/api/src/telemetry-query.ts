@@ -136,3 +136,57 @@ export async function queryTelemetry<T>(
   if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid JSON result.");
   return result.data;
 }
+
+export type TelemetryOverview = {
+  total: number;
+  events: number;
+  errors: number;
+  logs: number;
+  metrics: number;
+  spans: number;
+  lastEventAt: string | null;
+};
+
+export async function queryTelemetryOverview(
+  env: TelemetryQueryBindings,
+  input: Omit<TelemetryQuery, "limit" | "cursor" | "eventType">,
+): Promise<TelemetryOverview> {
+  if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
+  const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
+  const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
+  const filters = [
+    "organization_id = {organizationId:String}",
+    "project_id = {projectId:String}",
+    "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+    "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
+  ];
+  if (input.environmentId) filters.push("environment_id = {environmentId:String}");
+  const query = `SELECT count() AS total, countIf(event_type = 'event') AS events, countIf(event_type = 'error') AS errors, countIf(event_type = 'log') AS logs, countIf(event_type = 'metric') AS metrics, countIf(event_type = 'span') AS spans, if(count() = 0, NULL, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC')) AS lastEventAt FROM ${database}.${table} WHERE ${filters.join(" AND ")} FORMAT JSON`;
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("param_organizationId", input.organizationId);
+  url.searchParams.set("param_projectId", input.projectId);
+  url.searchParams.set("param_from", input.from);
+  url.searchParams.set("param_to", input.to);
+  if (input.environmentId) url.searchParams.set("param_environmentId", input.environmentId);
+  const headers = new Headers();
+  if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
+  else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
+    headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`ClickHouse overview query failed with status ${response.status}.`);
+  const result = await response.json() as { data?: Array<Record<string, unknown>> };
+  const row = result.data?.[0];
+  if (!row) throw new Error("ClickHouse returned an empty overview result.");
+  const count = (value: unknown) => Number(value ?? 0);
+  return {
+    total: count(row.total),
+    events: count(row.events),
+    errors: count(row.errors),
+    logs: count(row.logs),
+    metrics: count(row.metrics),
+    spans: count(row.spans),
+    lastEventAt: typeof row.lastEventAt === "string" ? row.lastEventAt : null,
+  };
+}
