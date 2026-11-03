@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lte, or } from "drizzle-orm";
 import {
   createEnvironmentSchema,
   createIngestionKeySchema,
@@ -9,12 +9,14 @@ import {
   createProjectSchema,
   createUptimeMonitorSchema,
   updateUptimeMonitorSchema,
+  uptimeProbeResultSchema,
 } from "@jerico/contracts";
 import { environments, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
+import { scheduleDueUptimeMonitors } from "./uptime-scheduler";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
@@ -75,6 +77,18 @@ async function withOrganization(
     if (!membership) return context.json({ error: { code: "FORBIDDEN", message: "You do not belong to this organization." } }, 403);
     return callback(database, organizationId, membership.role, session.user.id);
   });
+}
+
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const a = new TextEncoder().encode(left);
+  const b = new TextEncoder().encode(right);
+  let difference = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
+  }
+  return difference === 0;
 }
 
 function makeSlug(value: string): string {
@@ -574,7 +588,7 @@ app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOr
   const data = await database.select().from(uptimeMonitors)
     .where(and(eq(uptimeMonitors.organizationId, organizationId), eq(uptimeMonitors.projectId, projectId)))
     .orderBy(desc(uptimeMonitors.createdAt));
-  return context.json({ data, checksEnabled: false });
+  return context.json({ data, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
 
 app.post("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
@@ -598,7 +612,7 @@ app.post("/api/v1/projects/:projectId/uptime-monitors", async (context) => withO
     enabled: parsed.data.enabled,
     createdBy: userId,
   }).returning();
-  return context.json({ data: created, checksEnabled: false }, 201);
+  return context.json({ data: created, checksEnabled: Boolean(context.env.UPTIME_PROBES) }, 201);
 }));
 
 app.patch("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (context) => withOrganization(context, async (database, organizationId, role) => {
@@ -614,7 +628,7 @@ app.patch("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (conte
     .where(and(eq(uptimeMonitors.id, monitorId), eq(uptimeMonitors.projectId, projectId), eq(uptimeMonitors.organizationId, organizationId)))
     .returning();
   if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
-  return context.json({ data: updated, checksEnabled: false });
+  return context.json({ data: updated, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
 
 app.delete("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (context) => withOrganization(context, async (database, organizationId, role) => {
@@ -642,12 +656,79 @@ app.get("/api/v1/projects/:projectId/uptime-monitors/:monitorId/checks", async (
   const data = await database.select().from(uptimeCheckResults)
     .where(and(eq(uptimeCheckResults.monitorId, monitorId), eq(uptimeCheckResults.projectId, projectId), eq(uptimeCheckResults.organizationId, organizationId)))
     .orderBy(desc(uptimeCheckResults.checkedAt)).limit(limit);
-  return context.json({ data, checksEnabled: false });
+  return context.json({ data, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
+
+
+app.post("/internal/uptime-results", async (context) => {
+  const secret = context.env.UPTIME_RESULTS_SECRET;
+  const supplied = context.req.header("x-jerico-uptime-secret") ?? "";
+  if (!secret || secret.length < 32) return context.json({ error: { code: "UPTIME_RESULTS_UNAVAILABLE", message: "Internal uptime result ingestion is not configured." } }, 503);
+  if (!constantTimeEqual(secret, supplied)) return context.json({ error: { code: "UNAUTHORIZED", message: "Invalid internal credential." } }, 401);
+  const contentLength = Number(context.req.header("content-length") ?? "0");
+  if (contentLength > 4096) return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The probe result payload is too large." } }, 413);
+  const parsed = uptimeProbeResultSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The uptime probe result is invalid." } }, 400);
+  try {
+    const result = parsed.data;
+    const accepted = await withDatabase(context.env, async (database) => database.transaction(async (transaction) => {
+      const [monitor] = await transaction.select({ id: uptimeMonitors.id, enabled: uptimeMonitors.enabled })
+        .from(uptimeMonitors)
+        .where(and(
+          eq(uptimeMonitors.id, result.monitorId),
+          eq(uptimeMonitors.organizationId, result.organizationId),
+          eq(uptimeMonitors.projectId, result.projectId),
+        )).limit(1);
+      if (!monitor) return { accepted: false, reason: "monitor_not_found" as const };
+      const [inserted] = await transaction.insert(uptimeCheckResults).values({
+        id: result.checkId,
+        organizationId: result.organizationId,
+        projectId: result.projectId,
+        monitorId: result.monitorId,
+        status: result.status,
+        statusCode: result.statusCode,
+        responseTimeMs: result.responseTimeMs,
+        errorCode: result.errorCode,
+        checkedAt: new Date(result.checkedAt),
+      }).onConflictDoNothing().returning({ id: uptimeCheckResults.id });
+      if (!inserted) return { accepted: true, duplicate: true };
+      if (monitor.enabled) {
+        const checkedAt = new Date(result.checkedAt);
+        await transaction.update(uptimeMonitors).set({
+          lastCheckedAt: checkedAt,
+          lastStatus: result.status,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(uptimeMonitors.id, result.monitorId),
+          eq(uptimeMonitors.organizationId, result.organizationId),
+          eq(uptimeMonitors.projectId, result.projectId),
+          eq(uptimeMonitors.enabled, true),
+          or(isNull(uptimeMonitors.lastCheckedAt), lte(uptimeMonitors.lastCheckedAt, checkedAt)),
+        ));
+      }
+      return { accepted: true, duplicate: false };
+    }));
+    return context.json({ data: accepted }, 202);
+  } catch (error) {
+    console.error("Jerico uptime result persistence failed", {
+      checkId: parsed.data.checkId,
+      monitorId: parsed.data.monitorId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return context.json({ error: { code: "UPTIME_RESULT_FAILED", message: "The probe result could not be stored." } }, 502);
+  }
+});
 
 app.onError((error, context) => {
   console.error("Jerico API request failed", { requestId: context.get("requestId"), error });
   return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed.", requestId: context.get("requestId") } }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch.bind(app),
+  scheduled(_controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
+    context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
+      console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
+    }));
+  },
+};
