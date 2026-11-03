@@ -103,29 +103,47 @@ async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): 
     timeoutMs: message.timeoutMs,
     expectedStatusCode: message.expectedStatusCode,
   });
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    redirect: "error",
-    headers: {
-      "content-type": "application/json",
-      "x-jerico-uptime-secret": env.UPTIME_RESULTS_SECRET,
-    },
-    body: JSON.stringify({
-      checkId: message.checkId,
-      monitorId: message.monitorId,
-      organizationId: message.organizationId,
-      projectId: message.projectId,
-      ...result,
-      checkedAt: new Date().toISOString(),
-    }),
-  });
-  if (!response.ok) throw new Error("Uptime result callback rejected with status " + response.status + ".");
+  const callbackController = new AbortController();
+  const callbackTimeout = setTimeout(() => callbackController.abort(), 10000);
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      redirect: "error",
+      signal: callbackController.signal,
+      headers: {
+        "content-type": "application/json",
+        "x-jerico-uptime-secret": env.UPTIME_RESULTS_SECRET,
+      },
+      body: JSON.stringify({
+        checkId: message.checkId,
+        monitorId: message.monitorId,
+        organizationId: message.organizationId,
+        projectId: message.projectId,
+        ...result,
+        checkedAt: new Date().toISOString(),
+      }),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    if (!response.ok) throw new Error("Uptime result callback rejected with status " + response.status + ".");
+  } finally {
+    clearTimeout(callbackTimeout);
+  }
 }
 
 async function processUptimeProbeBatch(batch: MessageBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     const body = message.body;
-    if (body?.schemaVersion !== 1 || body.type !== "uptime.probe" || typeof body.checkId !== "string" || typeof body.monitorId !== "string") {
+    const validMessage = body?.schemaVersion === 1
+      && body.type === "uptime.probe"
+      && /^[0-9a-f-]{36}$/i.test(body.checkId)
+      && typeof body.monitorId === "string" && body.monitorId.length > 0 && body.monitorId.length <= 128
+      && typeof body.organizationId === "string" && body.organizationId.length > 0 && body.organizationId.length <= 128
+      && typeof body.projectId === "string" && body.projectId.length > 0 && body.projectId.length <= 128
+      && typeof body.url === "string" && body.url.length <= 2048
+      && (body.method === "GET" || body.method === "HEAD")
+      && Number.isInteger(body.timeoutMs) && body.timeoutMs >= 1000 && body.timeoutMs <= 30000
+      && Number.isInteger(body.expectedStatusCode) && body.expectedStatusCode >= 100 && body.expectedStatusCode <= 599;
+    if (!validMessage) {
       message.ack();
       continue;
     }
