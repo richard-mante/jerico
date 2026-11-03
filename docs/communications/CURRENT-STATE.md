@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `main` (no active feature branch)  
-**Current milestone:** Phase 3 — TypeScript SDK foundation merged; validation and ingestion integration pending
+**Current work branch:** `feat/phase-4-observability-query-api`  
+**Current milestone:** Phase 4 — tenant-safe observability query API (first slice in progress)
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -83,6 +83,21 @@ No migrations have been applied to a disposable or production PostgreSQL instanc
 6. Validate event-level deduplication and query semantics against a real ClickHouse instance.
 7. Validate SDK packages and run the documented examples against a local deployment.
 
+### Phase 4 — Observability query API (in progress)
+
+Branch: `feat/phase-4-observability-query-api`.
+
+The first API slice adds authenticated, organization/project-scoped read endpoints for events, errors, and logs. It verifies project ownership through PostgreSQL before querying ClickHouse, validates optional environment filters against the same project, bounds time ranges to 31 days, limits pages to 100 rows, uses opaque keyset cursors, binds ClickHouse values as query parameters, and keeps ClickHouse credentials server-side. The API returns 503 when ClickHouse is not configured and does not expose raw ClickHouse errors.
+
+Files added/updated:
+- `apps/api/src/telemetry-query.ts`
+- `apps/api/src/telemetry-query.test.ts`
+- `apps/api/src/index.ts`
+- `apps/api/.dev.vars.example`
+- `docs/roadmap/phase-4-observability.md`
+
+The tests are authored but not executed. PostgreSQL/ClickHouse integration, query performance, and route-level tenant isolation tests remain outstanding. Metrics, spans, project overview aggregates, and the dashboard UI are not part of this first slice.
+
 ### Known product gaps
 
 - Dashboard telemetry query APIs and observability views are not implemented.
@@ -99,7 +114,7 @@ No migrations have been applied to a disposable or production PostgreSQL instanc
 1. Complete Phase 2C/3 validation and infrastructure integration.
 2. Add request-level ingestion idempotency and integration tests.
 3. Finish browser/Node SDK capabilities and package build/release strategy.
-4. Build tenant-safe dashboard query APIs and Observability UI (events/errors/logs/metrics/traces).
+4. Finish Phase 4 query APIs (metrics, spans, overview aggregates), then build real Observability UI (events/errors/logs/metrics/traces).
 5. Add uptime checks, alert rules, and notification channels.
 6. Add usage metering/billing and production operational safeguards.
 7. Implement self-hosted runtime/queue adapters and Docker Compose deployment.
