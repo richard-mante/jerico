@@ -18,8 +18,8 @@ describe("notification enqueue retry backoff", () => {
 
 describe("notification enqueue lease recovery", () => {
   it("uses a two-minute lease so abandoned queued outbox rows can be reclaimed", () => {
-    // Lease duration is deliberately longer than the queue send request and
-    // shorter than the one-minute Cron's retry horizon by one scheduler tick.
+    // Keep the lease longer than one Cron tick to avoid reclaiming a normal
+    // in-flight enqueue immediately.
     expect(notificationEnqueueLeaseDuration()).toBe(120_000);
   });
 });
