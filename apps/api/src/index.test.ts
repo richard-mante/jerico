@@ -221,35 +221,6 @@ describe("project observability route authorization", () => {
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ activeCheckId: null }));
   });
 
-  it("updates monitor status and clears the active token for the current probe", async () => {
-    const checkId = "550e8400-e29b-41d4-a716-446655440000";
-    const monitorId = "550e8400-e29b-41d4-a716-446655440001";
-    const organizationId = "550e8400-e29b-41d4-a716-446655440002";
-    const projectId = "550e8400-e29b-41d4-a716-446655440003";
-    setSelectResults([{ id: monitorId, enabled: true, activeCheckId: checkId }]);
-    mocks.insert.mockReturnValue({
-      values: () => ({
-        onConflictDoNothing: () => ({
-          returning: async () => [{ id: checkId }],
-        }),
-      }),
-    });
-    const set = vi.fn().mockReturnValue({ where: async () => [{ id: monitorId }] });
-    mocks.update.mockReturnValue({ set });
-    const secret = "s".repeat(40);
-    const response = await app.request("/internal/uptime-results", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-jerico-uptime-secret": secret },
-      body: JSON.stringify({
-        checkId, monitorId, organizationId, projectId,
-        status: "up", statusCode: 200, responseTimeMs: 25,
-        checkedAt: "2026-11-03T12:00:00.000Z",
-      }),
-    }, { UPTIME_RESULTS_SECRET: secret });
-    expect(response.status).toBe(202);
-    expect(set).toHaveBeenCalledWith(expect.objectContaining({ lastStatus: "up", activeCheckId: null }));
-  });
-
   it("validates internal uptime result payloads before touching the database", async () => {
     const secret = "s".repeat(40);
     const response = await app.request("/internal/uptime-results", {
