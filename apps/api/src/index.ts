@@ -1139,11 +1139,13 @@ app.post("/internal/notification-delivery-results", async (context) => {
       activeConsumerAttempt: notificationDeliveries.activeConsumerAttempt,
     }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
     if (!existing) return false;
-    const activeTokenMatches = result.enqueueToken
-      ? existing.activeEnqueueToken === result.enqueueToken
-      : existing.activeEnqueueToken === null;
-    if (existing.status === "sent" || !activeTokenMatches
-      || existing.activeConsumerAttempt > result.attemptNumber) return true;
+    if (existing.status === "sent") return true;
+    // During a rolling deployment, an older Worker may still send callbacks
+    // without the enqueue token. Do not acknowledge those against a new
+    // token-owned enqueue; returning 404 makes that queue attempt retry.
+    if (!result.enqueueToken && existing.activeEnqueueToken !== null) return false;
+    if (result.enqueueToken && existing.activeEnqueueToken !== result.enqueueToken) return true;
+    if (existing.activeConsumerAttempt > result.attemptNumber) return true;
     if (existing.activeConsumerAttempt === result.attemptNumber
       && (existing.status === result.status || result.status === "attempting")) return true;
     return false;
