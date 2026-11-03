@@ -48,3 +48,6 @@ CREATE TABLE "uptime_check_results" (
 CREATE INDEX "uptime_check_results_monitor_checked_idx" ON "uptime_check_results" ("monitor_id", "checked_at");
 --> statement-breakpoint
 CREATE INDEX "uptime_check_results_project_checked_idx" ON "uptime_check_results" ("organization_id", "project_id", "checked_at");
+
+--> statement-breakpoint
+CREATE INDEX "uptime_check_results_checked_idx" ON "uptime_check_results" ("checked_at");
