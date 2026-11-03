@@ -18,6 +18,7 @@ The implementation through Phase 5E is present on `main`, but no successful work
 - GitHub Actions workflow exists, but jobs repeatedly fail before runner allocation (`runner_id: 0`, no runner name, no steps). This is not a passing or failing source test result.
 - The repository currently has no `pnpm-lock.yaml`; dependency resolution is therefore not pinned. The user has taken ownership of generating and committing this lockfile; do not fabricate or modify it.
 - No successful dependency install, lint, typecheck, unit test, build, disposable PostgreSQL migration, ClickHouse integration, Cloudflare runtime, or browser test has been observed.
+- ClickHouse API queries and Worker telemetry inserts now have an 8-second server-side execution limit and a 10-second client request timeout (PR #39); the focused tests and real ClickHouse behavior remain unverified.
 - The latest CI run is [#198](https://github.com/richard-mante/jerico/actions/runs/41628640738) (push to main). Its job uses the standard ubuntu-24.04 label but reports `runner_id: 0`, no runner name, and no steps; the job log is unavailable (`BlobNotFound`). The failure occurs before workflow execution and is not a source-check result.
 
 ## Phase 0 — Repository foundation
