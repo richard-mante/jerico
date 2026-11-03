@@ -289,3 +289,12 @@
 - Updated the Events tab to fetch and display responsive SVG event-volume charts alongside the catalogue and latest-event details.
 - Added query-adapter unit coverage for event count aggregation and tenant/environment parameter binding (authored, not executed).
 - No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.
+
+
+## 2026-11-03 — Phase 4 error group lifecycle
+
+- Created `feat/phase-4-error-lifecycle` from `main` after merging PR #19.
+- Added `project_error_group_states` with project/fingerprint primary key, same-organization composite foreign key, `open|resolved|ignored` check constraint, updater reference, and migration `0004_project_error_group_states.sql`.
+- Grouped-error GET now overlays persisted status (default `open`) and returns whether the current organization role can manage state.
+- Added POST status action guarded by owner/admin role; members remain read-only. Added a status selector to grouped-error cards for authorized users.
+- No migration execution, API integration tests, lint, typecheck, tests, build, or browser validation was run.
