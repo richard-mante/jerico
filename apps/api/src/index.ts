@@ -1098,7 +1098,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
   const accepted = await withDatabase(context.env, async (database) => {
     const common = [
       eq(notificationDeliveries.id, result.deliveryId),
-      eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken),
+      result.enqueueToken ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken) : isNull(notificationDeliveries.activeEnqueueToken),
       ne(notificationDeliveries.status, "sent"),
     ];
     const [updated] = result.status === "attempting"
@@ -1139,7 +1139,10 @@ app.post("/internal/notification-delivery-results", async (context) => {
       activeConsumerAttempt: notificationDeliveries.activeConsumerAttempt,
     }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
     if (!existing) return false;
-    if (existing.status === "sent" || existing.activeEnqueueToken !== result.enqueueToken
+    const activeTokenMatches = result.enqueueToken
+      ? existing.activeEnqueueToken === result.enqueueToken
+      : existing.activeEnqueueToken === null;
+    if (existing.status === "sent" || !activeTokenMatches
       || existing.activeConsumerAttempt > result.attemptNumber) return true;
     if (existing.activeConsumerAttempt === result.attemptNumber
       && (existing.status === result.status || result.status === "attempting")) return true;
