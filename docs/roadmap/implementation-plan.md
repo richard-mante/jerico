@@ -21,6 +21,7 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - ClickHouse API queries and Worker telemetry inserts now have an 8-second server-side execution limit and a 10-second client request timeout (PR #39); the focused tests and real ClickHouse behavior remain unverified.
 - API-side notification queue-send failures now have a scheduled outbox reconciliation path with atomic claims, five total enqueue attempts, and exponential backoff (PR #41; migration `0009_notification_enqueue_retries.sql`). Backoff tests were added but not executed; queue concurrency and end-to-end delivery remain unverified.
 - Alert-rule evaluations now use per-rule token-owned leases with five-minute expiry and stale-worker fencing (PR #43; migration `0010_alert_evaluation_leases.sql`). Lease-expiry and consecutive-count helper tests were added but not executed; manual concurrency/runtime validation remains outstanding.
+- Uptime scheduling now claims the current monitor row and constructs probe messages from the returned configuration; queue-failure rollback is guarded by the exact claimed schedule timestamp (PR #44). No migration was needed; manual concurrency/runtime validation remains outstanding.
 - The latest CI run checked for PR #43 is [#213](https://github.com/richard-mante/jerico/actions/runs/41640848052). Its job failed before recording workflow steps; no source checks executed, so this is not a source-check result.
 
 ## Phase 0 — Repository foundation
