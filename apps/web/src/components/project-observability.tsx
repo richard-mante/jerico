@@ -88,6 +88,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [environmentId, setEnvironmentId] = useState("");
   const [tab, setTab] = useState<Tab>("events");
   const [rangeHours, setRangeHours] = useState("24");
+  const [logLevel, setLogLevel] = useState("all");
   const [overview, setOverview] = useState<Overview>(emptyOverview);
   const [rows, setRows] = useState<TelemetryItem[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
@@ -148,6 +149,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     const headers = { "X-Jerico-Organization-Id": organizationId };
     const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to });
     if (environmentId) query.set("environmentId", environmentId);
+    if (tab === "logs" && logLevel !== "all") query.set("level", logLevel);
     setLoading(true);
     setError("");
     setNextCursor(null);
@@ -192,7 +194,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [organizationId, session, projectId, tab, environmentId, queryWindow]);
+  }, [organizationId, session, projectId, tab, environmentId, queryWindow, logLevel]);
 
   async function loadMore() {
     if (!organizationId || !nextCursor || loadingMore) return;
@@ -201,6 +203,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
     try {
       const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to, limit: "50", cursor: nextCursor });
       if (environmentId) query.set("environmentId", environmentId);
+      if (tab === "logs" && logLevel !== "all") query.set("level", logLevel);
       const response = await fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab}?${query}`, {
         credentials: "include",
         headers: { "X-Jerico-Organization-Id": organizationId },
@@ -254,6 +257,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
             <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Workspace</span><select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} className="block min-w-44 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white">{organizationList.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></label>
             <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Environment</span><select value={environmentId} onChange={(event) => setEnvironmentId(event.target.value)} className="block min-w-40 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white"><option value="">All environments</option>{environments.map((environment) => <option key={environment.id} value={environment.id}>{environment.name}</option>)}</select></label>
             <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Time range</span><select value={rangeHours} onChange={(event) => setRangeHours(event.target.value)} className="block min-w-32 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white"><option value="1">Last hour</option><option value="24">Last 24 hours</option><option value="168">Last 7 days</option><option value="720">Last 30 days</option></select></label>
+            {tab === "logs" && <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Severity</span><select value={logLevel} onChange={(event) => setLogLevel(event.target.value)} className="block min-w-32 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white"><option value="all">All levels</option><option value="debug">Debug</option><option value="info">Info</option><option value="warn">Warning</option><option value="error">Error</option><option value="fatal">Fatal</option></select></label>}
           </div>
         </section>
 
