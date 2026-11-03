@@ -41,7 +41,7 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 Draft PR #3: https://github.com/richard-mante/jerico/pull/3
 
 Implemented on the branch:
-- `project_ingestion_keys` Drizzle schema and SQL migration.
+- `project_ingestion_keys` Drizzle schema and SQL migration (`0001_project_ingestion_keys.sql`).
 - Credentials are bound to organization, project, and environment with composite foreign-key constraints.
 - Public (`jk_pub_`) and secret (`jk_sec_`) credentials use 256-bit Web Crypto randomness.
 - Store only SHA-256 hashes and a short display prefix; return raw credential once at creation.
@@ -59,7 +59,7 @@ Implemented on the same draft branch:
 - Request body capped at 96 KiB; batches capped at 100 events.
 - Redacts sensitive attribute names, email addresses, bearer tokens, and JWT-like strings before enqueueing.
 - Optional per-credential Cloudflare Rate Limiting binding; production mode returns 503 when configured with `APP_ENV=production` but the binding is missing.
-- Atomic per-credential daily event quota in PostgreSQL, default 100,000 events per UTC day, configurable through `INGEST_DAILY_EVENT_LIMIT`; failed queue sends refund the reservation.
+- Atomic per-credential daily event quota in PostgreSQL (`project_ingestion_usage`, migration `0002_project_ingestion_usage.sql`), default 100,000 events per UTC day, configurable through `INGEST_DAILY_EVENT_LIMIT`; failed queue sends refund the reservation.
 - Enqueues trusted, versioned envelopes to Cloudflare Queue `jerico-telemetry`.
 - Adds queue consumer in `apps/worker`, ClickHouse HTTP `JSONEachRow` writer, retry behavior, and dead-letter queue config.
 - Adds initial ClickHouse schema with 7-day log and 30-day other telemetry retention.
