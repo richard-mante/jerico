@@ -1148,6 +1148,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
     if (existing.activeConsumerAttempt > result.attemptNumber) return { accepted: true, active: false };
     if (existing.activeConsumerAttempt === result.attemptNumber) {
       if (result.status === "attempting") return { accepted: true, active: existing.status === "queued" };
+      if (result.status === "failed" && existing.status === "failed") return { accepted: true, active: true };
       if (existing.status === result.status) return { accepted: true, active: false };
     }
     return { accepted: false, active: false };
