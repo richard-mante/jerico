@@ -89,3 +89,20 @@
 - Added explicit JSON content-type enforcement and inline secret-assignment redaction coverage.
 - Updated Phase 2B docs, roadmap, current-state handover, and PR #3 description to reflect daily quota behavior. Monthly plan tiers/billing metering remain out of scope.
 - Latest validation remains pending; no local package install or automated checks were executed.
+
+
+## 2026-11-03 — Phase 2 merged; Phase 2C validation handover
+
+- Verified PR #3 is merged and closed: https://github.com/richard-mante/jerico/pull/3.
+- Merge commit: `d0430e584f496057ca73dda70e6df718a290e8ea` (squash merge). Phase 2A credentials and Phase 2B authenticated telemetry ingestion are now on `main`.
+- Re-checked the latest Actions run on the merge commit: run #73 / ID `41559078138`, triggered by the push to `main`. It failed within seconds. The job response contains `steps: null`, no runner/log URL, and no evidence that a hosted runner was assigned. This matches the earlier runner-startup pattern; the exact cause remains unknown and no code checks ran.
+- Inspected current `main` configuration: root package manager is pnpm 12.7.0; workspace globs are `apps/*` and `packages/*`; CI currently runs install, lint, typecheck, test, and build, but the repository still has no committed `pnpm-lock.yaml`.
+- Inspected Drizzle schema and journal. The journal lists migrations 0000–0002, while the initial migration snapshot is absent. Schema/migration consistency and migration execution therefore remain explicit validation tasks; no database was available through the GitHub-only workflow in this session.
+- Corrected `docs/communications/CURRENT-STATE.md`: PR #3 is no longer described as an open draft; it now records the actual merge SHA, current validation blockers, infrastructure gaps, and next milestones.
+- No dependency install, lockfile generation, lint, typecheck, unit tests, build, PostgreSQL migration, Cloudflare provisioning, or end-to-end ingestion test was run in this session.
+- Current branch: `chore/phase-2c-validation-handover`.
+
+### Next
+- Continue Phase 2C by establishing an executable validation environment, generating the pnpm lockfile, and running the full workspace checks.
+- Fix issues found by those checks; verify Drizzle migrations against disposable PostgreSQL.
+- Provision and test Hyperdrive, Cloudflare Queues, Rate Limiting, and ClickHouse before calling ingestion production-ready.
