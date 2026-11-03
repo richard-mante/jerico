@@ -43,7 +43,7 @@ Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, m
 
 ## Repository status
 
-The repository has merged the Phase 0 foundation and Phase 1 identity/tenancy implementation. Phase 2A credential management and Phase 2B ingestion pipeline are in draft review and have not been validated or deployed. SDKs, query APIs/dashboard, alerting, uptime monitoring, self-hosted queue runtime, and full quota enforcement remain incomplete. Implemented code is not considered production-ready until dependency installation, automated checks, and database integration tests pass.
+The repository has merged the Phase 0 foundation and Phase 1 identity/tenancy implementation. Phase 2A credential management and Phase 2B authenticated ingestion are merged. Phase 2C adds event IDs and ClickHouse queue-redelivery deduplication; infrastructure and automated validation remain outstanding. Phase 3 TypeScript SDK foundations are now under review. SDKs, query APIs/dashboard, alerting, uptime monitoring, self-hosted queue runtime, and full quota enforcement remain incomplete. Implemented code is not considered production-ready until dependency installation, automated checks, and database integration tests pass.
 
 ## Getting started
 
