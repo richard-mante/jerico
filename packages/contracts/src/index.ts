@@ -78,7 +78,7 @@ export const uptimeProbeResultSchema = z.object({
   projectId: z.string().min(1).max(128),
   status: z.enum(["up", "down"]),
   statusCode: z.number().int().min(100).max(599).nullable(),
-  responseTimeMs: z.number().int().min(0).max(30000).nullable(),
+  responseTimeMs: z.number().int().min(0).max(60000).nullable(),
   errorCode: z.enum(["unsafe_target", "unsafe_redirect", "redirect_limit", "timeout", "network_error", "unexpected_status"]).nullable(),
   checkedAt: z.string().datetime({ offset: true }),
 }).strict();
