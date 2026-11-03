@@ -2,7 +2,7 @@
 
 ## Scope
 
-This first backend slice makes ingested events, errors, and logs queryable by an authenticated organization member. It deliberately does not add mock data or pretend that metrics and traces are already supported by the dashboard.
+This first Phase 4 slice makes all five current telemetry types queryable by an authenticated organization member and adds a live project explorer. It deliberately uses real API responses and does not insert mock telemetry.
 
 ## Endpoints
 
@@ -65,4 +65,4 @@ The query adapter has unit coverage for time-range bounds, page limits, opaque c
 
 ## Next slice
 
-Add the project overview aggregates and metrics/spans queries, then wire real event/error/log views into the web dashboard with loading, empty, error, time-range, and environment states. Add route-level authorization tests before calling Phase 4 complete.
+Add route-level authorization tests and verify ClickHouse SQL against a real instance. Then expand the explorer with event catalogue/time-series, error grouping and stack traces, metric charts, span waterfalls, and structured log detail before calling Phase 4 complete.
