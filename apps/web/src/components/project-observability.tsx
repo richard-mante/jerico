@@ -61,7 +61,6 @@ export function ProjectObservability() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   const organizationList = useMemo(() => (organizations ?? []) as Organization[], [organizations]);
 
@@ -87,7 +86,7 @@ export function ProjectObservability() {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not load environments.");
     });
     return () => controller.abort();
-  }, [organizationId, projectId, session]);
+  }, [organizationId, projectId, session, environmentId]);
 
   const queryWindow = useMemo(() => {
     const to = new Date();
@@ -196,7 +195,6 @@ export function ProjectObservability() {
         </section>
 
         {error && <p role="alert" className="mb-5 rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">{error}</p>}
-        {notice && <p role="status" className="mb-5 text-sm text-[#d9f36a]">{notice}</p>}
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {stats.map((stat) => <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><p className="text-xs text-[#8f98a7]">{stat.label}</p><p className="mt-3 text-2xl font-semibold tabular-nums">{stat.value.toLocaleString()}</p></div>)}
