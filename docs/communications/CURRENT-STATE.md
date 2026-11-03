@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #56 — `1eeb3426fde5266b57ef4594fa3d65679fd1317b`  
-**Latest main merge:** PR #56 — `1eeb3426fde5266b57ef4594fa3d65679fd1317b`  
+**Latest feature merge:** PR #58 — `e76d1892c12f7fc2a74aabc75639bf889098b99b`  
+**Latest main merge:** PR #58 — `e76d1892c12f7fc2a74aabc75639bf889098b99b`  
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -42,9 +42,9 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5C — alert rules and incidents | #31 | Merged |
 | Phase 5D — verified email notifications | #32 | Merged |
 | Phase 5E — signed webhook notifications | #33 | Merged |
-| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, notification outbox and callback fencing | #39, #41, #43–#44, #49, #53, #56 | Merged |
+| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization | #39, #41, #43–#44, #49, #53, #56, #58 | Merged |
 
-Latest reliability milestone: [PR #56 — preserve cumulative notification attempts](https://github.com/richard-mante/jerico/pull/56). Merge commit: `1eeb3426fde5266b57ef4594fa3d65679fd1317b`.
+Latest reliability milestone: [PR #58 — finalize exhausted notification and uptime DLQs](https://github.com/richard-mante/jerico/pull/58). Merge commit: `e76d1892c12f7fc2a74aabc75639bf889098b99b`.
 
 ### Phase 5 notification capabilities
 
@@ -111,6 +111,10 @@ Reviewed the current Worker probe/webhook delivery paths, API notification callb
 ### 2026-11-03 ClickHouse request-bound update
 
 Merged PR #39. All API telemetry query operations now apply ClickHouse `max_execution_time=8` and a 10-second client request timeout. Worker telemetry inserts use the same server-side execution bound and a 10-second client request timeout. Focused tests assert the configured limits. This is an implementation-level safeguard only: tests were authored but not executed, and ClickHouse integration/runtime behavior remains unverified.
+
+### 2026-11-03 dead-letter queue finalization
+
+Merged PR #58. The Worker now consumes the notification and uptime DLQs. Exhausted notification deliveries are marked failed with `queue_retry_exhausted`, guarded by their active enqueue token and without downgrading sent deliveries. Exhausted webhook verification messages record endpoint-unavailable unless their challenge is stale. Exhausted uptime probes create an idempotent terminal `down` result using the original check ID. DLQ callback failures retry up to 100 times; the telemetry DLQ remains operator-managed for inspection/replay. No migration was needed. Tests were added but not executed; manual Cloudflare Queue and API outage/recovery validation remains outstanding.
 
 ### 2026-11-03 cumulative notification attempt counter
 
