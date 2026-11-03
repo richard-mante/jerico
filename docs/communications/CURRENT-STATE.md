@@ -240,3 +240,10 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-clickhouse-integration-tests` adds a gated real-ClickHouse query integration suite, a Docker Compose ClickHouse service, an API integration-test script, and CI service wiring.
 - The suite covers overview, error groups/stack, fingerprint occurrences, event catalogue/details/series, metric aggregation, and structured log severity.
 - The suite has not been executed successfully in this environment; CI runner allocation remains unresolved.
+
+
+### Phase 4 feature scope status (PR #24)
+
+- PR #23 merged the ClickHouse integration test harness and CI service wiring (merge commit `a801a0dbd151437db21dd947f3f0a9898e3de5af`).
+- Phase 4 feature slices are now represented in the roadmap as implemented: event catalogue/details/volume charts, grouped errors/stack/occurrences/lifecycle, metric charts, span waterfall/SDK trace helpers, and structured log severity filters.
+- Phase 4 is **not yet accepted/release-ready**: no successful local ClickHouse integration run, PostgreSQL migration/transaction validation, browser validation, or successful CI workflow has been observed. The latest CI run failed before any steps started due hosted runner allocation.
