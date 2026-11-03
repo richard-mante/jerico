@@ -3,8 +3,9 @@ import { ProjectObservability } from "../../../../../components/project-observab
 export default async function ProjectObservabilityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ organizationId?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = await searchParams;
-  return <ProjectObservability initialOrganizationId={query.organizationId ?? ""} />;
+  const organizationId = typeof query.organizationId === "string" ? query.organizationId : "";
+  return <ProjectObservability initialOrganizationId={organizationId} />;
 }
