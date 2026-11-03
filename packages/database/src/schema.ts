@@ -300,4 +300,50 @@ export const incidents = pgTable("incidents", {
   uniqueIndex("incidents_one_active_per_rule_unique").on(t.alertRuleId).where(sql`${t.status} IN ('open', 'acknowledged')`),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents };
+
+
+export const notificationChannels = pgTable("notification_channels", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  type: text("type").notNull().default("email"),
+  target: text("target").notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  verificationTokenHash: text("verification_token_hash"),
+  verificationExpiresAt: timestamp("verification_expires_at", { withTimezone: true }),
+  enabled: boolean("enabled").notNull().default(true),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("notification_channels_type_check", sql`${t.type} IN ('email')`),
+  uniqueIndex("notification_channels_id_org_unique").on(t.id, t.organizationId),
+  uniqueIndex("notification_channels_org_type_target_unique").on(t.organizationId, t.type, t.target),
+  index("notification_channels_org_enabled_idx").on(t.organizationId, t.enabled),
+]);
+
+export const notificationDeliveries = pgTable("notification_deliveries", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  incidentId: text("incident_id").notNull(),
+  channelId: text("channel_id").notNull(),
+  eventType: text("event_type").notNull(),
+  status: text("status").notNull().default("queued"),
+  attempts: integer("attempts").notNull().default(0),
+  providerMessageId: text("provider_message_id"),
+  lastErrorCode: text("last_error_code"),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("notification_deliveries_event_type_check", sql`${t.eventType} IN ('incident.opened', 'incident.acknowledged', 'incident.resolved')`),
+  check("notification_deliveries_status_check", sql`${t.status} IN ('queued', 'sent', 'failed')`),
+  check("notification_deliveries_attempts_check", sql`${t.attempts} >= 0`),
+  foreignKey({ name: "notification_deliveries_channel_same_org_fk", columns: [t.channelId, t.organizationId], foreignColumns: [notificationChannels.id, notificationChannels.organizationId] }).onDelete("cascade"),
+  foreignKey({ name: "notification_deliveries_incident_same_project_fk", columns: [t.incidentId, t.organizationId, t.projectId], foreignColumns: [incidents.id, incidents.organizationId, incidents.projectId] }).onDelete("cascade"),
+  uniqueIndex("notification_deliveries_incident_channel_event_unique").on(t.incidentId, t.channelId, t.eventType),
+  index("notification_deliveries_org_created_idx").on(t.organizationId, t.createdAt),
+  index("notification_deliveries_status_idx").on(t.status, t.createdAt),
+]);
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, notificationChannels, notificationDeliveries };
