@@ -130,6 +130,10 @@ describe("webhook notification contracts", () => {
       "https://hooks.example.com/hook?token=secret",
       "https://hooks.example.com/hook#fragment",
       "https://service.internal/hook",
+      "https://service.corp/hook",
+      "https://metadata/hook",
+      "https://service.private/hook",
+      "https://service.onion/hook",
     ]) expect(isAllowedWebhookUrl(url)).toBe(false);
   });
   it("requires a safe error code for failed endpoint verification", () => {
