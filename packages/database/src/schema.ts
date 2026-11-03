@@ -195,4 +195,54 @@ export const projectErrorGroupStates = pgTable("project_error_group_states", {
   foreignKey({ name: "project_error_group_states_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
   index("project_error_group_states_org_project_idx").on(t.organizationId, t.projectId),
 ]);
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates };
+
+
+export const uptimeMonitors = pgTable("uptime_monitors", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  method: text("method").notNull().default("GET"),
+  intervalSeconds: integer("interval_seconds").notNull().default(60),
+  timeoutMs: integer("timeout_ms").notNull().default(10000),
+  expectedStatusCode: integer("expected_status_code").notNull().default(200),
+  enabled: boolean("enabled").notNull().default(true),
+  nextCheckAt: timestamp("next_check_at", { withTimezone: true }).notNull().defaultNow(),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  lastStatus: text("last_status"),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("uptime_monitors_method_check", sql`${t.method} IN ('GET', 'HEAD')`),
+  check("uptime_monitors_interval_check", sql`${t.intervalSeconds} BETWEEN 60 AND 86400`),
+  check("uptime_monitors_timeout_check", sql`${t.timeoutMs} BETWEEN 1000 AND 30000`),
+  check("uptime_monitors_expected_status_check", sql`${t.expectedStatusCode} BETWEEN 100 AND 599`),
+  check("uptime_monitors_last_status_check", sql`${t.lastStatus} IS NULL OR ${t.lastStatus} IN ('up', 'down')`),
+  uniqueIndex("uptime_monitors_id_org_project_unique").on(t.id, t.organizationId, t.projectId),
+  foreignKey({ name: "uptime_monitors_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
+  index("uptime_monitors_project_idx").on(t.organizationId, t.projectId),
+  index("uptime_monitors_due_idx").on(t.enabled, t.nextCheckAt),
+]);
+
+export const uptimeCheckResults = pgTable("uptime_check_results", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  monitorId: text("monitor_id").notNull(),
+  status: text("status").notNull(),
+  statusCode: integer("status_code"),
+  responseTimeMs: integer("response_time_ms"),
+  errorCode: text("error_code"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  check("uptime_check_results_status_check", sql`${t.status} IN ('up', 'down')`),
+  check("uptime_check_results_status_code_check", sql`${t.statusCode} IS NULL OR ${t.statusCode} BETWEEN 100 AND 599`),
+  check("uptime_check_results_response_time_check", sql`${t.responseTimeMs} IS NULL OR ${t.responseTimeMs} >= 0`),
+  foreignKey({ name: "uptime_check_results_monitor_same_project_fk", columns: [t.monitorId, t.organizationId, t.projectId], foreignColumns: [uptimeMonitors.id, uptimeMonitors.organizationId, uptimeMonitors.projectId] }).onDelete("cascade"),
+  index("uptime_check_results_monitor_checked_idx").on(t.monitorId, t.checkedAt),
+  index("uptime_check_results_project_checked_idx").on(t.organizationId, t.projectId, t.checkedAt),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults };
