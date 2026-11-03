@@ -57,7 +57,7 @@ The web application now has a project observability route at `/dashboard/project
 - Newest-first signal rows and cursor-based Load more.
 - Loading, empty, unauthenticated, and API error states.
 
-The page does not yet show charts, grouped error details/stack traces, metric visualizations, span waterfalls, or log severity-specific controls. It is a functional first explorer, not the finished observability UI.
+The page now displays query-time grouped errors with occurrence counts, first/last seen timestamps, latest message, and latest event ID. It still does not show stack traces, persisted issue lifecycle actions, charts, metric visualizations, span waterfalls, or log severity-specific controls. It is a functional first explorer, not the finished observability UI.
 
 ## Tests and validation
 
@@ -71,3 +71,8 @@ Add route-level authorization tests and verify ClickHouse SQL against a real ins
 ## Error grouping API slice
 
 The project API now exposes `GET /api/v1/projects/:projectId/telemetry/errors/groups`. It returns a bounded list of groups for the selected time window and optional environment, with a stable query fingerprint derived from the error name and message, occurrence count, first/last seen timestamps, latest message, and latest event ID. The query always scopes by authenticated organization, verified project, and (when supplied) a PostgreSQL-validated environment. The fingerprint is a query-time grouping key, not a persisted issue identity; changes in message text create separate groups. This endpoint currently returns at most 100 groups and does not yet implement issue lifecycle actions or stack-trace aggregation.
+
+
+## Grouped errors dashboard slice
+
+The Errors tab calls the dedicated `/telemetry/errors/groups` endpoint and renders each group with its name, latest message, occurrence count, first/last seen times, and latest event ID. The current endpoint returns at most 100 groups; there is no group pagination or issue lifecycle workflow yet. The fingerprint remains query-time and is derived from error name + message.

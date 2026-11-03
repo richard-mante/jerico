@@ -100,7 +100,7 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 
 ### Known product gaps
 
-- The first live observability explorer and tenant-scoped query API are implemented in an open PR; charting, error grouping, metric visualization, span waterfalls, and route-level integration validation remain outstanding.
+- The first live observability explorer and tenant-scoped query API are merged; charting, error grouping, metric visualization, span waterfalls, and route-level integration validation remain outstanding.
 - SDK foundations are merged but not validated or production-ready.
 - Request-level idempotency is missing; client retries after ambiguous HTTP responses may create duplicate accepted batches.
 - Browser route-change instrumentation and Core Web Vitals are not implemented.
@@ -124,8 +124,16 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
 
 
-### Phase 4 follow-up — grouped errors (open PR #9)
+### Phase 4 follow-up — grouped errors API (merged PR #9)
 
 - Added a tenant-scoped error-group query adapter and `GET /api/v1/projects/:projectId/telemetry/errors/groups`.
 - Groups are derived at query time from error name + message and include occurrence count, first/last seen, latest message, and latest event ID. This is not a persisted issue fingerprint or error lifecycle system.
 - Added a query-adapter unit test for organization/project/environment parameter binding. Tests remain unexecuted; PostgreSQL/ClickHouse integration and browser validation remain outstanding.
+
+
+### Phase 4 grouped errors dashboard (PR #10)
+
+- PR #9 has been merged into `main` (merge commit `1918f231ea1feb976de87ecf419bb41c9bbb971e`).
+- Follow-up branch `feat/phase-4-error-groups-ui` displays grouped errors in the project Errors tab using the new grouped-error API.
+- Each group shows name, latest message, occurrence count, first/last seen, and latest event ID. The API currently caps groups at 100 and does not provide group pagination or issue lifecycle actions.
+- PR #10 is the UI follow-up; lint/typecheck/tests/build and browser/API integration validation remain unexecuted.

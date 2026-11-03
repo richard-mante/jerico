@@ -194,3 +194,11 @@
 - Added unit coverage for grouping output and tenant/project/environment query binding.
 - Important limitation: the fingerprint is not stored, message changes split groups, and there are no issue resolve/ignore actions or stack-trace aggregation yet. The endpoint returns at most 100 groups.
 - No lint, typecheck, tests, build, ClickHouse SQL execution, PostgreSQL integration, or browser validation was run. GitHub Actions currently fails before runner steps are available.
+
+
+## 2026-11-03 — Merge Phase 4 query API and grouped-error UI
+
+- Merged PR #9 into `main` using squash merge; merge commit `1918f231ea1feb976de87ecf419bb41c9bbb971e`. The PR documents that CI runner allocation and all local/integration checks remain unresolved; merge is not evidence of passing tests.
+- Created `feat/phase-4-error-groups-ui` from `main`.
+- Updated `apps/web/src/components/project-observability.tsx`: the Errors tab now calls `/telemetry/errors/groups` and renders grouped errors with occurrence counts, first/last seen timestamps, latest message, and latest event ID. Other telemetry tabs retain their existing paginated list behavior.
+- No local lint, typecheck, test, build, or browser run was available through the GitHub repository connector. API/ClickHouse integration remains unverified.

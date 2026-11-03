@@ -17,6 +17,15 @@ type TelemetryItem = {
   value: number | null;
   attributes: string;
 };
+type ErrorGroup = {
+  fingerprint: string;
+  name: string;
+  latestMessage: string;
+  occurrences: number;
+  firstSeen: string;
+  lastSeen: string;
+  latestEventId: string;
+};
 type Overview = {
   total: number;
   events: number;
@@ -57,6 +66,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [rangeHours, setRangeHours] = useState("24");
   const [overview, setOverview] = useState<Overview>(emptyOverview);
   const [rows, setRows] = useState<TelemetryItem[]>([]);
+  const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -109,7 +119,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
         credentials: "include", headers, signal: controller.signal,
       }),
-      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab}?${query}&limit=50`, {
+      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab === "errors" ? "errors/groups" : tab}?${query}&limit=50`, {
         credentials: "include", headers, signal: controller.signal,
       }),
     ]).then(async ([overviewResponse, listResponse]) => {
@@ -118,11 +128,19 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       if (!overviewResponse.ok) throw new Error(overviewPayload.error?.message ?? "Could not load project overview.");
       if (!listResponse.ok) throw new Error(listPayload.error?.message ?? "Could not load telemetry.");
       setOverview(overviewPayload.data as Overview);
-      setRows((listPayload.data ?? []) as TelemetryItem[]);
-      setNextCursor(listPayload.pagination?.nextCursor ?? null);
+      if (tab === "errors") {
+        setErrorGroups((listPayload.data ?? []) as ErrorGroup[]);
+        setRows([]);
+        setNextCursor(null);
+      } else {
+        setRows((listPayload.data ?? []) as TelemetryItem[]);
+        setErrorGroups([]);
+        setNextCursor(listPayload.pagination?.nextCursor ?? null);
+      }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) {
         setRows([]);
+        setErrorGroups([]);
         setOverview(emptyOverview);
         setError(cause instanceof Error ? cause.message : "Could not load telemetry.");
       }
@@ -214,7 +232,24 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 <div className="min-w-0"><p className="truncate text-sm font-medium">{row.name}</p>{row.message && <p className="mt-1 break-words text-xs leading-5 text-[#8f98a7]">{row.message}</p>}<p className="mt-1 font-mono text-[10px] text-[#606b7a]">{row.eventId}</p></div>
               </article>)}
             </div>
-          ) : <div className="px-5 py-16 text-center"><p className="text-sm font-medium text-[#c6cdd7]">No {tab} yet</p><p className="mt-2 text-xs text-[#7f8998]">When your application sends {tab}, they will appear here.</p></div>}
+          ) : tab === "errors" && errorGroups.length ? (
+            <div className="divide-y divide-white/[0.06]">
+              {errorGroups.map((group) => <article key={group.fingerprint} className="grid gap-3 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[#f5f7fb]">{group.name}</p>
+                    <span className="rounded-md border border-red-400/20 bg-red-400/[0.07] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-300">{group.occurrences.toLocaleString()} {group.occurrences === 1 ? "occurrence" : "occurrences"}</span>
+                  </div>
+                  <p className="mt-2 break-words text-sm leading-6 text-[#a4adba]">{group.latestMessage || "No error message provided."}</p>
+                  <p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {group.latestEventId}</p>
+                </div>
+                <div className="grid gap-2 text-xs text-[#8791a0] sm:min-w-48 sm:text-right">
+                  <p><span className="text-[#626e7d]">Last seen</span><br />{formatTimestamp(group.lastSeen)}</p>
+                  <p><span className="text-[#626e7d]">First seen</span><br />{formatTimestamp(group.firstSeen)}</p>
+                </div>
+              </article>)}
+            </div>
+          ) : <div className="px-5 py-16 text-center"><p className="text-sm font-medium text-[#c6cdd7]">No {tab === "errors" ? "error groups" : tab} yet</p><p className="mt-2 text-xs text-[#7f8998]">When your application sends {tab}, they will appear here.</p></div>}
           {nextCursor && <div className="border-t border-white/10 px-5 py-4 text-center"><button disabled={loadingMore} onClick={() => void loadMore()} className="rounded-lg border border-white/15 px-4 py-2 text-xs font-medium text-[#cbd2dc] hover:bg-white/5 disabled:opacity-50">{loadingMore ? "Loading…" : "Load more"}</button></div>}
         </section>
         <p className="mt-5 text-xs text-[#687382]">Latest signal: {overview.lastEventAt ? formatTimestamp(overview.lastEventAt) : "No telemetry received in this range."}</p>
