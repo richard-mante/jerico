@@ -62,7 +62,7 @@ The queue envelope contains:
 - Acceptance timestamp.
 - Redacted telemetry events.
 
-The consumer writes batches to ClickHouse using the HTTP `JSONEachRow` interface. It acknowledges queue messages only after ClickHouse returns success. Failed writes are retried with a delay; after the configured retry count, Cloudflare Queues moves messages to the configured dead-letter queue. Malformed queue envelopes are acknowledged and discarded.
+The consumer writes batches to ClickHouse using the HTTP `JSONEachRow` interface. Before queue publication, ingestion assigns each accepted event a server-generated `event_id`. The ID is carried inside the queue envelope, so Cloudflare Queue redelivery preserves it. ClickHouse uses `ReplacingMergeTree` with `event_id` included in the sorting key to collapse duplicate writes from the same queued event during background merges. This is eventual deduplication, not a strict uniqueness constraint: queries that require immediate deduplication should use `FINAL` or an explicit deduplication strategy. It acknowledges queue messages only after ClickHouse returns success. Failed writes are retried with a delay; after the configured retry count, Cloudflare Queues moves messages to the configured dead-letter queue. Malformed queue envelopes are acknowledged and discarded.
 
 ## ClickHouse table
 
@@ -102,7 +102,7 @@ The current ingestion runtime is implemented as a Cloudflare Worker and uses the
 - Redaction covers sensitive attribute names, email addresses, bearer tokens, and JWT-like values. It is a safety layer, not a guarantee that arbitrary user data is anonymous.
 - The rate limiter is optional in local development and mandatory when `APP_ENV=production`; the Cloudflare binding must actually be provisioned.
 - Monthly plan quotas, billing metering, adaptive backpressure, sampling, and plan-based per-tenant quota tiers are not implemented yet. The current daily quota is a fixed per-project limit configured per deployment.
-- Queue delivery is at-least-once. A worker crash after a ClickHouse write but before queue acknowledgement can produce duplicate rows. Query/aggregation layers must account for this; an idempotent event ID strategy is a follow-up.
+- Queue delivery is at-least-once. Server-generated event IDs and ClickHouse `ReplacingMergeTree` now mitigate duplicate rows caused by queue redelivery, but replacement happens during background merges. It does not guarantee immediate uniqueness, and a client retry after an ambiguous HTTP response is treated as a new accepted event because request-level idempotency keys are not implemented.
 - There is no dashboard query API or SDK in this milestone.
 - Database, queue, and ClickHouse integration tests and deployment validation are still required.
 
