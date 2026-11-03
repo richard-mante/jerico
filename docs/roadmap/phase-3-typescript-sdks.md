@@ -7,7 +7,7 @@
 | Package | Purpose | Initial capabilities |
 |---|---|---|
 | `@jerico/sdk-core` | Shared transport and buffering | bounded in-memory queue, batching, custom events, errors, logs, metrics, spans, explicit flush/close |
-| `@jerico/sdk-browser` | Browser instrumentation | public-key enforcement, page views, window errors, unhandled promise rejections |
+| `@jerico/sdk-browser` | Browser instrumentation | public-key enforcement, anonymous session IDs, explicit identify/reset, page views, window errors, unhandled promise rejections |
 | `@jerico/sdk-node` | Server-side instrumentation | secret-key enforcement, custom events/errors/logs/metrics/spans, opt-in unhandled rejection capture |
 
 All packages are TypeScript-first workspace packages. They are intentionally private until a build/output and package publishing strategy is validated.
