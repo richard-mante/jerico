@@ -153,3 +153,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-trace-waterfall` adds best-effort span grouping by `attributes.traceId`, standalone handling when trace IDs are absent, parent-span indication, duration bars, and duration labels.
 - The current SDK span method stores duration in milliseconds in `value`; trace/span IDs must be supplied manually in attributes. Automatic trace context propagation is not implemented.
 - PR #12 is the trace visualization follow-up. Validation remains outstanding.
+
+
+### Phase 4 error stack details (PR #13)
+
+- PR #12 merged the best-effort span waterfall into `main` (merge commit `75d7f7a76effa00aed840ffbfc35623e75c438df`).
+- Branch `feat/phase-4-error-stack-details` adds the latest captured error stack to grouped-error results and a collapsed, scrollable stack disclosure in the Errors tab.
+- Stack content is rendered as text; groups without stack data do not show the disclosure. Only the latest stack is included.
+- PR #13 is the stack-detail follow-up. Validation remains outstanding.
