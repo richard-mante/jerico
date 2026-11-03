@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationEnqueueRetryDelay } from "./notification-delivery";
+import { notificationEnqueueLeaseDuration, notificationEnqueueRetryDelay } from "./notification-delivery";
 
 describe("notification enqueue retry backoff", () => {
   it("uses exponential delays beginning at one minute", () => {
