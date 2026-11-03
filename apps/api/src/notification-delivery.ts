@@ -79,3 +79,20 @@ export async function queueIncidentNotifications(
     }
   }
 }
+
+export async function safelyQueueIncidentNotifications(
+  database: JericoDatabase,
+  env: ApiBindings,
+  incident: { id: string; organizationId: string; projectId: string; title: string; triggerValue: number },
+  eventType: IncidentNotificationEvent,
+): Promise<void> {
+  try {
+    await queueIncidentNotifications(database, env, incident, eventType);
+  } catch (error) {
+    console.error("Jerico incident notification enqueue failed", {
+      incidentId: incident.id,
+      eventType,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
