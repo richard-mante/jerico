@@ -86,3 +86,8 @@ The API exposes `GET /api/v1/projects/:projectId/telemetry/metrics/series`. It v
 ## Span trace waterfall slice
 
 The Traces tab now groups the currently loaded span rows by `attributes.traceId`. When `traceId` is absent, each span is shown as a standalone span rather than being incorrectly joined to unrelated spans. Each group displays span names, optional span IDs, parent-span indication, timestamp-relative bars, and duration in milliseconds (the existing SDK `span()` contract stores duration in `value`). This is a best-effort waterfall over the currently loaded page(s), not full distributed trace reconstruction: the SDK does not yet generate or propagate trace/span context automatically, and missing `traceId`/`parentSpanId` attributes cannot be inferred. Load more can extend the visible span set.
+
+
+## Error stack trace details
+
+The grouped-error query now extracts the latest event's `attributes.stack` value from the stored JSON attributes, and the Errors tab exposes it in a collapsed, scrollable text disclosure. The stack is rendered as text (not HTML). Groups without a stack trace simply omit the disclosure. This shows the latest stack only; stack-based grouping, occurrence-by-occurrence history, and issue lifecycle actions remain future work.
