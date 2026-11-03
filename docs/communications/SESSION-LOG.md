@@ -697,3 +697,15 @@
 
 ### Next
 - Continue source-level review of ingestion credential scoping, deployed Worker egress, and queue retention/replay. Manual runtime validation remains the release gate.
+
+
+## 2026-11-03 — Ingestion future timestamp bounds
+
+- Reviewed the ingestion credential path and ClickHouse retention behavior. The telemetry table partitions and applies TTL based on client event timestamp; the ingestion schema previously accepted any valid ISO timestamp, including far-future dates. Such rows could remain outside dashboard query windows and extend retention beyond the intended 7/30 days.
+- Added a 60-second future-skew bound relative to a single server-generated `acceptedAt` value. The same timestamp is placed in the queue envelope. Historical timestamps remain valid for offline/backfilled events; absent timestamps continue to use the accepted time downstream. Rejection occurs before daily quota reservation and queue publication.
+- Added tests for the exact boundary, timestamps beyond it, historical values, missing timestamps, and offset-aware timestamps.
+- Merged [PR #66](https://github.com/richard-mante/jerico/pull/66); merge commit: `fdfd55f86e03a9a5fd6af0a48ebe1c9d41b54e67`. Issue #65 closed.
+- GitHub combined status had no reported checks. Tests, typecheck, lint, build, and ingestion/ClickHouse runtime checks were not executed. The user will manually test. No migration or lockfile changes.
+
+### Next
+- Continue the remaining ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
