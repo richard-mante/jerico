@@ -17,7 +17,7 @@ type TelemetryItem = {
   value: number | null;
   attributes: string;
 };
-type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string };
+type EventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string; latestMessage: string; latestAttributes: string };
 type MetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
 type MetricSeries = { name: string; points: MetricPoint[] };
 type ErrorGroup = {
@@ -329,7 +329,13 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                 const maxCount = Math.max(1, ...eventCatalogue.map((item) => item.occurrences));
                 const width = Math.max(2, (event.occurrences / maxCount) * 100);
                 return <article key={event.name} className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center">
-                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold">{event.name}</p><span className="rounded-md border border-white/10 px-2 py-1 text-[10px] tabular-nums text-[#aeb8c5]">{event.occurrences.toLocaleString()} occurrences</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><span className="block h-full rounded-full bg-[#d9f36a]/80" style={{ width: String(width) + "%" }} /></div><p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {event.latestEventId}</p></div>
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold">{event.name}</p><span className="rounded-md border border-white/10 px-2 py-1 text-[10px] tabular-nums text-[#aeb8c5]">{event.occurrences.toLocaleString()} occurrences</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><span className="block h-full rounded-full bg-[#d9f36a]/80" style={{ width: String(width) + "%" }} /></div><p className="mt-2 font-mono text-[10px] text-[#606b7a]">Latest event · {event.latestEventId}</p>
+                    {(event.latestMessage || event.latestAttributes) && <details className="mt-3 rounded-lg border border-white/[0.07] bg-black/15 p-3">
+                      <summary className="cursor-pointer text-xs font-medium text-[#aab4c2]">Latest event details</summary>
+                      {event.latestMessage && <p className="mt-3 break-words text-xs text-[#a4adba]">{event.latestMessage}</p>}
+                      {event.latestAttributes && <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-5 text-[#8793a3]">{event.latestAttributes}</pre>}
+                    </details>}
+                  </div>
                   <div className="text-xs text-[#8791a0] sm:text-right"><span className="text-[#626e7d]">Last seen</span><p className="mt-1">{formatTimestamp(event.lastSeen)}</p></div>
                 </article>;
               })}

@@ -270,3 +270,12 @@
 - Added query-adapter test coverage for event catalogue output and tenant/environment parameter binding (authored, not executed).
 - Updated the Events tab to show event counts, relative count bars, last-seen timestamps, and latest event IDs.
 - No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.
+
+
+## 2026-11-03 — Phase 4 latest event details
+
+- Created `feat/phase-4-event-details` from `main` after merging PR #17.
+- Extended event catalogue summaries with the latest event message and up to 4 KiB of serialized attributes using ClickHouse `argMax` and `substring`.
+- Updated the Events tab to reveal the latest message/attributes in a collapsed, scrollable text disclosure; response size is bounded and content is rendered as text.
+- Added query-adapter fixture/assertion coverage (authored, not executed).
+- No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.

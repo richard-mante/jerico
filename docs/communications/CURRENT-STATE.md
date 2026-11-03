@@ -193,3 +193,10 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-event-catalogue` adds a tenant-scoped event catalogue endpoint and a top-events view in the dashboard Events tab.
 - The catalogue returns up to 100 event names ranked by count, with last-seen and latest event ID. Counts may include duplicates until ClickHouse background merges complete.
 - PR #17 is the event analytics follow-up. Validation remains outstanding.
+
+
+### Phase 4 latest event details (PR #18)
+
+- PR #17 merged the top event catalogue into `main` (merge commit `e5840289317795f84eb44e9e63a4e55963c42273`).
+- Branch `feat/phase-4-event-details` adds the latest event message and up to 4 KiB of serialized attributes to each catalogue row, shown in a collapsed details disclosure.
+- This is a latest-occurrence preview only; older occurrence history and full event detail retrieval are not included. Validation remains outstanding.

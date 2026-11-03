@@ -106,3 +106,8 @@ The Node SDK now supports `logWithLevel(level, name, message, attributes)` with 
 ## Event catalogue
 
 The API exposes `GET /api/v1/projects/:projectId/telemetry/events/catalogue`, returning up to 100 event names ranked by occurrence count for the selected time range and optional environment. Each summary includes count, last-seen timestamp, and latest event ID. The Events tab now displays this catalogue with relative count bars. Counts can include duplicate queue deliveries until ClickHouse `ReplacingMergeTree` background merges complete; this is not a strict real-time unique count. Raw event detail drill-down and catalogue pagination remain future work.
+
+
+## Event detail disclosure
+
+Each event catalogue row now includes the latest event message and up to 4 KiB of the latest event's serialized attributes. The Events tab exposes those fields in a collapsed, scrollable text disclosure, alongside the latest event ID. The payload is truncated at the query layer to bound response size and rendered as text. This is a latest-occurrence preview, not an event search/detail API; older occurrences and full payload retrieval remain future work.
