@@ -81,8 +81,7 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [ ] Metric charts, route performance, and percentiles.
 - [ ] Span waterfall and trace detail views.
 - [ ] Structured log severity filters and detail view.
-- [ ] Project overview with time range and environment filters.
-- [ ] Event explorer, event catalogue, top events, and time-series.
+- [ ] Event catalogue, top events, and time-series.
 - [ ] Error grouping, stack traces, occurrence history, resolve/ignore actions.
 - [ ] Core Web Vitals, route performance, and percentiles.
 - [ ] Structured log explorer with severity and time filters.
