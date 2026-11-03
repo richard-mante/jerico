@@ -26,7 +26,7 @@ export function notificationEnqueueRetryDelay(attempt: number): number {
 }
 
 function buildNotificationMessage(
-  delivery: { id: string; eventType: string; createdAt: Date },
+  delivery: { id: string; eventType: string; createdAt: Date; enqueueAttempts: number },
   channel: { type: string; target: string; secretCiphertext: string | null; secretIv: string | null },
   incident: { id: string; projectId: string; title: string; triggerValue: number },
   env: ApiBindings,
@@ -37,6 +37,7 @@ function buildNotificationMessage(
       schemaVersion: 1 as const,
       type: "notification.webhook" as const,
       deliveryId: delivery.id,
+      enqueueAttempt: delivery.enqueueAttempts,
       url: channel.target,
       secretCiphertext: channel.secretCiphertext,
       secretIv: channel.secretIv,
@@ -58,6 +59,7 @@ function buildNotificationMessage(
     schemaVersion: 1 as const,
     type: "notification.email" as const,
     deliveryId: delivery.id,
+    enqueueAttempt: delivery.enqueueAttempts,
     to: channel.target,
     subject: `[${eventLabel}] ${incident.title}`,
     text: [
