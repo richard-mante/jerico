@@ -2,7 +2,7 @@ import { and, count, desc, eq, gte, isNull, lt, lte, or } from "drizzle-orm";
 import { alertRules, incidents, uptimeCheckResults } from "@jerico/database/schema";
 import { withDatabase, type ApiBindings } from "./database";
 import { queryTelemetryErrorCount, type TelemetryQueryBindings } from "./telemetry-query";
-import { queueIncidentNotifications } from "./notification-delivery";
+import { safelyQueueIncidentNotifications } from "./notification-delivery";
 
 type AlertEnvironment = ApiBindings & TelemetryQueryBindings;
 
@@ -107,7 +107,7 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
           }).onConflictDoNothing().returning({ id: incidents.id });
           if (created) {
             opened += 1;
-            await queueIncidentNotifications(database, env, {
+            await safelyQueueIncidentNotifications(database, env, {
               id: created.id, organizationId: rule.organizationId, projectId: rule.projectId,
               title: rule.name, triggerValue: Math.round(value),
             }, "incident.opened");
@@ -119,7 +119,7 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
           resolvedAt: now,
           updatedAt: now,
         }).where(eq(incidents.id, active[0].id));
-        await queueIncidentNotifications(database, env, {
+        await safelyQueueIncidentNotifications(database, env, {
           id: active[0].id, organizationId: rule.organizationId, projectId: rule.projectId,
           title: rule.name, triggerValue: Math.round(value),
         }, "incident.resolved");
