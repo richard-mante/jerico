@@ -308,3 +308,10 @@ At the end of each substantial session, update this file and append a session-lo
 - Added probe queue retries and a dead-letter queue; the UI now distinguishes configured queue from real stored check results.
 - Critical deployment constraint: the probe Worker must remain on workers.dev with no custom-domain route, VPC binding, or private outbound network. Private-address/DNS-rebinding safety relies on Workerd's default public-only global fetch egress. The implementation does not use TCP sockets.
 - Cloudflare queues and secrets are not provisioned; migration 0005, scheduler, queue, and callback have not been executed in a deployed environment. Tests are authored but not run.
+
+
+#### Probe security/retention follow-up
+
+- Probe Worker now enables the `global_fetch_strictly_public` compatibility flag and requires `PROBE_WORKER_HOST` to block requests back to itself.
+- API retains check history for 30 days and schedules daily pruning with a timestamp index.
+- The probe Worker still requires provisioning of the queues, API URL, shared result secret, and exact worker hostname. No deployed Workerd test has verified the egress assumptions yet.
