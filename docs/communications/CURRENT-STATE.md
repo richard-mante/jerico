@@ -34,7 +34,7 @@ Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository conta
 
 ## Phase 1 implementation in review
 
-Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest branch commit: `80ae14fa18959ac5db187149138396ace0bfdb8e`.
+Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest branch commit: `82c46afc93925a636c77e55a2351b166320a755e`.
 
 Implemented:
 - Better Auth identity, session, account, verification, organization, membership, and invitation schema.
@@ -47,6 +47,7 @@ Implemented:
 - Shared Zod request contracts and validation tests.
 - Organization invitation acceptance page at `apps/web/src/app/accept-invitation/[id]/page.tsx`; signed-in users can accept via Better Auth, and signed-out users are instructed to sign in and reopen the invitation link.
 - Updated `withDatabase` lifecycle: a request-scoped `pg.Client` is created per Worker invocation; Hyperdrive clients are not explicitly ended because Workers clean up the edge connection, while local direct PostgreSQL clients are closed after use.
+- CI runner label pinned to `ubuntu-24.04` rather than the moving `ubuntu-latest` alias.
 
 These capabilities remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
 
@@ -67,12 +68,12 @@ ClickHouse telemetry storage, queueing, SDKs, ingestion credential lifecycle, ob
 - No successful dependency install or committed pnpm lockfile.
 - No lint/typecheck/test/build run.
 - No PostgreSQL migration execution or Better Auth/tenancy integration test.
-- CI job fails before recording steps; latest inspected run (run #16, for commit `7dad40c`) has `steps: null` and no downloadable logs. Root cause remains unknown. Run #16 was created by the first code change in the latest session; a later docs-only commit is now the PR head.
+- GitHub Actions runs fail before runner allocation. The latest run using the pinned `ubuntu-24.04` label (run #20, workflow commit `70a7e4d`) reports `runner_id: 0`, an empty runner name, and no steps; its logs are unavailable. Pinning the runner image did not resolve the startup failure. This is not a diagnosed source-code failure; the GitHub-hosted runner issue remains unresolved.
 - No production Hyperdrive resource/binding ID or email/OAuth secrets configured.
 
 ## Next actions
 
-1. Diagnose CI startup and establish a runnable validation environment.
+1. Establish a runnable CI/local validation environment and resolve the GitHub Actions runner allocation issue.
 2. Generate and commit the pnpm lockfile; run lint, typecheck, tests, and builds.
 3. Provision disposable PostgreSQL, validate/apply the migration, and add Better Auth + tenant-isolation integration tests.
 4. Provision Hyperdrive only when a real PostgreSQL resource and binding ID are available; test the Worker connection path.
