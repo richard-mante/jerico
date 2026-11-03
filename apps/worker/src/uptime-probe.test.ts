@@ -19,10 +19,6 @@ describe("uptime target validation", () => {
     expect(validateProbeUrl("https://jerico-worker.account.workers.dev/health", ["jerico-worker.account.workers.dev"])).toBeNull();
     expect(validateProbeUrl("https://status.example.com:8443/health#section")?.hash).toBe("");
   });
-
-  it("accepts public HTTP(S) hostnames and strips fragments", () => {
-    expect(validateProbeUrl("https://status.example.com:8443/health#section")?.hash).toBe("");
-  });
 });
 
 describe("uptime endpoint probe", () => {
