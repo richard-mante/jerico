@@ -66,3 +66,8 @@ The query adapter has unit coverage for time-range bounds, page limits, opaque c
 ## Next slice
 
 Add route-level authorization tests and verify ClickHouse SQL against a real instance. Then expand the explorer with event catalogue/time-series, error grouping and stack traces, metric charts, span waterfalls, and structured log detail before calling Phase 4 complete.
+
+
+## Error grouping API slice
+
+The project API now exposes `GET /api/v1/projects/:projectId/telemetry/errors/groups`. It returns a bounded list of groups for the selected time window and optional environment, with a stable query fingerprint derived from the error name and message, occurrence count, first/last seen timestamps, latest message, and latest event ID. The query always scopes by authenticated organization, verified project, and (when supplied) a PostgreSQL-validated environment. The fingerprint is a query-time grouping key, not a persisted issue identity; changes in message text create separate groups. This endpoint currently returns at most 100 groups and does not yet implement issue lifecycle actions or stack-trace aggregation.
