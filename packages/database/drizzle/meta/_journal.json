@@ -36,6 +36,13 @@
       "when": 1793700900000,
       "tag": "0004_project_error_group_states",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793701200000,
+      "tag": "0005_uptime_monitors",
+      "breakpoints": true
     }
   ]
 }
