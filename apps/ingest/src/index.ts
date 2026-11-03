@@ -10,7 +10,7 @@ import { redactTelemetryEvent } from "./redaction";
 import { DailyQuotaExceeded, dailyEventLimit, secondsUntilUtcMidnight, utcUsageDate } from "./quota";
 import { createStableEventId, hashTelemetryRequest, isValidIdempotencyKey } from "./idempotency";
 import { isAllowedPublicMetric } from "./public-metrics";
-import { hasFutureTimestampBeyondSkew } from "./timestamps";
+import { hasFutureTimestampBeyondSkew, MAX_FUTURE_EVENT_SKEW_MS } from "./timestamps";
 
 const MAX_BODY_BYTES = 96 * 1024;
 const MAX_BATCH_EVENTS = 100;
@@ -234,7 +234,7 @@ app.post("/ingest/v1/events", async (context) => {
     if (hasFutureTimestampBeyondSkew(parsed.data.events, acceptedAt)) {
       return context.json({ error: {
         code: "FUTURE_EVENT_TIMESTAMP",
-        message: "Event timestamps may not be more than 60 seconds in the future.",
+        message: `Event timestamps may not be more than ${MAX_FUTURE_EVENT_SKEW_MS / 1000} seconds in the future.`,
         requestId,
       } }, 400);
     }
