@@ -409,3 +409,14 @@
 - Added a checked-at index and daily 30-day check-history retention.
 - Expanded internal result response-time bounds to tolerate scheduler delay.
 - Cloudflare queue/secret provisioning and deployed Workerd egress verification remain outstanding.
+
+
+## 2026-11-03 — Phase 5C uptime availability summaries
+
+- Confirmed PR #30 merged into `main` (merge commit `497b0cfad44b8c04252e6c6bb65da82af5194a54`).
+- Created `feat/uptime-availability-summary` from current `main`.
+- Added a project-scoped summary endpoint for 24h/7d/30d windows, grouping check results by monitor and returning up/down/total counts, sample-based uptime percentage, average response time, p95 response time, and latest checked timestamp.
+- Bounded summary aggregation to the selected time window and authenticated organization/project.
+- Updated uptime management UI with window selection and per-monitor observed uptime/latency summaries.
+- Added helper unit tests, API response tests, cross-tenant project test, and invalid-window test. No lint, typecheck, tests, build, DB integration, or browser validation was run.
+- Clarified that sample-based uptime is not time-weighted and missed schedules are not counted as downtime.
