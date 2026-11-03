@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryMetricSeries, queryTelemetryOverview } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryMetricSeries, queryTelemetryOverview } from "./telemetry-query";
 
 describe("telemetry query validation", () => {
   it("defaults to one hour and rejects ranges over 31 days", () => {
@@ -141,5 +141,23 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("param_logLevel")).toBe("warn");
     expect(parsed.searchParams.get("query")).toContain("JSONExtractString(attributes");
     expect(parsed.searchParams.get("query")).toContain("{logLevel:String}");
+  });
+  it("returns a tenant-scoped top event catalogue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
+      name: "checkout.completed", occurrences: "27", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-27",
+    }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const catalogue = await queryTelemetryEventCatalogue(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", environmentId: "env-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z" },
+    );
+    expect(catalogue).toEqual([{ name: "checkout.completed", occurrences: 27, lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-27" }]);
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_organizationId")).toBe("org-a");
+    expect(parsed.searchParams.get("param_projectId")).toBe("project-a");
+    expect(parsed.searchParams.get("param_environmentId")).toBe("env-a");
+    expect(parsed.searchParams.get("query")).toContain("event_type =");
+    expect(parsed.searchParams.get("query")).toContain("LIMIT 100");
   });
 });
