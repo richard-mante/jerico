@@ -230,3 +230,13 @@
 - Added unit test fixture/assertion for latest stack extraction (authored, not executed).
 - Updated grouped error cards with a collapsed, scrollable stack-trace disclosure. Stack content is rendered as text.
 - No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.
+
+
+## 2026-11-03 — Phase 4 structured logs
+
+- Created `feat/phase-4-structured-logs` from `main` after merging PR #13.
+- Added `LogLevel` and `logWithLevel()` to `@jerico/sdk-core`; legacy `log()` now writes `info` by default. Browser SDK explicitly rejects `logWithLevel()` just as it rejects `log()`.
+- Added Node SDK documentation and SDK unit coverage for severity metadata.
+- Added optional `level` filtering to API log queries with strict supported-level validation and ClickHouse parameter binding; historical entries without a level default to `info` in the query.
+- Added API unit coverage for severity parameter binding and a Logs-tab severity selector that persists across Load more.
+- No lint, typecheck, tests, build, or live ClickHouse/browser validation was run.
