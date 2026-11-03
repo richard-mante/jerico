@@ -118,7 +118,7 @@ Rules support `gt` and `gte` comparisons, thresholds, 1–10 consecutive minute 
 - Continued breaches update the active incident's latest value and timestamp.
 - Recovery automatically resolves an active incident.
 - Organization members can acknowledge or manually resolve incidents; rules remain owner/admin managed.
-- Deleting a rule cascades its incident history. Webhook channels, escalation policies, assignments, comments, and an incident audit timeline remain open.
+- Deleting a rule cascades its incident history. Webhook channels are implemented in Phase 5E. Escalation policies, assignments, comments, and an incident audit timeline remain open.
 
 ### API
 
@@ -189,7 +189,13 @@ Apply migration 0007_email_notification_channels.sql before deploying. The code 
 In addition to Phase 5D queue and callback configuration:
 - Generate a random 32-byte key, encode it as unpadded base64url, and set `WEBHOOK_ENCRYPTION_KEY` on both API and Worker.
 - Apply migration `0008_webhook_notification_channels.sql`.
+- Set the same base64url-encoded 32-byte `WEBHOOK_ENCRYPTION_KEY` on API and Worker using deployment secret stores.
 - The existing `jerico-notifications` queue and `jerico-notifications-dlq` are reused; no additional queue is required.
+
+### Merge status
+
+- Implemented and merged in [PR #33](https://github.com/richard-mante/jerico/pull/33), merge commit `9d45571e0639d418914b0d0fdbc34e6cf484e321`.
+- Contract, encryption, worker signing/delivery, queue validation, and mocked API authorization tests are included but have not been executed.
 
 ### Validation and remaining work
 
