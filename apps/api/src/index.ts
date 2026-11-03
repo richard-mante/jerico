@@ -952,7 +952,24 @@ app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOr
   const [project] = await database.select({ id: projects.id }).from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
   if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
-  const data = await database.select().from(uptimeMonitors)
+  const data = await database.select({
+    id: uptimeMonitors.id,
+    organizationId: uptimeMonitors.organizationId,
+    projectId: uptimeMonitors.projectId,
+    name: uptimeMonitors.name,
+    url: uptimeMonitors.url,
+    method: uptimeMonitors.method,
+    intervalSeconds: uptimeMonitors.intervalSeconds,
+    timeoutMs: uptimeMonitors.timeoutMs,
+    expectedStatusCode: uptimeMonitors.expectedStatusCode,
+    enabled: uptimeMonitors.enabled,
+    nextCheckAt: uptimeMonitors.nextCheckAt,
+    lastCheckedAt: uptimeMonitors.lastCheckedAt,
+    lastStatus: uptimeMonitors.lastStatus,
+    createdBy: uptimeMonitors.createdBy,
+    createdAt: uptimeMonitors.createdAt,
+    updatedAt: uptimeMonitors.updatedAt,
+  }).from(uptimeMonitors)
     .where(and(eq(uptimeMonitors.organizationId, organizationId), eq(uptimeMonitors.projectId, projectId)))
     .orderBy(desc(uptimeMonitors.createdAt));
   return context.json({ data, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
@@ -978,7 +995,24 @@ app.post("/api/v1/projects/:projectId/uptime-monitors", async (context) => withO
     expectedStatusCode: parsed.data.expectedStatusCode,
     enabled: parsed.data.enabled,
     createdBy: userId,
-  }).returning();
+  }).returning({
+    id: uptimeMonitors.id,
+    organizationId: uptimeMonitors.organizationId,
+    projectId: uptimeMonitors.projectId,
+    name: uptimeMonitors.name,
+    url: uptimeMonitors.url,
+    method: uptimeMonitors.method,
+    intervalSeconds: uptimeMonitors.intervalSeconds,
+    timeoutMs: uptimeMonitors.timeoutMs,
+    expectedStatusCode: uptimeMonitors.expectedStatusCode,
+    enabled: uptimeMonitors.enabled,
+    nextCheckAt: uptimeMonitors.nextCheckAt,
+    lastCheckedAt: uptimeMonitors.lastCheckedAt,
+    lastStatus: uptimeMonitors.lastStatus,
+    createdBy: uptimeMonitors.createdBy,
+    createdAt: uptimeMonitors.createdAt,
+    updatedAt: uptimeMonitors.updatedAt,
+  });
   return context.json({ data: created, checksEnabled: Boolean(context.env.UPTIME_PROBES) }, 201);
 }));
 
@@ -991,9 +1025,26 @@ app.patch("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (conte
   if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
   const parsed = updateUptimeMonitorSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide valid uptime monitor fields.", details: parsed.error.flatten() } }, 400);
-  const [updated] = await database.update(uptimeMonitors).set({ ...parsed.data, updatedAt: new Date() })
+  const [updated] = await database.update(uptimeMonitors).set({ ...parsed.data, activeCheckId: null, updatedAt: new Date() })
     .where(and(eq(uptimeMonitors.id, monitorId), eq(uptimeMonitors.projectId, projectId), eq(uptimeMonitors.organizationId, organizationId)))
-    .returning();
+    .returning({
+      id: uptimeMonitors.id,
+      organizationId: uptimeMonitors.organizationId,
+      projectId: uptimeMonitors.projectId,
+      name: uptimeMonitors.name,
+      url: uptimeMonitors.url,
+      method: uptimeMonitors.method,
+      intervalSeconds: uptimeMonitors.intervalSeconds,
+      timeoutMs: uptimeMonitors.timeoutMs,
+      expectedStatusCode: uptimeMonitors.expectedStatusCode,
+      enabled: uptimeMonitors.enabled,
+      nextCheckAt: uptimeMonitors.nextCheckAt,
+      lastCheckedAt: uptimeMonitors.lastCheckedAt,
+      lastStatus: uptimeMonitors.lastStatus,
+      createdBy: uptimeMonitors.createdBy,
+      createdAt: uptimeMonitors.createdAt,
+      updatedAt: uptimeMonitors.updatedAt,
+    });
   if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
   return context.json({ data: updated, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
@@ -1223,7 +1274,7 @@ app.post("/internal/uptime-results", async (context) => {
   try {
     const result = parsed.data;
     const accepted = await withDatabase(context.env, async (database) => database.transaction(async (transaction) => {
-      const [monitor] = await transaction.select({ id: uptimeMonitors.id, enabled: uptimeMonitors.enabled })
+      const [monitor] = await transaction.select({ id: uptimeMonitors.id, enabled: uptimeMonitors.enabled, activeCheckId: uptimeMonitors.activeCheckId })
         .from(uptimeMonitors)
         .where(and(
           eq(uptimeMonitors.id, result.monitorId),
@@ -1243,18 +1294,26 @@ app.post("/internal/uptime-results", async (context) => {
         checkedAt: new Date(result.checkedAt),
       }).onConflictDoNothing().returning({ id: uptimeCheckResults.id });
       if (!inserted) return { accepted: true, duplicate: true };
-      if (monitor.enabled) {
+      if (monitor.enabled && monitor.activeCheckId === result.checkId) {
         const checkedAt = new Date(result.checkedAt);
         await transaction.update(uptimeMonitors).set({
-          lastCheckedAt: checkedAt,
-          lastStatus: result.status,
+          // Keep the timestamp monotonic even if the probe Worker clock is
+          // behind a previously persisted result; the active token, not the
+          // client timestamp, decides which check owns the current state.
+          lastCheckedAt: sql`GREATEST(COALESCE(${uptimeMonitors.lastCheckedAt}, ${checkedAt}), ${checkedAt})`,
+          lastStatus: sql`CASE
+            WHEN ${uptimeMonitors.lastCheckedAt} IS NULL OR ${uptimeMonitors.lastCheckedAt} <= ${checkedAt}
+              THEN ${result.status}
+            ELSE ${uptimeMonitors.lastStatus}
+          END`,
+          activeCheckId: null,
           updatedAt: new Date(),
         }).where(and(
           eq(uptimeMonitors.id, result.monitorId),
           eq(uptimeMonitors.organizationId, result.organizationId),
           eq(uptimeMonitors.projectId, result.projectId),
           eq(uptimeMonitors.enabled, true),
-          or(isNull(uptimeMonitors.lastCheckedAt), lte(uptimeMonitors.lastCheckedAt, checkedAt)),
+          eq(uptimeMonitors.activeCheckId, result.checkId),
         ));
       }
       return { accepted: true, duplicate: false };

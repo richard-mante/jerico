@@ -209,6 +209,7 @@ export const uptimeMonitors = pgTable("uptime_monitors", {
   expectedStatusCode: integer("expected_status_code").notNull().default(200),
   enabled: boolean("enabled").notNull().default(true),
   nextCheckAt: timestamp("next_check_at", { withTimezone: true }).notNull().defaultNow(),
+  activeCheckId: text("active_check_id"),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   lastStatus: text("last_status"),
   createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
