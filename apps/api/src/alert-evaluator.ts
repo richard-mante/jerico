@@ -43,7 +43,7 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
             gte(uptimeCheckResults.checkedAt, from),
             lte(uptimeCheckResults.checkedAt, now),
           ));
-          if (rule.metric === "uptime_down") value = checks.filter((check) => check.status === "down").length;
+          if (rule.metric === "uptime_down") value = checks.length ? checks.filter((check) => check.status === "down").length : null;
           else value = percentile95(checks.flatMap((check) => check.responseTimeMs === null ? [] : [check.responseTimeMs]));
         }
       } catch (error) {
