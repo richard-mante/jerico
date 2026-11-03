@@ -151,3 +151,6 @@
 
 
 - Added documentation-only Next.js App Router and Express/Node integration examples under `docs/examples/`. The examples are not yet executed in sample applications; the Next.js page-view example explicitly avoids double-counting the initial route.
+
+
+- After adding the Next.js and Express examples, latest PR #6 CI run #94 (ID `41562241700`) also failed before runner assignment; GitHub returned `steps: null` and no logs. No lint, typecheck, tests, or build steps executed.
