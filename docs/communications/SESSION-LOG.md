@@ -212,3 +212,12 @@
 - Added a query-adapter unit test for metric bucketing and parameter binding (authored, not executed).
 - Updated the Metrics tab to render responsive SVG average-value charts for up to eight metric names. No charting dependency added.
 - No local lint, typecheck, tests, build, ClickHouse execution, or browser validation was run.
+
+
+## 2026-11-03 — Phase 4 span trace waterfall
+
+- Created `feat/phase-4-trace-waterfall` from `main` after merging PR #11.
+- Updated the Traces tab in `apps/web/src/components/project-observability.tsx` to group loaded spans by `attributes.traceId`; spans without a trace ID are displayed independently to avoid false grouping.
+- Added timeline-relative duration bars using the existing span `value` in milliseconds, plus span ID and parent-span indicators when supplied in attributes.
+- No API changes or new dependencies were needed. No lint, typecheck, tests, build, or browser validation was run.
+- Limitation: the SDK does not automatically create or propagate trace/span IDs; this view is best-effort and limited to loaded rows.
