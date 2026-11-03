@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `feat/phase-2c-queue-deduplication`  
+**Current work branch:** `feat/phase-3-typescript-sdk-foundation`  
 **Current milestone:** Phase 2C — validation and infrastructure readiness
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
@@ -57,7 +57,7 @@ PR #5 merged to `main` as `b6515688db8dc9e688e70b52635019848ed0967c`. It assigns
 
 **No automated checks are currently confirmed passing.** The repository has no committed `pnpm-lock.yaml`; dependency installation, lint, typecheck, tests, builds, and PostgreSQL integration tests remain outstanding.
 
-The latest main-branch CI run before this SDK branch was run #73 (ID `41559078138`). The Phase 2C PR #5 CI run #78 (ID `41560761906`) also failed before runner assignment, with no steps or logs. It failed within seconds. The job endpoint returned no runner assignment, no steps, and no logs (`steps: null`). Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
+The latest main-branch CI run before this SDK branch was run #73 (ID `41559078138`). The Phase 2C PR #5 CI run #78 (ID `41560761906`) also failed before runner assignment, with no steps or logs. Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
 
 Database migrations have not been applied to a disposable or production PostgreSQL instance. Cloudflare Hyperdrive, Queue, Rate Limiting bindings, and ClickHouse have not been provisioned or exercised end-to-end. No production deployment has been verified.
 
@@ -85,12 +85,12 @@ Branch `feat/phase-3-typescript-sdk-foundation` introduces three workspace packa
 - `@jerico/sdk-browser`: public-key-only browser client, anonymous session IDs, explicit identify/reset, page-view capture, window errors, and unhandled promise rejections.
 - `@jerico/sdk-node`: secret-key-only Node client, telemetry methods, and opt-in unhandled-rejection capture.
 
-The SDK requires an explicit ingestion endpoint; no hosted Jerico endpoint is assumed. Failed batches remain in memory for explicit flush. Automatic retries are intentionally disabled because the ingestion API does not yet support request-level idempotency and retrying ambiguous requests could duplicate accepted events. These packages are not yet validated by install/typecheck/tests/build and are not production-ready. Browser session/identity APIs, Core Web Vitals, OpenTelemetry integrations, examples, and published package release remain outstanding.
+The SDK requires an explicit ingestion endpoint; no hosted Jerico endpoint is assumed. Failed batches remain in memory for explicit flush. Automatic retries are intentionally disabled because the ingestion API does not yet support request-level idempotency and retrying ambiguous requests could duplicate accepted events. These packages are not yet validated by install/typecheck/tests/build and are not production-ready. Core Web Vitals, route-change instrumentation, OpenTelemetry integrations, framework examples, build artifacts, and published package release remain outstanding.
 
 ## Next milestones after Phase 2C
 
 1. Stabilize the ingestion pipeline and its contracts.
-2. Build the TypeScript browser and Node SDKs with integration examples.
+2. Complete and validate the TypeScript browser and Node SDKs, then add integration examples.
 3. Build dashboard query APIs and the Observability UI (events/errors/logs/metrics/traces).
 4. Add uptime checks, alert rules, and notification channels.
 5. Add usage metering/billing and production operational safeguards.
