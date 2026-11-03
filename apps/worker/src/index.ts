@@ -250,7 +250,8 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
   const active = await postNotificationResult(env, { ...callbackIdentity, status: "attempting" });
   if (!active) return;
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-    await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "configuration_missing" });
+    const current = await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "configuration_missing" });
+    if (!current) return;
     throw new Error("Resend email delivery is not configured.");
   }
   const controller = new AbortController();
@@ -274,7 +275,8 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
-      await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "provider_rejected" });
+      const current = await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "provider_rejected" });
+      if (!current) return;
       throw new Error("Email provider rejected the notification.");
     }
     const payload = await response.json().catch(() => ({})) as { id?: unknown };
@@ -285,7 +287,8 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Email provider rejected the notification.") throw error;
-    await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "provider_unavailable" });
+    const current = await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: "provider_unavailable" });
+    if (!current) return;
     throw new Error("Email provider request failed.");
   } finally {
     clearTimeout(timeout);
@@ -387,7 +390,8 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
     await postNotificationResult(env, { ...callbackIdentity, status: "sent" });
   } catch (error) {
     const rejected = error instanceof Error && error.message === "Webhook endpoint rejected the event.";
-    await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
+    const current = await postNotificationResult(env, { ...callbackIdentity, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
+    if (!current) return;
     throw new Error(rejected ? "Webhook endpoint rejected the event." : "Webhook delivery failed.");
   }
 }
