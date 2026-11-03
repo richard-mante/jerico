@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `docs/phase-3-merged-handover`  
+**Current work branch:** `main` (no active feature branch)  
 **Current milestone:** Phase 3 — TypeScript SDK foundation merged; validation and ingestion integration pending
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
