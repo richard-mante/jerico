@@ -392,7 +392,7 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
       message.ack();
     } catch (error) {
       console.error("Jerico notification delivery failed", {
-        deliveryId: message.body.deliveryId,
+        ...(message.body.type === "notification.webhook.verify" ? { channelId: message.body.channelId } : { deliveryId: message.body.deliveryId }),
         error: error instanceof Error ? error.message : String(error),
       });
       message.retry({ delaySeconds: 60 });
