@@ -35,6 +35,8 @@
 **Acceptance:** A user can register, create a workspace, create a project, and configure environments without manual database operations.
 
 ## Phase 2 — Credentials and telemetry ingestion
+
+**Current milestone:** [Phase 2A — Project Ingestion Credentials](phase-2-credentials.md) is implemented on a feature branch; validation and review are pending. The remaining Phase 2 work below is not yet complete.
 - [ ] Generate project/environment-scoped ingestion keys.
 - [ ] Store credential hashes only; show raw key once; support revocation.
 - [ ] Separate public ingestion credentials from server-only secrets.
