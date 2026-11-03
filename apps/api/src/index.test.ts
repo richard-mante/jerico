@@ -17,7 +17,7 @@ vi.mock("./database", () => ({
   }),
 }));
 
-import app from "./index";
+import { app } from "./index";
 
 function setSelectResults(...results: unknown[][]) {
   const pending = [...results];
