@@ -226,7 +226,7 @@ app.get("/api/v1/projects/:projectId/telemetry/logs", (context) => listProjectTe
 app.get("/api/v1/projects/:projectId/telemetry/metrics", (context) => listProjectTelemetry(context, "metric"));
 app.get("/api/v1/projects/:projectId/telemetry/spans", (context) => listProjectTelemetry(context, "span"));
 
-app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) => withOrganization(context, async (database, organizationId) => {
+app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) => withOrganization(context, async (database, organizationId, role) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
