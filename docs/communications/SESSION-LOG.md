@@ -433,3 +433,9 @@
 - Added project Alerts & Incidents UI for channel management and recent delivery history, plus a verification page.
 - Added notification contract tests, worker queue-message validation tests, and mocked API authorization/callback tests. None have been executed. No dependency install, lint, typecheck, unit tests, build, migration, Resend, Cloudflare queue, or browser validation was run.
 - Webhook channels and endpoint verification remain the next notification slice.
+
+## 2026-11-03 — Phase 5D email notifications merged
+
+- PR #32 merged into main (merge commit `40654eecd4c76583d849a741ac497af65e23e54e`).
+- Verified email channels, verification flow, notification queue producer/consumer, Resend idempotency key, callback attempt tracking, delivery history, and dashboard controls are now in main.
+- Runtime setup still requires migration 0007, notification and DLQ queues, matching callback secret, and Resend credentials on API and Worker. No tests or runtime delivery validation have been executed.
