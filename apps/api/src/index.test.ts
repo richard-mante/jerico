@@ -145,6 +145,28 @@ describe("alert rule route authorization", () => {
     expect(mocks.insert).not.toHaveBeenCalled();
   });
 
+  it("revokes an in-flight evaluation lease when an alert rule is edited", async () => {
+    setSelectResults([{ role: "owner" }], [{ id: "project-a" }]);
+    const updatedRule = { id: "rule-a", name: "Updated rule", consecutiveCount: 0 };
+    const set = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: async () => [updatedRule],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const response = await app.request("/api/v1/projects/project-a/alert-rules/rule-a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ name: "Updated rule" }),
+    });
+    expect(response.status).toBe(200);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      consecutiveCount: 0,
+      evaluationLeaseToken: null,
+      evaluationLeaseExpiresAt: null,
+    }));
+  });
+
   it("does not reveal alert rules for a project outside the active organization", async () => {
     setSelectResults([{ role: "member" }], []);
     const response = await app.request("/api/v1/projects/project-from-org-b/alert-rules", {
