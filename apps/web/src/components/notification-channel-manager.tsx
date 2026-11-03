@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 type Channel = { id: string; type: string; target: string; verifiedAt: string | null; enabled: boolean; createdAt: string };
@@ -47,7 +47,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
     void refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not load notification settings."));
   }, [organizationId, projectId]);
 
-  async function addEmail(event: React.FormEvent<HTMLFormElement>) {
+  async function addEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
       await request("/api/v1/notification-channels", { method: "POST", body: JSON.stringify({ email: email.trim() }) });
