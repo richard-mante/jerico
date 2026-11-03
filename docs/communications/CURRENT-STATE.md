@@ -4,7 +4,8 @@
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Current work branch:** `feat/phase-2-ingestion-credentials`  
-**Current milestone:** Phase 2A — Project Ingestion Credentials
+**Current milestone:** Phase 2A — Project Ingestion Credentials  
+**Phase 2A PR:** https://github.com/richard-mante/jerico/pull/3 (draft)
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -37,7 +38,7 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 
 ## Phase 2A — Project ingestion credentials
 
-Branch: `feat/phase-2-ingestion-credentials`. Implementation is underway; open PR status should be checked before resuming.
+Branch: `feat/phase-2-ingestion-credentials`. Draft PR #3 is open: https://github.com/richard-mante/jerico/pull/3.
 
 Implemented on the branch:
 - Added `project_ingestion_keys` Drizzle schema and SQL migration `0001_project_ingestion_keys.sql`.
@@ -61,6 +62,7 @@ Implemented on the branch:
 
 ## Validation blockers
 
+- GitHub Actions run for PR #3 failed before runner allocation; job has no steps or logs.
 - No dependency install or pnpm lockfile.
 - No lint/typecheck/unit test/build run for Phase 1 or Phase 2A.
 - No PostgreSQL migration execution or API integration tests.
