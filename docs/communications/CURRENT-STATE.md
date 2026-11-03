@@ -4,7 +4,7 @@
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Latest feature merge:** PR #33 — `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
-**Latest main merge:** PR #39 — `4d23197e52f95edbf71741b1f8735b7f3b709c13`  
+**Latest main merge:** PR #41 — `eca004ec9034f7275caaf581f26f453937c1c767`  
 **Current milestone:** Phase 5E — signed webhook notifications merged; Phase 0–5 implementation is present, but validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -53,7 +53,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 - 256-bit webhook signing secrets encrypted at rest with AES-256-GCM; the raw signing secret is shown only once.
 - Timestamped HMAC-SHA256 webhook signatures over the exact request body.
 - Incident opened, acknowledged, and resolved delivery events.
-- Queue retries, dead-letter routing, bounded internal callbacks, and delivery history.
+- Cloudflare Queue consumer retries and dead-letter routing, plus API-side enqueue reconciliation with bounded exponential backoff (PR #41), bounded internal callbacks, and delivery history.
 - Delivery IDs are stable across retries; webhook receivers must deduplicate them.
 - The Worker retains `global_fetch_strictly_public`. Do not attach VPC bindings, private egress, or custom-domain routes to the probe/notification Worker.
 
@@ -73,7 +73,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 
 Before exercising the notification pipeline in a non-production environment:
 
-1. Apply migrations through `0008_webhook_notification_channels.sql`.
+1. Apply migrations through `0009_notification_enqueue_retries.sql`.
 2. Provision `jerico-uptime-probes`, `jerico-uptime-probes-dlq`, `jerico-notifications`, and `jerico-notifications-dlq`.
 3. Configure matching `UPTIME_RESULTS_SECRET` on API and Worker.
 4. Configure matching `NOTIFICATION_DELIVERY_SECRET` on API and Worker.
@@ -98,6 +98,10 @@ Do not store any of these secrets in the repository. Use deployment secret store
 Potential Phase 5 follow-ups include per-event notification preferences, quiet hours, escalation policies, manual retry controls, incident assignment/comments, and an audit timeline. Do not let these delay the essential validation and self-hosting release gates.
 
 
+
+### 2026-11-03 notification enqueue reconciliation
+
+Merged PR #41. Notification deliveries now persist enqueue-attempt count and next retry time. The API minute scheduler retries queue-send failures using atomic failed-to-queued claims, a bounded five-attempt policy, and exponential backoff. Disabled/unverified channels and missing webhook signing material are not re-enqueued. Stable delivery IDs are retained. Migration `0009_notification_enqueue_retries.sql` is required before deployment. Unit coverage for backoff was added but not executed; queue/database concurrency and delivery behavior remain unverified at runtime.
 
 ### 2026-11-03 source-level review update
 
