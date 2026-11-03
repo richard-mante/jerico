@@ -59,6 +59,7 @@ Implemented on the same draft branch:
 - Request body capped at 96 KiB; batches capped at 100 events.
 - Redacts sensitive attribute names, email addresses, bearer tokens, and JWT-like strings before enqueueing.
 - Optional per-credential Cloudflare Rate Limiting binding; production mode returns 503 when configured with `APP_ENV=production` but the binding is missing.
+- Atomic per-credential daily event quota in PostgreSQL, default 100,000 events per UTC day, configurable through `INGEST_DAILY_EVENT_LIMIT`; failed queue sends refund the reservation.
 - Enqueues trusted, versioned envelopes to Cloudflare Queue `jerico-telemetry`.
 - Adds queue consumer in `apps/worker`, ClickHouse HTTP `JSONEachRow` writer, retry behavior, and dead-letter queue config.
 - Adds initial ClickHouse schema with 7-day log and 30-day other telemetry retention.
@@ -72,7 +73,7 @@ Implemented on the same draft branch:
 - Cloudflare Rate Limiting binding must be provisioned and named `INGEST_RATE_LIMITER`; production requests fail closed without it when `APP_ENV=production`.
 - ClickHouse must be provisioned and its SQL schema applied; Worker URL/token secrets must be configured.
 - Queue delivery is at-least-once. Duplicate writes are possible if a worker crashes after a successful ClickHouse insert but before acknowledgement. Event IDs/idempotency are follow-up work.
-- Daily/monthly plan quotas, billing metering, adaptive backpressure, self-hosted runtime/queue adapter, dashboard query APIs, and SDKs are not implemented.
+- Monthly plan tiers/billing metering, adaptive backpressure, self-hosted runtime/queue adapter, dashboard query APIs, and SDKs are not implemented.
 - The current Worker runtime is Cloudflare-specific. Do not claim self-hosted ingestion is supported yet.
 
 ## Validation blockers
