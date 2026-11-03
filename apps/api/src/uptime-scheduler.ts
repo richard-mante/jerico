@@ -32,11 +32,13 @@ export async function scheduleDueUptimeMonitors(env: ApiBindings): Promise<numbe
 
     for (const candidate of due) {
       const claimedAt = new Date();
+      const checkId = crypto.randomUUID();
       const [monitor] = await database.update(uptimeMonitors)
         .set({
           // Calculate from the current database row's interval while holding
           // the update lock, so concurrent edits cannot leave a stale cadence.
           nextCheckAt: sql`${claimedAt}::timestamptz + (${uptimeMonitors.intervalSeconds} * interval '1 second')`,
+          activeCheckId: checkId,
           updatedAt: claimedAt,
         })
         .where(and(
@@ -50,7 +52,7 @@ export async function scheduleDueUptimeMonitors(env: ApiBindings): Promise<numbe
       const message: UptimeProbeMessage = {
         schemaVersion: 1,
         type: "uptime.probe",
-        checkId: crypto.randomUUID(),
+        checkId,
         monitorId: monitor.id,
         organizationId: monitor.organizationId,
         projectId: monitor.projectId,
@@ -66,11 +68,12 @@ export async function scheduleDueUptimeMonitors(env: ApiBindings): Promise<numbe
         // Only roll back the schedule if it is still the exact claim made by
         // this invocation. A concurrent edit or newer schedule must win.
         await database.update(uptimeMonitors)
-          .set({ nextCheckAt: claimedAt, updatedAt: new Date() })
+          .set({ nextCheckAt: claimedAt, activeCheckId: null, updatedAt: new Date() })
           .where(and(
             eq(uptimeMonitors.id, monitor.id),
             eq(uptimeMonitors.enabled, true),
             eq(uptimeMonitors.nextCheckAt, monitor.nextCheckAt),
+            eq(uptimeMonitors.activeCheckId, checkId),
           ));
         console.error("Jerico failed to enqueue uptime probe", {
           monitorId: monitor.id,
