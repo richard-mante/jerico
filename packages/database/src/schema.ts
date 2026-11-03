@@ -313,6 +313,7 @@ export const notificationChannels = pgTable("notification_channels", {
   secretCiphertext: text("secret_ciphertext"),
   secretIv: text("secret_iv"),
   lastVerificationErrorCode: text("last_verification_error_code"),
+  lastVerificationChallengeHash: text("last_verification_challenge_hash"),
   enabled: boolean("enabled").notNull().default(true),
   createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
   createdAt: createdAt(),
