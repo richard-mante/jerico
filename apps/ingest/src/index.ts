@@ -101,18 +101,18 @@ async function withCredentialDatabase<T>(
 
 async function reserveDailyQuota(
   env: Bindings,
-  credentialId: string,
+  projectId: string,
   usageDate: string,
   eventCount: number,
 ): Promise<void> {
   const limit = dailyEventLimit(env.INGEST_DAILY_EVENT_LIMIT);
   await withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
     const [usage] = await transaction.insert(projectIngestionUsage).values({
-      credentialId,
+      projectId,
       usageDate,
       eventCount,
     }).onConflictDoUpdate({
-      target: [projectIngestionUsage.credentialId, projectIngestionUsage.usageDate],
+      target: [projectIngestionUsage.projectId, projectIngestionUsage.usageDate],
       set: {
         eventCount: sql`${projectIngestionUsage.eventCount} + ${eventCount}`,
         updatedAt: new Date(),
@@ -126,7 +126,7 @@ async function reserveDailyQuota(
 
 async function releaseDailyQuota(
   env: Bindings,
-  credentialId: string,
+  projectId: string,
   usageDate: string,
   eventCount: number,
 ): Promise<void> {
@@ -135,7 +135,7 @@ async function releaseDailyQuota(
       eventCount: sql`GREATEST(${projectIngestionUsage.eventCount} - ${eventCount}, 0)`,
       updatedAt: new Date(),
     }).where(and(
-      eq(projectIngestionUsage.credentialId, credentialId),
+      eq(projectIngestionUsage.projectId, projectId),
       eq(projectIngestionUsage.usageDate, usageDate),
     ));
   });
@@ -186,7 +186,7 @@ app.post("/ingest/v1/events", async (context) => {
   }
 
   const keyHash = await hashPresentedCredential(rawKey);
-  let reservedUsage: { credentialId: string; usageDate: string; eventCount: number } | null = null;
+  let reservedUsage: { projectId: string; usageDate: string; eventCount: number } | null = null;
   let queueAccepted = false;
   try {
     const credential = await withCredentialDatabase(context.env, async (database) => {
@@ -220,8 +220,8 @@ app.post("/ingest/v1/events", async (context) => {
     }
 
     const usageDate = utcUsageDate();
-    await reserveDailyQuota(context.env, credential.id, usageDate, parsed.data.events.length);
-    reservedUsage = { credentialId: credential.id, usageDate, eventCount: parsed.data.events.length };
+    await reserveDailyQuota(context.env, credential.projectId, usageDate, parsed.data.events.length);
+    reservedUsage = { projectId: credential.projectId, usageDate, eventCount: parsed.data.events.length };
 
     await withCredentialDatabase(context.env, async (database) => {
       await database.update(projectIngestionKeys)
@@ -250,7 +250,7 @@ app.post("/ingest/v1/events", async (context) => {
     }
     if (reservedUsage && !queueAccepted) {
       try {
-        await releaseDailyQuota(context.env, reservedUsage.credentialId, reservedUsage.usageDate, reservedUsage.eventCount);
+        await releaseDailyQuota(context.env, reservedUsage.projectId, reservedUsage.usageDate, reservedUsage.eventCount);
       } catch (releaseError) {
         console.error("Could not release reserved telemetry quota", { requestId, releaseError });
       }
