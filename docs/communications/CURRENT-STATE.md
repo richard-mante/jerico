@@ -57,7 +57,7 @@ PR #5 merged to `main` as `b6515688db8dc9e688e70b52635019848ed0967c`. It assigns
 
 **No automated checks are currently confirmed passing.** The repository has no committed `pnpm-lock.yaml`; dependency installation, lint, typecheck, tests, builds, and PostgreSQL integration tests remain outstanding.
 
-The latest main-branch CI run after PR #3 merged is run #73 (ID `41559078138`). It failed within seconds. The job endpoint returned no runner assignment, no steps, and no logs (`steps: null`). Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
+The latest main-branch CI run before this SDK branch was run #73 (ID `41559078138`). The Phase 2C PR #5 CI run #78 (ID `41560761906`) also failed before runner assignment, with no steps or logs. It failed within seconds. The job endpoint returned no runner assignment, no steps, and no logs (`steps: null`). Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
 
 Database migrations have not been applied to a disposable or production PostgreSQL instance. Cloudflare Hyperdrive, Queue, Rate Limiting bindings, and ClickHouse have not been provisioned or exercised end-to-end. No production deployment has been verified.
 
@@ -73,7 +73,7 @@ Database migrations have not been applied to a disposable or production PostgreS
 ### Known product gaps
 
 - Dashboard telemetry query APIs and observability views are not implemented.
-- TypeScript browser and Node SDKs are not implemented.
+- SDK foundation is in an unmerged Phase 3 branch; it is not validated or production-ready.
 - Alerts, notification channels, and full uptime monitoring are not implemented.
 - Monthly plan tiers, billing metering, adaptive backpressure, and configurable retention are not implemented.
 - A self-hosted durable queue/runtime adapter and Docker Compose deployment are not implemented. The current ingestion runtime is Cloudflare-specific; do not claim self-hosted ingestion support yet.
