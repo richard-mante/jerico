@@ -118,6 +118,11 @@ export const createNotificationChannelSchema = z.object({
 export const verifyNotificationChannelSchema = z.object({
   token: z.string().min(32).max(128),
 }).strict();
+export const notificationDeadLetterResultSchema = z.object({
+  deliveryId: z.string().uuid(),
+  enqueueToken: z.string().uuid().optional(),
+}).strict();
+
 export const notificationDeliveryResultSchema = z.object({
   deliveryId: z.string().uuid(),
   enqueueToken: z.string().uuid().optional(),
