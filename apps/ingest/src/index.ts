@@ -104,6 +104,11 @@ app.post("/ingest/v1/events", async (context) => {
     return context.json({ error: { code: "INGESTION_UNAVAILABLE", message: "Telemetry processing is not configured.", requestId } }, 503);
   }
 
+  const contentType = context.req.header("content-type")?.split(";")[0]?.trim().toLowerCase();
+  if (contentType !== "application/json") {
+    return context.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Send telemetry using application/json.", requestId } }, 415);
+  }
+
   const contentLength = Number(context.req.header("content-length") ?? 0);
   if (contentLength > MAX_BODY_BYTES) {
     return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body exceeds 96 KiB.", requestId } }, 413);
