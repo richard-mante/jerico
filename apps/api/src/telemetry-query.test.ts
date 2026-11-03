@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryOverview } from "./telemetry-query";
 
 describe("telemetry query validation", () => {
   it("defaults to one hour and rejects ranges over 31 days", () => {
