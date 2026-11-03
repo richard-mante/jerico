@@ -107,7 +107,7 @@ describe("email notification contracts", () => {
     expect(verifyNotificationChannelSchema.safeParse({ token: "short" }).success).toBe(false);
   });
   it("accepts delivery results only with safe failure codes", () => {
-    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "sent", providerMessageId: "msg_123" }).success).toBe(true);
+    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "attempting" }).success).toBe(true);\n    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "sent", providerMessageId: "msg_123" }).success).toBe(true);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed" }).success).toBe(false);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed", errorCode: "private endpoint response" }).success).toBe(false);
   });
