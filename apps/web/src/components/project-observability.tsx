@@ -68,6 +68,15 @@ function metricLine(points: MetricPoint[]) {
     return `${x},${y}`;
   }).join(" ");
 }
+type SpanMetadata = { traceId?: string; spanId?: string; parentSpanId?: string };
+function spanMetadata(row: TelemetryItem): SpanMetadata {
+  try {
+    const attributes: unknown = JSON.parse(row.attributes || "{}");
+    if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) return {};
+    const value = attributes as Record<string, unknown>;
+    return { traceId: typeof value.traceId === "string" ? value.traceId : undefined, spanId: typeof value.spanId === "string" ? value.spanId : undefined, parentSpanId: typeof value.parentSpanId === "string" ? value.parentSpanId : undefined };
+  } catch { return {}; }
+}
 export function ProjectObservability({ initialOrganizationId }: { initialOrganizationId: string }) {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -88,6 +97,17 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   const [error, setError] = useState("");
 
   const organizationList = useMemo(() => (organizations ?? []) as Organization[], [organizations]);
+
+  const traceGroups = useMemo(() => {
+    const grouped = new Map<string, { traceId: string | null; spans: TelemetryItem[] }>();
+    for (const row of rows) {
+      const traceId = spanMetadata(row).traceId ?? null;
+      const key = traceId ?? ("standalone:" + row.eventId);
+      const current = grouped.get(key) ?? { traceId, spans: [] };
+      current.spans.push(row); grouped.set(key, current);
+    }
+    return Array.from(grouped.values()).map((group) => ({ ...group, spans: [...group.spans].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) }));
+  }, [rows]);
 
   useEffect(() => {
     if (organizationList.length && (!organizationId || !organizationList.some((item) => item.id === organizationId))) {
@@ -247,7 +267,37 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
             <div><h2 className="font-semibold">Signal explorer</h2><p className="mt-1 text-xs text-[#7f8998]">Latest matching telemetry from ClickHouse</p></div>
             <div className="flex flex-wrap gap-1 rounded-xl bg-black/20 p-1">{tabs.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${tab === item.id ? "bg-[#d9f36a] text-[#15190b]" : "text-[#9ba4b2] hover:text-white"}`}>{item.label}</button>)}</div>
           </div>
-          {loading ? <div className="px-5 py-16 text-center text-sm text-[#8f98a7]">Loading telemetry…</div> : rows.length ? (
+          {loading ? <div className="px-5 py-16 text-center text-sm text-[#8f98a7]">Loading telemetry…</div> : tab === "spans" && rows.length ? (
+            <div className="space-y-4 p-4">
+              {traceGroups.map((group) => {
+                const start = Math.min(...group.spans.map((span) => new Date(span.timestamp).getTime()));
+                const end = Math.max(...group.spans.map((span) => new Date(span.timestamp).getTime() + Math.max(0, span.value ?? 0)));
+                const duration = Math.max(1, end - start);
+                return <article key={group.traceId ?? group.spans[0].eventId} className="overflow-hidden rounded-xl border border-white/10 bg-black/10">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3">
+                    <div><p className="text-xs font-semibold">{group.traceId ? ("Trace " + group.traceId.slice(0, 18)) : "Standalone span"}</p><p className="mt-1 text-[10px] text-[#758091]">{group.spans.length} {group.spans.length === 1 ? "span" : "spans"} · {Math.round(duration).toLocaleString()} ms total window</p></div>
+                    <span className="text-[10px] text-[#758091]">{formatTimestamp(new Date(start).toISOString())}</span>
+                  </div>
+                  <div className="space-y-3 p-4">
+                    {group.spans.map((span) => {
+                      const metadata = spanMetadata(span);
+                      const spanStart = new Date(span.timestamp).getTime();
+                      const spanDuration = Math.max(0, span.value ?? 0);
+                      const left = Math.max(0, ((spanStart - start) / duration) * 100);
+                      const width = Math.max(1.2, (spanDuration / duration) * 100);
+                      return <div key={span.eventId} className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)_90px] sm:items-center">
+                        <div className="min-w-0"><p className="truncate text-xs font-medium">{metadata.parentSpanId ? "↳ " : ""}{span.name}</p><p className="truncate text-[10px] text-[#657181]">{metadata.spanId ? ("span " + metadata.spanId.slice(0, 12)) : span.eventId.slice(0, 14)}</p></div>
+                        <div className="relative h-7 overflow-hidden rounded-md bg-white/[0.035]">
+                          <span className="absolute top-1 h-5 min-w-[3px] rounded bg-[#d9f36a]/80" style={{ left: String(left) + "%", width: String(Math.min(width, 100 - left)) + "%" }} />
+                        </div>
+                        <p className="text-right text-[10px] tabular-nums text-[#a7b0bd]">{spanDuration.toLocaleString(undefined, { maximumFractionDigits: 2 })} ms</p>
+                      </div>;
+                    })}
+                  </div>
+                </article>;
+              })}
+            </div>
+          ) : rows.length ? (
             <div className="divide-y divide-white/[0.06]">
               {rows.map((row, index) => <article key={`${row.eventId}-${index}`} className="grid gap-2 px-5 py-4 sm:grid-cols-[190px_110px_minmax(0,1fr)] sm:items-start">
                 <time className="text-xs text-[#8791a0]">{formatTimestamp(row.timestamp)}</time>
