@@ -578,3 +578,17 @@
 ### Next
 - Continue source-level tenant-isolation review, starting with schema-level foreign keys and internal callback/API resource lookups.
 - Continue the remaining Workerd egress and queue retry/DLQ review; retain the manual validation and provisioning release gates.
+
+
+## 2026-11-03 — Notification verification and alert-edit race hardening
+
+- Reviewed the tenant-scoped notification channel resend and public email verification flows. Found a read-then-update race: a verification request could read a valid token, a resend could replace it, and the old request could still mark the channel verified because its final update matched only channel ID and organization.
+- Replaced the email verification read/update sequence with a single conditional update matching the exact token hash and unexpired timestamp. A resend that replaces the hash causes an older verification request to update zero rows. Resend and queue-failure updates now also include the organization ID.
+- Added route tests for successful atomic token consumption and the invalidated-token outcome. Merged [PR #45](https://github.com/richard-mante/jerico/pull/45); merge commit: `33f0880b94824aefcbd204ec6c1954b2bf9ca5ed`.
+- Follow-up review found that editing an alert rule reset its consecutive count but did not revoke an in-flight evaluator lease. An evaluator could therefore finish a query using the previous configuration and commit a stale count/incident decision.
+- Alert-rule PATCH now clears the lease token and expiry in the same update as the configuration edit and counter reset. The evaluator's existing token guard fences the old evaluation. Added a route test asserting lease revocation.
+- Merged [PR #46](https://github.com/richard-mante/jerico/pull/46); merge commit: `a5f722d981c621b1edef49c015a4f93e8807fa03`.
+- Tests, typecheck, lint, build, and database concurrency checks were not executed. The user will handle manual testing. No lockfile was generated or modified.
+
+### Next
+- Continue the source-level tenant-isolation and callback lifecycle review, then inspect remaining Worker egress and queue retry/DLQ failure modes.
