@@ -20,7 +20,7 @@ export async function createStableEventId(
   requestHash: string,
   eventIndex: number,
 ): Promise<string> {
-  return sha256Hex(`jerico:event:${credentialId}:${idempotencyKey}:${requestHash}:${eventIndex}`);
+  return sha256Hex(canonicalJson(["jerico:event", credentialId, idempotencyKey, requestHash, eventIndex]));
 }
 
 export function isValidIdempotencyKey(value: string): boolean {
