@@ -18,6 +18,7 @@ export function isBreaching(value: number, comparison: string, threshold: number
 export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()): Promise<{ evaluated: number; opened: number; resolved: number }> {
   return withDatabase(env, async (database) => {
     const rules = await database.select().from(alertRules).where(eq(alertRules.enabled, true));
+    let evaluated = 0;
     let opened = 0;
     let resolved = 0;
 
@@ -30,6 +31,7 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
           or(isNull(alertRules.lastEvaluatedAt), lt(alertRules.lastEvaluatedAt, evaluationMinute)),
         )).returning({ id: alertRules.id });
       if (!claimed) continue;
+      evaluated += 1;
       const from = new Date(now.getTime() - rule.windowSeconds * 1000);
       let value: number | null = null;
 
@@ -113,6 +115,6 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
         resolved += 1;
       }
     }
-    return { evaluated: rules.length, opened, resolved };
+    return { evaluated, opened, resolved };
   });
 }
