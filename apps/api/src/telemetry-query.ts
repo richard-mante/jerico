@@ -257,7 +257,7 @@ export async function queryTelemetryErrorGroups(
   }));
 }
 
-export type TelemetryMetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; samples: number };
+export type TelemetryMetricPoint = { timestamp: string; average: number; minimum: number; maximum: number; p50: number; p75: number; p95: number; samples: number; unit: string; rating: string };
 export type TelemetryMetricSeries = { name: string; points: TelemetryMetricPoint[] };
 
 export async function queryTelemetryMetricSeries(
@@ -276,7 +276,7 @@ export async function queryTelemetryMetricSeries(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, avg(value) AS average, min(value) AS minimum, max(value) AS maximum, count() AS samples FROM ${database}.${table} WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
+  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, avg(value) AS average, min(value) AS minimum, max(value) AS maximum, quantileTDigest(0.50)(value) AS p50, quantileTDigest(0.75)(value) AS p75, quantileTDigest(0.95)(value) AS p95, count() AS samples, argMax(JSONExtractString(attributes, 'unit'), timestamp) AS unit, argMax(JSONExtractString(attributes, 'rating'), timestamp) AS rating FROM ${database}.${table} WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -302,7 +302,12 @@ export async function queryTelemetryMetricSeries(
       average: Number(row.average),
       minimum: Number(row.minimum),
       maximum: Number(row.maximum),
+      p50: Number(row.p50),
+      p75: Number(row.p75),
+      p95: Number(row.p95),
       samples: Number(row.samples),
+      unit: String(row.unit ?? ""),
+      rating: String(row.rating ?? ""),
     });
     grouped.set(name, points);
   }
