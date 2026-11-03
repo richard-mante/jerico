@@ -367,3 +367,14 @@
 - Captured the browser SDK's initial pathname when Web Vitals collection starts so page-finalized metrics remain attributed to the document's initial route.
 - Added query-adapter tests, a mocked route-level cross-tenant test, and a gated ClickHouse integration case with route fixtures.
 - No lint, typecheck, unit tests, build, ClickHouse integration, or browser validation was run. Route path cardinality and privacy implications are documented.
+
+
+## 2026-11-03 — Route-template normalization
+
+- Confirmed PR #27 merged into `main` (merge commit `70530ebd3fbe0de8667988595bc44e319cd773af`).
+- Created `feat/route-template-normalization` from current `main`.
+- Added conservative browser route normalization: UUIDs, long hex identifiers, and long numeric segments become `:id`; query strings and fragments are removed; segment and total path lengths are bounded.
+- Added optional `resolveRoute(pathname)` for framework-specific templates. Resolver errors safely fall back to built-in normalization.
+- Applied normalized paths to page-view events and the initial Core Web Vitals document attribution.
+- Added unit tests and updated browser SDK README, Next.js example, Phase 4 roadmap, and handover.
+- No lint, typecheck, tests, build, or browser validation was run.
