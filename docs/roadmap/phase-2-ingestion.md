@@ -120,3 +120,16 @@ The current ingestion runtime is implemented as a Cloudflare Worker and uses the
 - [ ] Consumer retries ClickHouse failures and routes exhausted messages to the DLQ.
 - [ ] ClickHouse writes preserve tenant dimensions and apply retention.
 - [ ] PostgreSQL, queue, and ClickHouse integration tests pass before production use.
+
+
+## Request-level idempotency
+
+The ingestion endpoint accepts an optional `Idempotency-Key` header, scoped to the ingestion credential and retained for 24 hours. The server hashes the canonical parsed batch, stores the trusted queue envelope and pending/accepted state in PostgreSQL, and reserves daily quota in the same transaction as the first idempotency record.
+
+- Reusing a key with the same payload returns HTTP 202 without reserving quota again when the previous queue send was recorded as accepted.
+- Reusing a key with a different payload returns HTTP 409.
+- Pending records are re-published on retry with deterministic event IDs, so ambiguous queue-send outcomes do not create new logical event IDs. Queue delivery is still at-least-once and ClickHouse replacement remains eventual.
+- A 15-minute scheduled cleanup removes records after 24 hours. Pending quota reservations are not refunded at expiry because the queue may have accepted a message even if the status update failed; this conservative reservation remains counted until the UTC quota date rolls over.
+- Requests without the header retain legacy non-idempotent behavior.
+
+The implementation is now in this mainline PR but remains unvalidated against PostgreSQL, Cloudflare Queues, and ClickHouse. Do not treat it as production-validated until local/CI and end-to-end tests pass.
