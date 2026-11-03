@@ -1,23 +1,11 @@
 {
-  "name": "jerico",
-  "version": "0.1.0",
-  "private": true,
-  "packageManager": "pnpm@12.7.0",
-  "engines": { "node": ">=22.12.0" },
-  "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "typecheck": "turbo typecheck",
-    "test": "turbo test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "format": "biome format --write .",
-    "format:check": "biome format . --check"
+  "name":"jerico","version":"0.1.0","private":true,"packageManager":"pnpm@12.7.0",
+  "engines":{"node":">=22.12.0"},
+  "scripts":{
+    "dev":"turbo dev","build":"turbo build","lint":"turbo lint","typecheck":"turbo typecheck","test":"turbo test",
+    "check":"pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "format":"biome format --write .","format:check":"biome format . --check",
+    "db:migrate":"drizzle-kit migrate"
   },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.4",
-    "turbo": "^2.8.5",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.8"
-  }
+  "devDependencies":{"@biomejs/biome":"^2.3.4","@types/node":"^22.19.0","dotenv":"^16.4.7","drizzle-kit":"^0.31.8","turbo":"^2.8.5","typescript":"^5.9.3","vitest":"^4.0.8"}
 }

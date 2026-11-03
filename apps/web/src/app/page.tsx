@@ -15,7 +15,7 @@ export default function HomePage() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-[#d9f36a] text-sm font-black text-[#15190b]">J</span>
             <span className="text-lg font-semibold tracking-tight">jerico</span>
           </a>
-          <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-[#a8afbd]">Platform foundation</span>
+          <nav className="flex items-center gap-4 text-sm"><a className="text-[#a8afbd] transition hover:text-white" href="/sign-in">Sign in</a><a className="rounded-lg bg-[#d9f36a] px-3 py-2 font-medium text-[#15190b]" href="/sign-up">Get started</a></nav>
         </header>
         <section className="grid flex-1 items-center gap-16 py-20 lg:grid-cols-[1.1fr_0.9fr]">
           <div>

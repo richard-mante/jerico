@@ -1,0 +1,7 @@
+{
+  "name":"@jerico/database","version":"0.1.0","private":true,"type":"module",
+  "exports":{".":"./src/index.ts","./schema":"./src/schema.ts"},
+  "scripts":{"db:migrate":"drizzle-kit migrate --config ../../drizzle.config.ts","lint":"biome lint .","typecheck":"tsc --noEmit","test":"vitest run --passWithNoTests"},
+  "dependencies":{"drizzle-orm":"^0.44.7"},
+  "devDependencies":{"@types/node":"^22.19.0","typescript":"^5.9.3","drizzle-kit":"^0.31.8"}
+}

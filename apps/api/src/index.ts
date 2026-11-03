@@ -1,24 +1,185 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { cors } from "hono/cors";
+import { and, asc, eq } from "drizzle-orm";
+import {
+  createEnvironmentSchema,
+  createOrganizationSchema,
+  createProductSchema,
+  createProjectSchema,
+} from "@jerico/contracts";
+import { environments, member, products, projects } from "@jerico/database/schema";
+import { createAuth } from "./auth";
+import { canManageOrganizationResources } from "./permissions";
+import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 
-type Bindings = { APP_ENV?: string };
-const app = new Hono<{ Bindings: Bindings }>();
+type Variables = { requestId: string };
+type AppEnvironment = { Bindings: ApiBindings; Variables: Variables };
+type ApiContext = Context<AppEnvironment>;
+const app = new Hono<AppEnvironment>();
+
+app.use("*", async (context, next) => {
+  const requestId = context.req.header("x-request-id") ?? crypto.randomUUID();
+  context.set("requestId", requestId);
+  context.header("x-request-id", requestId);
+  await next();
+});
+
+app.use("/api/*", cors({
+  origin: (origin, context) => origin === (context.env.WEB_APP_URL ?? "http://localhost:3000") ? origin : "",
+  credentials: true,
+  allowHeaders: ["Content-Type", "Authorization", "X-Request-Id", "X-Jerico-Organization-Id"],
+  allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  maxAge: 600,
+}));
 
 app.get("/", (context) => context.json({
-  name: "Jerico API",
-  version: "v1",
-  status: "foundation",
+  name: "Jerico API", version: "v1", status: "phase-1",
   documentation: "https://github.com/richard-mante/jerico",
 }));
-
 app.get("/health", (context) => context.json({
-  status: "ok",
-  service: "api",
-  environment: context.env.APP_ENV ?? "development",
-  checks: { database: "not-configured", authentication: "not-configured" },
+  status: "ok", service: "api", environment: context.env.APP_ENV ?? "development",
+  checks: { database: context.env.HYPERDRIVE || context.env.DATABASE_URL ? "configured" : "not-configured" },
 }));
 
-app.all("/api/v1/*", (context) => context.json({
-  error: { code: "NOT_IMPLEMENTED", message: "The management API is being implemented." },
-}, 501));
+app.on(["GET", "POST"], "/api/auth/*", async (context) => withDatabase(context.env, async (database) => {
+  const auth = createAuth(database, context.env);
+  return auth.handler(context.req.raw);
+}));
+
+app.get("/api/v1/me", async (context) => withDatabase(context.env, async (database) => {
+  const auth = createAuth(database, context.env);
+  const session = await auth.api.getSession({ headers: context.req.raw.headers });
+  if (!session) return context.json({ error: { code: "UNAUTHENTICATED", message: "Sign in to continue." } }, 401);
+  return context.json({ user: session.user, session: session.session });
+}));
+
+async function withOrganization(
+  context: ApiContext,
+  callback: (database: JericoDatabase, organizationId: string, role: string, userId: string) => Promise<Response>,
+): Promise<Response> {
+  return withDatabase(context.env, async (database) => {
+    const auth = createAuth(database, context.env);
+    const session = await auth.api.getSession({ headers: context.req.raw.headers });
+    if (!session) return context.json({ error: { code: "UNAUTHENTICATED", message: "Sign in to continue." } }, 401);
+
+    const organizationId = context.req.header("X-Jerico-Organization-Id") ?? session.session.activeOrganizationId;
+    if (!organizationId) return context.json({ error: { code: "ORGANIZATION_REQUIRED", message: "Select an organization first." } }, 400);
+
+    const [membership] = await database.select({ role: member.role }).from(member)
+      .where(and(eq(member.organizationId, organizationId), eq(member.userId, session.user.id))).limit(1);
+    if (!membership) return context.json({ error: { code: "FORBIDDEN", message: "You do not belong to this organization." } }, 403);
+    return callback(database, organizationId, membership.role, session.user.id);
+  });
+}
+
+function makeSlug(value: string): string {
+  const slug = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+  return slug || "resource";
+}
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
+app.get("/api/v1/organizations", async (context) => withDatabase(context.env, async (database) => {
+  const auth = createAuth(database, context.env);
+  const session = await auth.api.getSession({ headers: context.req.raw.headers });
+  if (!session) return context.json({ error: { code: "UNAUTHENTICATED", message: "Sign in to continue." } }, 401);
+  return context.json({ data: await auth.api.listOrganizations({ headers: context.req.raw.headers }) });
+}));
+
+app.post("/api/v1/organizations", async (context) => withDatabase(context.env, async (database) => {
+  const auth = createAuth(database, context.env);
+  const session = await auth.api.getSession({ headers: context.req.raw.headers });
+  if (!session) return context.json({ error: { code: "UNAUTHENTICATED", message: "Sign in to continue." } }, 401);
+  const parsed = createOrganizationSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide a valid organization name and slug." } }, 400);
+  const result = await auth.api.createOrganization({
+    body: { name: parsed.data.name, slug: parsed.data.slug },
+    headers: context.req.raw.headers,
+  });
+  return context.json({ data: result }, 201);
+}));
+
+app.get("/api/v1/products", async (context) => withOrganization(context, async (database, organizationId) => {
+  const rows = await database.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(asc(products.name));
+  return context.json({ data: rows });
+}));
+app.post("/api/v1/products", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create products." } }, 403);
+  const parsed = createProductSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The product details are invalid.", details: parsed.error.flatten() } }, 400);
+  try {
+    const [created] = await database.insert(products).values({
+      id: crypto.randomUUID(), organizationId, name: parsed.data.name, slug: parsed.data.slug ?? makeSlug(parsed.data.name),
+      description: parsed.data.description ?? null, websiteUrl: parsed.data.websiteUrl ?? null,
+    }).returning();
+    return context.json({ data: created }, 201);
+  } catch (error) {
+    if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "A product with this slug already exists in the organization." } }, 409);
+    throw error;
+  }
+}));
+
+app.get("/api/v1/projects", async (context) => withOrganization(context, async (database, organizationId) => {
+  const rows = await database.select().from(projects).where(eq(projects.organizationId, organizationId)).orderBy(asc(projects.name));
+  return context.json({ data: rows });
+}));
+app.post("/api/v1/projects", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create projects." } }, 403);
+  const parsed = createProjectSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The project details are invalid.", details: parsed.error.flatten() } }, 400);
+  try {
+    const created = await database.transaction(async (transaction) => {
+      const [project] = await transaction.insert(projects).values({
+        id: crypto.randomUUID(), organizationId, name: parsed.data.name, slug: parsed.data.slug ?? makeSlug(parsed.data.name),
+        productId: parsed.data.productId ?? null, framework: parsed.data.framework ?? null, platform: parsed.data.platform,
+      }).returning();
+      await transaction.insert(environments).values([
+        { id: crypto.randomUUID(), organizationId, projectId: project.id, name: "Development", slug: "development", isProduction: false },
+        { id: crypto.randomUUID(), organizationId, projectId: project.id, name: "Production", slug: "production", isProduction: true },
+      ]);
+      return project;
+    });
+    return context.json({ data: created }, 201);
+  } catch (error) {
+    if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "A project with this slug already exists in the organization." } }, 409);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "23503") {
+      return context.json({ error: { code: "INVALID_PRODUCT", message: "The selected product does not belong to this organization." } }, 400);
+    }
+    throw error;
+  }
+}));
+
+app.get("/api/v1/projects/:projectId/environments", async (context) => withOrganization(context, async (database, organizationId) => {
+  const rows = await database.select().from(environments)
+    .where(and(eq(environments.organizationId, organizationId), eq(environments.projectId, context.req.param("projectId"))))
+    .orderBy(asc(environments.name));
+  return context.json({ data: rows });
+}));
+app.post("/api/v1/projects/:projectId/environments", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create environments." } }, 403);
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const parsed = createEnvironmentSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The environment details are invalid.", details: parsed.error.flatten() } }, 400);
+  try {
+    const [created] = await database.insert(environments).values({
+      id: crypto.randomUUID(), organizationId, projectId, name: parsed.data.name,
+      slug: parsed.data.slug ?? makeSlug(parsed.data.name), isProduction: parsed.data.isProduction,
+    }).returning();
+    return context.json({ data: created }, 201);
+  } catch (error) {
+    if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "An environment with this slug already exists for the project." } }, 409);
+    throw error;
+  }
+}));
+
+app.onError((error, context) => {
+  console.error("Jerico API request failed", { requestId: context.get("requestId"), error });
+  return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed.", requestId: context.get("requestId") } }, 500);
+});
 
 export default app;

@@ -1,10 +1,11 @@
 # Jerico — Current Project Handover
 
-**Last updated:** 2026-11-02  
-**Status:** Phase 0 foundation scaffold created; verification pending  
+**Last updated:** 2026-11-03  
+**Status:** Phase 0 merged; Phase 1 identity and tenancy implementation in review  
 **Repository:** https://github.com/richard-mante/jerico  
-**Working branch:** `feat/phase-0-monorepo-foundation`  
-**Base branch:** `main`
+**Working branch:** feat/phase-1-identity-tenancy  
+**Base branch:** main  
+**Phase 1 PR:** https://github.com/richard-mante/jerico/pull/2
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -18,55 +19,67 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 - Web dashboard: Next.js + React + TypeScript.
 - Desktop client: Tauri 2 + Vite + React + TypeScript.
 - Backend APIs: Hono, designed for Cloudflare Workers and future self-hosted runtime adapters.
-- Transactional data: PostgreSQL.
-- Telemetry analytics: ClickHouse.
+- Transactional data: PostgreSQL through Drizzle ORM.
+- Cloudflare Hyperdrive: Worker-to-PostgreSQL connectivity/pooling layer; code can consume the `HYPERDRIVE` binding, but no production binding ID has been provisioned/configured yet.
+- Telemetry analytics: ClickHouse (not yet implemented).
+- Authentication: Better Auth, self-hosted inside the Hono API Worker, using the Drizzle/PostgreSQL adapter and organization plugin. No separate Better Auth hosting subscription or managed auth service is required.
 - Shared contracts and UI: workspace packages.
-- Lit is not the primary application framework; reconsider only for a future framework-neutral embed use case.
-- Desktop is a separate client of the same APIs. Monitoring must continue when desktop is closed.
-- Validate Next.js deployment on Workers before production; keep Node.js/Docker deployment available as fallback.
+- Desktop is a separate client of the same APIs; monitoring must continue when desktop is closed.
 
-## Repository baseline
+## Phase 0 status
 
-Planning and architecture documentation exists under `docs/`. The Phase 0 branch adds the initial workspace and application scaffolds.
+Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository contains the pnpm/Turborepo scaffold, Next.js web shell, Tauri desktop shell, Hono management and ingestion Workers, shared UI/contracts, CI workflow, and contribution/security docs.
 
-### Added in the Phase 0 branch
+**Verification remains incomplete:** GitHub Actions attempts on the Phase 0 and Phase 1 pull requests have failed before any workflow step was recorded; job logs are unavailable. The repository still needs a generated lockfile plus a complete install/lint/typecheck/test/build run. The Phase 0 PR was merged at the user's explicit request; this is not evidence of passing checks.
 
-- Root pnpm workspace, Turborepo tasks, TypeScript baseline, Biome configuration, environment example, and ignore rules.
-- GitHub Actions validation workflow, PR template, and issue templates.
-- Contribution and security policy documents.
-- Next.js web application shell.
-- Tauri 2 + Vite + React desktop application shell.
-- Hono management API Worker and telemetry-ingestion Worker with health endpoints.
-- Shared `@jerico/contracts` and `@jerico/ui` workspace packages.
+## Phase 1 implementation in review
 
-### Explicitly not implemented
+Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest implementation commit: `70a7e4d7399008e287bb17722f1d49f62b3ca421`; subsequent commits update continuity documentation. Consult PR #2 for the exact current branch head.
 
-- Authentication, authorization, organizations, memberships, projects, environments, or persistence.
-- PostgreSQL/Drizzle schema or migrations.
-- ClickHouse tables or telemetry queries.
-- Durable queue, queue consumers, retry/dead-letter behavior.
-- Functional telemetry ingestion, credential verification, rate limits, or redaction.
-- SDK packages.
-- Alerts, incidents, uptime probes, notifications, or monitoring UI.
-- Docker self-hosting, production deployment, or release signing.
+Implemented:
+- Better Auth identity, session, account, verification, organization, membership, and invitation schema.
+- Drizzle database package and initial PostgreSQL migration.
+- Email/password auth requiring email verification; Resend adapter and optional Google OAuth configuration.
+- Organization-scoped product, project, and environment endpoints with membership checks.
+- Composite database foreign keys for same-organization product/project/environment relationships.
+- Explicit owner/admin write-permission helper with tests; members remain read-only and unknown roles are denied.
+- Web sign-in/sign-up pages and first-run organization/project onboarding, including Development and Production environment creation.
+- Shared Zod request contracts and validation tests.
+- Organization invitation acceptance page at `apps/web/src/app/accept-invitation/[id]/page.tsx`; signed-in users can accept via Better Auth, and signed-out users are instructed to sign in and reopen the invitation link.
+- Updated `withDatabase` lifecycle: a request-scoped `pg.Client` is created per Worker invocation; Hyperdrive clients are not explicitly ended because Workers clean up the edge connection, while local direct PostgreSQL clients are closed after use.
+- CI runner label pinned to `ubuntu-24.04` rather than the moving `ubuntu-latest` alias.
 
-The API and ingestion routes intentionally return not-ready/not-implemented responses. Do not treat health endpoints as proof that persistence or telemetry works.
+These capabilities remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
 
-## Verification status
+## Required environment
 
-**Not yet run in a local checkout:** dependency installation, Biome, TypeScript checks, Vitest, Next.js build, Wrangler dry-run, Vite build, and native Tauri/Rust build.
+- Local: PostgreSQL, DATABASE_URL, BETTER_AUTH_SECRET, email provider configuration.
+- Cloudflare API Worker: provisioned Hyperdrive binding named HYPERDRIVE; Worker secrets for Better Auth and email delivery; exact web origin in WEB_APP_URL.
+- Google OAuth is optional and requires provider credentials.
+- The Hyperdrive binding ID must be added to `apps/api/wrangler.jsonc` after the actual Hyperdrive resource exists.
+- Never commit credentials or real connection strings.
 
-GitHub Actions is configured to run lint, typecheck, tests, and builds on pushes to main and pull requests. The first three workflow attempts failed before any job step was recorded; GitHub exposed no step logs, so the cause is not yet diagnosed. Do not interpret this as a code-test failure or a successful validation. The workflow must be made to start and complete before the foundation is accepted. The repository has no committed `pnpm-lock.yaml`; generate it after a successful install, then switch CI to frozen-lockfile installs.
+## Not implemented yet
+
+ClickHouse telemetry storage, queueing, SDKs, ingestion credential lifecycle, observability dashboard, alerts, uptime probes, self-hosted Docker distribution, API key management, audit logging, production deployment, complete organization management/switching, and full project CRUD.
+
+## Validation blockers
+
+- No successful dependency install or committed pnpm lockfile.
+- No lint/typecheck/test/build run.
+- No PostgreSQL migration execution or Better Auth/tenancy integration test.
+- GitHub Actions runs fail before runner allocation. The latest run using the pinned `ubuntu-24.04` label (run #20, workflow commit `70a7e4d`) reports `runner_id: 0`, an empty runner name, and no steps; its logs are unavailable. Pinning the runner image did not resolve the startup failure. This is not a diagnosed source-code failure; the GitHub-hosted runner issue remains unresolved.
+- No production Hyperdrive resource/binding ID or email/OAuth secrets configured.
 
 ## Next actions
 
-1. Review the branch diff and resolve any scaffold/configuration issues.
-2. Diagnose why GitHub Actions jobs are terminating before their first recorded step; then get a complete validation run and fix all actual code failures.
-3. Generate and commit `pnpm-lock.yaml`; use frozen installs in CI.
-4. Validate native Tauri build on Linux and add Windows/macOS build matrix.
-5. Test Next.js deployment compatibility on Cloudflare Workers; retain a Node.js/Docker fallback.
-6. Add Phase 0 acceptance tests and only then begin Phase 1 database/authentication work.
+1. Establish a runnable CI/local validation environment and resolve the GitHub Actions runner allocation issue.
+2. Generate and commit the pnpm lockfile; run lint, typecheck, tests, and builds.
+3. Provision disposable PostgreSQL, validate/apply the migration, and add Better Auth + tenant-isolation integration tests.
+4. Provision Hyperdrive only when a real PostgreSQL resource and binding ID are available; test the Worker connection path.
+5. Improve organization switching/member/invitation management and project CRUD.
+6. Add audit logging and scoped API key lifecycle, then build the telemetry ingestion pipeline.
 
 ## Continuity rules
 
-At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and the next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
+At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
