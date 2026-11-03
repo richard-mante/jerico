@@ -324,3 +324,11 @@
 - Added `docker-compose.integration.yml` with a local ClickHouse service and `@jerico/api` `test:integration` script.
 - Updated CI to provision ClickHouse and run the integration suite.
 - The integration suite is authored and wired but not executed here. No local Docker, lint, typecheck, unit tests, build, or successful CI result has been observed.
+
+
+## 2026-11-03 — Phase 4 roadmap reconciliation
+
+- Created `docs/phase-4-roadmap-sync` from `main` after merging PR #23.
+- Updated implementation plan checkboxes for event catalogue/details/time series, grouped errors/stack/occurrences/lifecycle, metric charts, span waterfall/SDK trace helpers, and structured log severity filters.
+- Clarified Phase 4 exit status: feature slices are implemented and route tests/integration harness are authored, but no successful ClickHouse run, PostgreSQL migration/transaction validation, browser validation, or successful CI run has been observed.
+- Phase 4 must not be marked accepted/release-ready until validation passes.
