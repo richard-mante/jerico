@@ -32,6 +32,14 @@ describe("ClickHouse telemetry adapter", () => {
     expect(row.event_type).toBe("error");
   });
 
+  it("derives a stable fallback ID for pre-upgrade queued events", () => {
+    const event = { type: "event" as const, name: "legacy.signup" };
+    const first = toRow(message, event, 2);
+    const redelivery = toRow(message, event, 2);
+    expect(first.event_id).toBe("legacy:req_123:2");
+    expect(redelivery.event_id).toBe(first.event_id);
+  });
+
   it("rejects unsafe ClickHouse identifiers", () => {
     expect(escapeIdentifier("telemetry_events")).toBe("telemetry_events");
     expect(() => escapeIdentifier("events; DROP TABLE users")).toThrow();
