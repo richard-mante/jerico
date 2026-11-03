@@ -151,3 +151,8 @@ CI now provisions the same ClickHouse service and runs the integration suite. Th
 ## Trace detail drill-down
 
 The Traces tab can now retrieve all spans for an individual trace independently of the initial project-wide span page. It reuses the authenticated project spans endpoint with a `traceId` filter. The API binds the trace ID as a ClickHouse query parameter and continues to enforce the existing organization, project, environment, time-range, and cursor constraints. Trace IDs are bounded to 1–256 characters. The dashboard loads up to 100 spans per request, renders span IDs, parent indicators, timestamps, messages, and durations, and supports cursor-based loading of additional spans. This avoids treating the first 50 project-wide rows as the complete trace. It remains a span detail view rather than a full distributed-trace service map or cross-project trace search.
+
+
+## Browser Core Web Vitals
+
+The browser SDK can opt into `captureWebVitals: true`. It records TTFB and FCP when the browser exposes the relevant timing entries, tracks LCP and CLS, and estimates INP from interaction-duration entries. LCP, CLS, and INP are finalized when the page becomes hidden or closes, then a best-effort flush is started. Public ingestion credentials remain restricted: they may submit events, errors, and only five named metric series (`web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, `web.vitals.ttfb`). Custom browser metrics, logs, and spans remain forbidden. This is an initial native PerformanceObserver implementation; cross-browser comparison with the official `web-vitals` library and SPA route attribution remain future validation/work.
