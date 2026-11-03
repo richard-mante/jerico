@@ -762,7 +762,7 @@ app.post("/api/v1/notification-channels/:channelId/resend-verification", async (
     verificationExpiresAt: expiresAt,
     lastVerificationErrorCode: null,
     updatedAt: new Date(),
-  }).where(eq(notificationChannels.id, channel.id));
+  }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId)));
   if (channel.type === "webhook") {
     try {
       await context.env.NOTIFICATIONS.send({
@@ -770,7 +770,7 @@ app.post("/api/v1/notification-channels/:channelId/resend-verification", async (
         url: channel.target, challenge: token,
       });
     } catch {
-      await database.update(notificationChannels).set({ lastVerificationErrorCode: "queue_unavailable", updatedAt: new Date() }).where(eq(notificationChannels.id, channel.id));
+      await database.update(notificationChannels).set({ lastVerificationErrorCode: "queue_unavailable", updatedAt: new Date() }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId)));
       return context.json({ error: { code: "NOTIFICATION_QUEUE_UNAVAILABLE", message: "The webhook verification could not be queued. Try again later." } }, 503);
     }
     return context.json({ data: { id: channel.id, verificationExpiresAt: expiresAt } }, 202);
@@ -795,19 +795,18 @@ app.post("/api/v1/notification-channels/verify", async (context) => {
   const tokenHash = await hashVerificationToken(parsed.data.token);
   const now = new Date();
   const result = await withDatabase(context.env, async (database) => {
-    const [channel] = await database.select({ id: notificationChannels.id, organizationId: notificationChannels.organizationId })
-      .from(notificationChannels).where(and(
-        eq(notificationChannels.verificationTokenHash, tokenHash),
-        gte(notificationChannels.verificationExpiresAt, now),
-      )).limit(1);
-    if (!channel) return null;
+    // Consume the token atomically. A concurrent resend changes the hash, so
+    // an older link cannot verify after it has been replaced.
     const [verified] = await database.update(notificationChannels).set({
       verifiedAt: now,
       verificationTokenHash: null,
       verificationExpiresAt: null,
       enabled: true,
       updatedAt: now,
-    }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, channel.organizationId))).returning({ id: notificationChannels.id });
+    }).where(and(
+      eq(notificationChannels.verificationTokenHash, tokenHash),
+      gte(notificationChannels.verificationExpiresAt, now),
+    )).returning({ id: notificationChannels.id });
     return verified ?? null;
   });
   if (!result) return context.json({ error: { code: "INVALID_VERIFICATION_TOKEN", message: "The verification token is invalid or expired." } }, 400);
