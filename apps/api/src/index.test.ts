@@ -293,3 +293,147 @@ describe("notification channel authorization", () => {
     expect(mocks.select).not.toHaveBeenCalled();
   });
 });
+
+
+describe("notification delivery callback attempt fencing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.update.mockReset();
+  });
+
+  it("records a new consumer attempt once with its enqueue token", async () => {
+    const set = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: async () => [{ id: "delivery-a" }],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        attemptNumber: 2,
+        status: "attempting",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      status: "queued",
+      attempts: 2,
+      activeConsumerAttempt: 2,
+    }));
+  });
+
+
+  it("acknowledges duplicate attempting callbacks without incrementing again", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{
+      id: "delivery-a",
+      status: "queued",
+      activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+      activeConsumerAttempt: 2,
+    }]);
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        attemptNumber: 2,
+        status: "attempting",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect((await response.json() as { data: { active: boolean } }).data.active).toBe(true);
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes only the active notification consumer attempt", async () => {
+    const set = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: async () => [{ id: "delivery-a" }],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        attemptNumber: 2,
+        status: "sent",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: "sent" }));
+  });
+
+  it("ignores a failed callback from an earlier consumer attempt", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{
+      id: "delivery-a",
+      status: "queued",
+      activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+      activeConsumerAttempt: 2,
+    }]);
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        attemptNumber: 1,
+        status: "failed",
+        errorCode: "provider_unavailable",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect((await response.json() as { data: { active: boolean } }).data.active).toBe(false);
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores callbacks from an enqueue token that has already been superseded", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{
+      id: "delivery-a",
+      status: "queued",
+      activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440002",
+      activeConsumerAttempt: 1,
+    }]);
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        attemptNumber: 1,
+        status: "failed",
+        errorCode: "provider_unavailable",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect((await response.json() as { data: { active: boolean } }).data.active).toBe(false);
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+});

@@ -75,7 +75,7 @@ describe("notification queue contract", () => {
   it("accepts bounded email delivery messages", () => {
     expect(isValidNotificationMessage({
       schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000",
-      to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
+      enqueueToken: "550e8400-e29b-41d4-a716-446655440001", to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
     })).toBe(true);
   });
   it("accepts bounded webhook verification and delivery messages", () => {
@@ -87,12 +87,24 @@ describe("notification queue contract", () => {
     expect(isValidNotificationMessage({
       schemaVersion: 1, type: "notification.webhook",
       deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
       url: "https://hooks.example.com/jerico",
       secretCiphertext: "c".repeat(48), secretIv: "i".repeat(16),
       eventType: "incident.opened", incidentId: "incident-a", projectId: "project-a",
       title: "High error rate", triggerValue: 12, occurredAt: "2026-11-03T10:00:00.000Z",
     })).toBe(true);
   });
+  it("accepts legacy webhook deliveries without enqueue tokens", () => {
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.webhook",
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      url: "https://hooks.example.com/jerico",
+      secretCiphertext: "c".repeat(48), secretIv: "i".repeat(16),
+      eventType: "incident.opened", incidentId: "incident-a", projectId: "project-a",
+      title: "High error rate", triggerValue: 12, occurredAt: "2026-11-03T10:00:00.000Z",
+    })).toBe(true);
+  });
+
   it("rejects webhook messages targeting the probe worker or unsafe hosts", () => {
     const base = {
       schemaVersion: 1, type: "notification.webhook.verify",

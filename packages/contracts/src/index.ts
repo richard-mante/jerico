@@ -120,6 +120,8 @@ export const verifyNotificationChannelSchema = z.object({
 }).strict();
 export const notificationDeliveryResultSchema = z.object({
   deliveryId: z.string().uuid(),
+  enqueueToken: z.string().uuid().optional(),
+  attemptNumber: z.number().int().min(1).max(100).default(1),
   status: z.enum(["attempting", "sent", "failed"]),
   providerMessageId: z.string().max(255).optional(),
   errorCode: z.enum(["provider_rejected", "provider_unavailable", "configuration_missing", "invalid_message"]).optional(),

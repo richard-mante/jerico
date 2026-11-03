@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
   createWebhookNotificationChannelSchema,
@@ -1096,24 +1096,65 @@ app.post("/internal/notification-delivery-results", async (context) => {
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
   const result = parsed.data;
   const accepted = await withDatabase(context.env, async (database) => {
-    const [updated] = await database.update(notificationDeliveries).set({
-      status: result.status === "attempting" ? "queued" : result.status,
-      attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
-      providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
-      lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
-      lastAttemptAt: new Date(),
-      enqueuedAt: new Date(),
-      nextEnqueueAt: null,
-      sentAt: result.status === "sent" ? new Date() : null,
-      updatedAt: new Date(),
-    }).where(and(eq(notificationDeliveries.id, result.deliveryId), ne(notificationDeliveries.status, "sent"))).returning({ id: notificationDeliveries.id });
-    if (updated) return true;
-    const [existing] = await database.select({ id: notificationDeliveries.id, status: notificationDeliveries.status })
-      .from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
-    return existing?.status === "sent";
+    const common = [
+      eq(notificationDeliveries.id, result.deliveryId),
+      result.enqueueToken ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken) : isNull(notificationDeliveries.activeEnqueueToken),
+      ne(notificationDeliveries.status, "sent"),
+    ];
+    const [updated] = result.status === "attempting"
+      ? await database.update(notificationDeliveries).set({
+        status: "queued",
+        attempts: result.attemptNumber,
+        activeConsumerAttempt: result.attemptNumber,
+        providerMessageId: null,
+        lastErrorCode: null,
+        lastAttemptAt: new Date(),
+        enqueuedAt: new Date(),
+        nextEnqueueAt: null,
+        sentAt: null,
+        updatedAt: new Date(),
+      }).where(and(
+        ...common,
+        lt(notificationDeliveries.activeConsumerAttempt, result.attemptNumber),
+      )).returning({ id: notificationDeliveries.id })
+      : await database.update(notificationDeliveries).set({
+        status: result.status,
+        providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
+        lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
+        lastAttemptAt: new Date(),
+        enqueuedAt: new Date(),
+        nextEnqueueAt: null,
+        sentAt: result.status === "sent" ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(and(
+        ...common,
+        eq(notificationDeliveries.activeConsumerAttempt, result.attemptNumber),
+      )).returning({ id: notificationDeliveries.id });
+    if (updated) return { accepted: true, active: true };
+
+    const [existing] = await database.select({
+      id: notificationDeliveries.id,
+      status: notificationDeliveries.status,
+      activeEnqueueToken: notificationDeliveries.activeEnqueueToken,
+      activeConsumerAttempt: notificationDeliveries.activeConsumerAttempt,
+    }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+    if (!existing) return { accepted: false, active: false };
+    if (existing.status === "sent") return { accepted: true, active: false };
+    // During a rolling deployment, an older Worker may still send callbacks
+    // without the enqueue token. Do not acknowledge those against a new
+    // token-owned enqueue; returning 404 makes that queue attempt retry.
+    if (!result.enqueueToken && existing.activeEnqueueToken !== null) return { accepted: false, active: false };
+    if (result.enqueueToken && existing.activeEnqueueToken !== result.enqueueToken) return { accepted: true, active: false };
+    if (existing.activeConsumerAttempt > result.attemptNumber) return { accepted: true, active: false };
+    if (existing.activeConsumerAttempt === result.attemptNumber) {
+      if (result.status === "attempting") return { accepted: true, active: existing.status === "queued" };
+      if (result.status === "failed" && existing.status === "failed") return { accepted: true, active: true };
+      if (existing.status === result.status) return { accepted: true, active: false };
+    }
+    return { accepted: false, active: false };
   });
-  if (!accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
-  return context.json({ data: { accepted: true } }, 202);
+  if (!accepted.accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
+  return context.json({ data: { accepted: true, active: accepted.active } }, 202);
 });
 
 app.post("/internal/uptime-results", async (context) => {
