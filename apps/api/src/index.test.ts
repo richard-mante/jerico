@@ -81,4 +81,14 @@ describe("project observability route authorization", () => {
     expect(mocks.insert).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toMatchObject({ data: { fingerprint: "123456", status: "resolved" } });
   });
+  it("does not expose route performance for a project outside the active organization", async () => {
+    setSelectResults([{ role: "member" }], []);
+    const response = await app.request("/api/v1/projects/project-from-org-b/telemetry/metrics/routes", {
+      method: "GET",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+    expect(response.status).toBe(404);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
 });
