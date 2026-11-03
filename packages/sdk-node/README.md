@@ -12,7 +12,8 @@ const jerico = createNodeClient({
 });
 
 jerico.track("order.completed", { orderId: "order_123" });
-jerico.log("billing.invoice.created", "Invoice created", { amount: 49 });
+jerico.log("billing.invoice.created", "Invoice created", { amount: 49 }); // defaults to info
+jerico.logWithLevel("warn", "billing.payment.retry", "Payment retry scheduled", { attempt: 2 });
 jerico.metric("queue.depth", 12);
 
 await jerico.flush();
@@ -20,3 +21,6 @@ await jerico.close();
 ```
 
 Call `close()` during graceful shutdown to stop the timer and flush pending events. The SDK does not install process exit handlers or terminate the host process. Unhandled rejection capture is opt-in and does not suppress Node's normal process behavior.
+
+
+Supported log levels are `debug`, `info`, `warn`, `error`, and `fatal`. Existing `log(name, message, attributes)` calls remain compatible and are recorded at `info` by default. Use `logWithLevel(level, name, message, attributes)` when the severity is known.
