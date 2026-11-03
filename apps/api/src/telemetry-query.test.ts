@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryOverview } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryMetricSeries, queryTelemetryOverview } from "./telemetry-query";
 
 describe("telemetry query validation", () => {
   it("defaults to one hour and rejects ranges over 31 days", () => {
@@ -111,4 +111,22 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("query")).toContain("event_type = 'error'");
   });
 
+  it("aggregates metric values into tenant-scoped time buckets", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
+      name: "http.request.duration", timestamp: "2026-11-03T10:15:00.000Z", average: "125.5", minimum: "90", maximum: "180", samples: "8",
+    }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const series = await queryTelemetryMetricSeries(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", environmentId: "env-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z", bucketMinutes: 15 },
+    );
+    expect(series).toEqual([{ name: "http.request.duration", points: [{ timestamp: "2026-11-03T10:15:00.000Z", average: 125.5, minimum: 90, maximum: 180, samples: 8 }] }]);
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_organizationId")).toBe("org-a");
+    expect(parsed.searchParams.get("param_projectId")).toBe("project-a");
+    expect(parsed.searchParams.get("param_environmentId")).toBe("env-a");
+    expect(parsed.searchParams.get("query")).toContain("event_type = 'metric'");
+    expect(parsed.searchParams.get("query")).toContain("INTERVAL 15 MINUTE");
+  });
 });
