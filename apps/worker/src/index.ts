@@ -173,7 +173,7 @@ export function isValidNotificationMessage(value: unknown): value is Notificatio
   const message = value as Record<string, unknown>;
   return message.schemaVersion === 1
     && message.type === "notification.email"
-    && typeof message.deliveryId === "string" && /^[0-9a-f-]{36}$/i.test(message.deliveryId)
+    && typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
     && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
     && typeof message.subject === "string" && message.subject.length >= 1 && message.subject.length <= 200
     && typeof message.text === "string" && message.text.length >= 1 && message.text.length <= 10000;
