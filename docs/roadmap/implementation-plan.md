@@ -13,14 +13,15 @@
 
 ## Validation status — implementation is not verification
 
-The implementation through Phase 5E is present on `main`, but no successful workspace validation or production runtime validation has been confirmed. Checkboxes below distinguish implemented work from work that remains unimplemented; parenthetical notes identify validation gaps.
+The implementation through Phase 5E and the subsequent reliability hardening is present on `main`, but no successful workspace validation or production runtime validation has been confirmed. Checkboxes below distinguish implemented work from work that remains unimplemented; parenthetical notes identify validation gaps.
 
 - GitHub Actions workflow exists, but jobs repeatedly fail before runner allocation (`runner_id: 0`, no runner name, no steps). This is not a passing or failing source test result.
 - The repository currently has no `pnpm-lock.yaml`; dependency resolution is therefore not pinned. The user has taken ownership of generating and committing this lockfile; do not fabricate or modify it.
 - No successful dependency install, lint, typecheck, unit test, build, disposable PostgreSQL migration, ClickHouse integration, Cloudflare runtime, or browser test has been observed.
 - ClickHouse API queries and Worker telemetry inserts now have an 8-second server-side execution limit and a 10-second client request timeout (PR #39); the focused tests and real ClickHouse behavior remain unverified.
 - API-side notification queue-send failures now have a scheduled outbox reconciliation path with atomic claims, five total enqueue attempts, and exponential backoff (PR #41; migration `0009_notification_enqueue_retries.sql`). Backoff tests were added but not executed; queue concurrency and end-to-end delivery remain unverified.
-- The latest CI run is [#198](https://github.com/richard-mante/jerico/actions/runs/41628640738) (push to main). Its job uses the standard ubuntu-24.04 label but reports `runner_id: 0`, no runner name, and no steps; the job log is unavailable (`BlobNotFound`). The failure occurs before workflow execution and is not a source-check result.
+- Alert-rule evaluations now use per-rule token-owned leases with five-minute expiry and stale-worker fencing (PR #43; migration `0010_alert_evaluation_leases.sql`). Lease-expiry and consecutive-count helper tests were added but not executed; manual concurrency/runtime validation remains outstanding.
+- The latest CI run checked for PR #43 is [#213](https://github.com/richard-mante/jerico/actions/runs/41640848052). Its job failed before recording workflow steps; no source checks executed, so this is not a source-check result.
 
 ## Phase 0 — Repository foundation
 - [x] Inspect repository, branch, settings, and existing files.
@@ -94,7 +95,7 @@ See [Phase 4 query API plan](phase-4-observability.md).
 See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Project-scoped uptime monitor CRUD, check-history storage/API, scheduled queue dispatch, bounded public probes, and idempotent result persistence (Cloudflare provisioning/runtime validation pending).
 - [x] Initial SSRF controls: reject IP literals/internal hostnames/unsafe ports, use public-only Worker fetch egress, manually revalidate up to three redirects, bound timeout, and cancel response bodies. DNS/private egress assumptions require deployed Workerd verification; `global_fetch_strictly_public` and an exact self-host block are configured, and the probe Worker must remain workers.dev-only with no VPC binding.
-- [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration and scheduled evaluation (runtime validation pending).
+- [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration, scheduled evaluation, and token-owned evaluation leases with stale-worker fencing (PR #43; migration and manual runtime validation pending).
 - [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notification delivery is implemented in Phase 5D/5E; incident audit history remains open).
 - [x] Verified email notification channels, Resend delivery through a Cloudflare Queue, retry/DLQ wiring, and delivery history (provider/runtime validation pending).
 - [x] Signed webhook channels with endpoint verification, timestamped HMAC-SHA256 delivery, retries, and delivery history (implementation and tests authored; execution/runtime validation pending).
