@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
-import { authClient } from "../../../../../lib/auth-client";
+import { authClient } from "../lib/auth-client";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
