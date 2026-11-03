@@ -20,14 +20,22 @@ export async function withDatabase<T>(
   env: ApiBindings,
   callback: (database: JericoDatabase) => Promise<T>,
 ): Promise<T> {
-  const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
-  if (!connectionString) throw new Error("Database is not configured. Set HYPERDRIVE or DATABASE_URL.");
+  const hyperdrive = env.HYPERDRIVE;
+  const connectionString = hyperdrive?.connectionString ?? env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("Database is not configured. Set HYPERDRIVE or DATABASE_URL.");
+  }
 
+  // Hyperdrive pools origin connections independently. Create a request-scoped
+  // client; Workers clean up this edge connection when the invocation ends.
   const client = new Client({ connectionString });
   await client.connect();
+
   try {
     return await callback(drizzle(client, { schema }));
   } finally {
-    await client.end();
+    // Local Node.js development owns its direct connection and must close it.
+    // Do not call end() for Hyperdrive clients in a Worker invocation.
+    if (!hyperdrive) await client.end();
   }
 }
