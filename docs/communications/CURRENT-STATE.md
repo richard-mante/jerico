@@ -137,3 +137,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Follow-up branch `feat/phase-4-error-groups-ui` displays grouped errors in the project Errors tab using the new grouped-error API.
 - Each group shows name, latest message, occurrence count, first/last seen, and latest event ID. The API currently caps groups at 100 and does not provide group pagination or issue lifecycle actions.
 - PR #10 is the UI follow-up; lint/typecheck/tests/build and browser/API integration validation remain unexecuted.
+
+
+### Phase 4 metric series (PR #11)
+
+- PR #10 merged grouped errors into `main` (merge commit `b245ce1020c644eff617e77c6b7feb4a65370a1d`).
+- Branch `feat/phase-4-metric-series` adds a tenant-scoped metric aggregation endpoint and responsive SVG charts in the dashboard Metrics tab.
+- Metric buckets include average/minimum/maximum/sample count; bucket size adapts to the time range and the query is bounded to the top eight metric names and 1,200 rows.
+- PR #11 is the metric visualization follow-up. No lint/typecheck/tests/build or live ClickHouse/browser validation has been run.
