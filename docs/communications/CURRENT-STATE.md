@@ -232,3 +232,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-api-route-tests` adds Hono route tests for unauthenticated access, member write denial, cross-organization project isolation, and owner status updates using mocked session/database adapters.
 - These tests are authored but not executed and do not replace PostgreSQL/ClickHouse integration validation.
 - PR #22 is the route-authorization test follow-up.
+
+
+### Phase 4 ClickHouse integration harness (PR #23)
+
+- PR #22 merged mocked Hono route authorization tests into `main` (merge commit `604af9d7051bbd8f78b5df2e7943bf2e00430935`).
+- Branch `feat/phase-4-clickhouse-integration-tests` adds a gated real-ClickHouse query integration suite, a Docker Compose ClickHouse service, an API integration-test script, and CI service wiring.
+- The suite covers overview, error groups/stack, fingerprint occurrences, event catalogue/details/series, metric aggregation, and structured log severity.
+- The suite has not been executed successfully in this environment; CI runner allocation remains unresolved.
