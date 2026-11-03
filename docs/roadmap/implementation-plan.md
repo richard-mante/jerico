@@ -93,7 +93,7 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration and scheduled evaluation (runtime validation pending).
 - [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notifications and audit history remain open).
 - [x] Verified email notification channels, Resend delivery through a Cloudflare Queue, retry/DLQ wiring, and delivery history (provider/runtime validation pending).
-- [ ] Signed webhook channels with endpoint verification, delivery retries, and delivery history.
+- [x] Signed webhook channels with endpoint verification, timestamped HMAC-SHA256 delivery, retries, and delivery history (implementation and tests authored; execution/runtime validation pending).
 
 **Acceptance:** An unavailable test endpoint creates one incident, sends a notification, and resolves after recovery according to configured thresholds.
 
