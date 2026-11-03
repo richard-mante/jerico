@@ -146,3 +146,8 @@ docker compose -f docker-compose.integration.yml down -v
 ```
 
 CI now provisions the same ClickHouse service and runs the integration suite. The repository's hosted runner allocation issue has prevented confirming this job so far; the suite is authored and wired into CI but has not been observed passing.
+
+
+## Trace detail drill-down
+
+The Traces tab can now retrieve all spans for an individual trace independently of the initial project-wide span page. It reuses the authenticated project spans endpoint with a `traceId` filter. The API binds the trace ID as a ClickHouse query parameter and continues to enforce the existing organization, project, environment, time-range, and cursor constraints. Trace IDs are bounded to 1–256 characters. The dashboard loads up to 100 spans per request, renders span IDs, parent indicators, timestamps, messages, and durations, and supports cursor-based loading of additional spans. This avoids treating the first 50 project-wide rows as the complete trace. It remains a span detail view rather than a full distributed-trace service map or cross-project trace search.
