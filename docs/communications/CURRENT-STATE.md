@@ -315,3 +315,13 @@ At the end of each substantial session, update this file and append a session-lo
 - Probe Worker now enables the `global_fetch_strictly_public` compatibility flag and requires `PROBE_WORKER_HOST` to block requests back to itself.
 - API retains check history for 30 days and schedules daily pruning with a timestamp index.
 - The probe Worker still requires provisioning of the queues, API URL, shared result secret, and exact worker hostname. No deployed Workerd test has verified the egress assumptions yet.
+
+
+### Phase 5C — alert rules and incidents (PR in progress)
+
+- Added migration 0006 and Drizzle schema for project-scoped alert rules and incidents, including same-organization/project composite foreign keys and a partial unique index allowing only one active incident per rule.
+- Added rule contracts and API CRUD routes. Only owners/admins can create, update, or delete rules; project members can read rules and acknowledge/resolve incidents.
+- Added scheduled evaluation every minute for error-count (ClickHouse), failed uptime-check count (PostgreSQL), and uptime response-time p95 (up to the 10,000 most recent samples).
+- Breaches open or update one active incident; recovery automatically resolves it. Missing uptime check data is treated as unknown and does not clear an incident.
+- Added a project Alerts & Incidents UI and dashboard link, plus contract, query adapter, evaluator helper, and mocked tenant/role tests.
+- Notifications, escalation, incident assignment/comments/audit history, full database integration, migrations, and deployment verification remain outstanding. No lint, typecheck, tests, build, or browser validation has been run.
