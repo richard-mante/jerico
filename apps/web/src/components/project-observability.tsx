@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { authClient } from "../lib/auth-client";
 
@@ -45,14 +45,12 @@ function formatTimestamp(value: string) {
   }).format(date);
 }
 
-export function ProjectObservability() {
+export function ProjectObservability({ initialOrganizationId }: { initialOrganizationId: string }) {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
-  const searchParams = useSearchParams();
-  const requestedOrganizationId = searchParams.get("organizationId") ?? "";
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const { data: organizations, isPending: organizationsPending } = authClient.useListOrganizations();
-  const [organizationId, setOrganizationId] = useState(requestedOrganizationId);
+  const [organizationId, setOrganizationId] = useState(initialOrganizationId);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [environmentId, setEnvironmentId] = useState("");
   const [tab, setTab] = useState<Tab>("events");
