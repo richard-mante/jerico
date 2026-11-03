@@ -302,3 +302,45 @@ export async function queryTelemetryMetricSeries(
   }
   return Array.from(grouped, ([name, points]) => ({ name, points }));
 }
+
+export type TelemetryEventSummary = { name: string; occurrences: number; lastSeen: string; latestEventId: string };
+
+export async function queryTelemetryEventCatalogue(
+  env: TelemetryQueryBindings,
+  input: Omit<TelemetryQuery, "limit" | "cursor" | "eventType" | "logLevel">,
+): Promise<TelemetryEventSummary[]> {
+  if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
+  const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
+  const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
+  const filters = [
+    "organization_id = {organizationId:String}",
+    "project_id = {projectId:String}",
+    "event_type = 'event'",
+    "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+    "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
+  ];
+  if (input.environmentId) filters.push("environment_id = {environmentId:String}");
+  const query = `SELECT name, count() AS occurrences, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY occurrences DESC, max(timestamp) DESC LIMIT 100 FORMAT JSON`;
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("param_organizationId", input.organizationId);
+  url.searchParams.set("param_projectId", input.projectId);
+  url.searchParams.set("param_from", input.from);
+  url.searchParams.set("param_to", input.to);
+  if (input.environmentId) url.searchParams.set("param_environmentId", input.environmentId);
+  const headers = new Headers();
+  if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
+  else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
+    headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`ClickHouse event-catalogue query failed with status ${response.status}.`);
+  const result = await response.json() as { data?: Array<Record<string, unknown>> };
+  if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid event-catalogue result.");
+  return result.data.map((row) => ({
+    name: String(row.name ?? "Unnamed event"),
+    occurrences: Number(row.occurrences ?? 0),
+    lastSeen: String(row.lastSeen),
+    latestEventId: String(row.latestEventId),
+  }));
+}

@@ -101,3 +101,8 @@ The Node SDK now supports `logWithLevel(level, name, message, attributes)` with 
 ## SDK trace context helpers
 
 `@jerico/sdk-core` now provides `startSpan(name, attributes?, parentContext?)` and `withSpan(name, operation, attributes?, parentContext?)`. Root spans create a trace ID; child spans reuse the parent trace ID and store the parent's span ID. `withSpan` records elapsed milliseconds in the existing span `value` field and writes `status: ok|error`. Context is passed explicitly by the caller; no global async context or automatic HTTP framework instrumentation is installed. The browser SDK blocks these server-only span methods.
+
+
+## Event catalogue
+
+The API exposes `GET /api/v1/projects/:projectId/telemetry/events/catalogue`, returning up to 100 event names ranked by occurrence count for the selected time range and optional environment. Each summary includes count, last-seen timestamp, and latest event ID. The Events tab now displays this catalogue with relative count bars. Counts can include duplicate queue deliveries until ClickHouse `ReplacingMergeTree` background merges complete; this is not a strict real-time unique count. Raw event detail drill-down and catalogue pagination remain future work.

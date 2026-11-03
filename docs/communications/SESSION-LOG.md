@@ -260,3 +260,13 @@
 - Updated SDK core to attach one idempotency key to each batch and reuse the exact body/key on explicit retry while preserving later merged structured logging and span helpers.
 - Added/updated SDK and ingestion helper tests and updated Phase 2/3 docs. Tests remain authored but unexecuted.
 - No local dependency install, lint, typecheck, tests, build, PostgreSQL migration, Cloudflare Queue, or ClickHouse integration validation was run.
+
+
+## 2026-11-03 — Phase 4 event catalogue
+
+- Merged PR #16 request-level ingestion idempotency into `main` (merge commit `932abd421c516ef311388f6866a91b75bd5dd763`) and closed stale PR #8 as superseded by PR #16.
+- Created `feat/phase-4-event-catalogue` from current `main`.
+- Added `queryTelemetryEventCatalogue` and authenticated `GET /api/v1/projects/:projectId/telemetry/events/catalogue`, scoped by organization/project/environment and bounded to 100 event names.
+- Added query-adapter test coverage for event catalogue output and tenant/environment parameter binding (authored, not executed).
+- Updated the Events tab to show event counts, relative count bars, last-seen timestamps, and latest event IDs.
+- No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.
