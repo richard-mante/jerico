@@ -92,7 +92,8 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Initial SSRF controls: reject IP literals/internal hostnames/unsafe ports, use public-only Worker fetch egress, manually revalidate up to three redirects, bound timeout, and cancel response bodies. DNS/private egress assumptions require deployed Workerd verification; `global_fetch_strictly_public` and an exact self-host block are configured, and the probe Worker must remain workers.dev-only with no VPC binding.
 - [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration and scheduled evaluation (runtime validation pending).
 - [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notifications and audit history remain open).
-- [ ] Email and webhook notifications with verification, retries, and delivery history.
+- [x] Verified email notification channels, Resend delivery through a Cloudflare Queue, retry/DLQ wiring, and delivery history (provider/runtime validation pending).
+- [ ] Signed webhook channels with endpoint verification, delivery retries, and delivery history.
 
 **Acceptance:** An unavailable test endpoint creates one incident, sends a notification, and resolves after recovery according to configured thresholds.
 
