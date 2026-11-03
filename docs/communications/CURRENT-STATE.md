@@ -57,7 +57,7 @@ PR #5 merged to `main` as `b6515688db8dc9e688e70b52635019848ed0967c`. It assigns
 
 **No automated checks are currently confirmed passing.** The repository has no committed `pnpm-lock.yaml`; dependency installation, lint, typecheck, tests, builds, and PostgreSQL integration tests remain outstanding.
 
-The latest main-branch CI run before this SDK branch was run #73 (ID `41559078138`). The Phase 2C PR #5 CI run #78 (ID `41560761906`) and Phase 3 PR #6 CI run #82 (ID `41562084344`) both failed before runner assignment, with no steps or logs. Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
+The latest main-branch CI run before this SDK branch was run #73 (ID `41559078138`). The Phase 2C PR #5 CI run #78 (ID `41560761906`) and Phase 3 PR #6 latest CI run #94 (ID `41562241700`) both failed before runner assignment, with no steps or logs. Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
 
 Database migrations have not been applied to a disposable or production PostgreSQL instance. Cloudflare Hyperdrive, Queue, Rate Limiting bindings, and ClickHouse have not been provisioned or exercised end-to-end. No production deployment has been verified.
 
