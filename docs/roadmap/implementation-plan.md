@@ -77,13 +77,10 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [x] Tenant-safe query APIs for events, errors, logs, metrics, and spans (implemented; tests and PostgreSQL/ClickHouse integration validation pending).
 - [x] Project overview aggregates (implemented; query validation pending).
 - [x] First project explorer UI with environment/time filters, overview cards, signal tabs, and pagination (implemented; browser validation pending).
-- [ ] Error grouping, stack traces, and occurrence history.
-- [ ] Metric charts, route performance, and percentiles.
-- [ ] Span waterfall and trace detail views.
-- [ ] Structured log severity filters and detail view.
-- [ ] Event catalogue, top events, and time-series.
+- [ ] Event catalogue, top events, and time-series charts.
 - [ ] Error grouping, stack traces, occurrence history, resolve/ignore actions.
-- [ ] Core Web Vitals, route performance, and percentiles.
+- [ ] Metric charts, Core Web Vitals, route performance, and percentiles.
+- [ ] Span waterfall and trace detail views.
 - [ ] Structured log explorer with severity and time filters.
 
 **Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization.
