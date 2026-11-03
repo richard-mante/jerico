@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #33 — `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
-**Latest main merge:** PR #41 — `eca004ec9034f7275caaf581f26f453937c1c767`  
-**Current milestone:** Phase 5E — signed webhook notifications merged; Phase 0–5 implementation is present, but validation and infrastructure provisioning remain release blockers.
+**Latest feature merge:** PR #43 — `e48c9095f2f15fcca83c5bd2228fd207dd53f288`  
+**Latest main merge:** PR #43 — `e48c9095f2f15fcca83c5bd2228fd207dd53f288`  
+**Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -42,8 +42,9 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5C — alert rules and incidents | #31 | Merged |
 | Phase 5D — verified email notifications | #32 | Merged |
 | Phase 5E — signed webhook notifications | #33 | Merged |
+| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases | #39, #41, #43 | Merged |
 
-Latest milestone: [PR #33 — verified signed webhook notifications](https://github.com/richard-mante/jerico/pull/33). Merge commit: `9d45571e0639d418914b0d0fdbc34e6cf484e321`.
+Latest reliability milestone: [PR #43 — prevent overlapping alert rule evaluations](https://github.com/richard-mante/jerico/pull/43). Merge commit: `e48c9095f2f15fcca83c5bd2228fd207dd53f288`.
 
 ### Phase 5 notification capabilities
 
@@ -61,7 +62,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 
 **No successful end-to-end validation is confirmed for the repository's Phase 0–5 work.** Tests have been authored, but do not assume they pass.
 
-- CI jobs have repeatedly failed before runner allocation. Latest run #198 (push to main) failed before runner allocation. Its job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. The job has no execution steps or downloadable log; this is an Actions runner allocation/startup failure, not evidence that source checks passed or failed.
+- CI jobs have repeatedly failed before runner allocation. Latest run #213 (PR #43) failed before workflow steps were recorded. Its job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. The job has no execution steps or downloadable log; this is an Actions runner allocation/startup failure, not evidence that source checks passed or failed.
 - No completed workspace dependency install, lint, typecheck, unit-test run, or full build has been verified.
 - No disposable PostgreSQL migration run or Better Auth/tenant integration test has been verified.
 - ClickHouse integration tests are gated and have not been observed passing against a real service.
@@ -73,7 +74,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 
 Before exercising the notification pipeline in a non-production environment:
 
-1. Apply migrations through `0009_notification_enqueue_retries.sql`.
+1. Apply migrations through `0010_alert_evaluation_leases.sql` (includes notification enqueue retry migration 0009).
 2. Provision `jerico-uptime-probes`, `jerico-uptime-probes-dlq`, `jerico-notifications`, and `jerico-notifications-dlq`.
 3. Configure matching `UPTIME_RESULTS_SECRET` on API and Worker.
 4. Configure matching `NOTIFICATION_DELIVERY_SECRET` on API and Worker.
@@ -87,7 +88,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 
 ## Outstanding work and next sequence
 
-1. **Validation foundation:** restore GitHub-hosted runner allocation or establish a reachable local validation environment. The user will generate and commit the missing `pnpm-lock.yaml`; do not fabricate or modify it. Once it is present and a runner is available, install dependencies, run lint/typecheck/tests/build, and fix all findings. Latest run #198 failed before runner allocation (`runner_id: 0`, no runner name, no steps, and no downloadable job log); this is not a source-check result.
+1. **Validation foundation:** restore GitHub-hosted runner allocation or establish a reachable local validation environment. The user will generate and commit the missing `pnpm-lock.yaml`; do not fabricate or modify it. Once it is present and a runner is available, install dependencies, run lint/typecheck/tests/build, and fix all findings. Latest run #213 failed before workflow steps were recorded; this is not a source-check result.
 2. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
 3. **Telemetry validation:** run ClickHouse integration tests and verify ingestion/query behavior, deduplication, and retention.
 4. **Phase 5 runtime validation:** exercise Cron → uptime queue → public probe → callback → PostgreSQL, and incident → notification queue → email/webhook → callback → delivery history, including retry and DLQ cases.
@@ -105,11 +106,15 @@ Merged PR #41. Notification deliveries now persist enqueue-attempt count and nex
 
 ### 2026-11-03 source-level review update
 
-Reviewed the current Worker probe/webhook delivery paths, API notification callbacks and channel lifecycle, database constraints, telemetry query construction, and auth setup. No confirmed exploitable issue was established from source inspection alone. In particular, the public-only Worker fetch compatibility flag remains configured, redirect handling is explicit, webhook secrets are AES-GCM encrypted at rest, and internal callbacks use bounded payload parsing plus shared-secret authentication. These are source observations, not deployed SSRF certification or runtime verification. Remaining review/validation items include deployed Workerd egress behavior, retry/DLQ semantics under callback outages, concurrent scheduler/evaluator behavior, tenant isolation against a live PostgreSQL instance, and ClickHouse query timeouts/resource limits.
+Reviewed the current Worker probe/webhook delivery paths, API notification callbacks and channel lifecycle, database constraints, telemetry query construction, and auth setup. No confirmed exploitable issue was established from source inspection alone. In particular, the public-only Worker fetch compatibility flag remains configured, redirect handling is explicit, webhook secrets are AES-GCM encrypted at rest, and internal callbacks use bounded payload parsing plus shared-secret authentication. These are source observations, not deployed SSRF certification or runtime verification. Remaining review/validation items include deployed Workerd egress behavior, retry/DLQ semantics under callback outages, uptime-scheduler concurrency, tenant isolation against a live PostgreSQL instance, and ClickHouse query timeout/resource-limit behavior.
 
 ### 2026-11-03 ClickHouse request-bound update
 
 Merged PR #39. All API telemetry query operations now apply ClickHouse `max_execution_time=8` and a 10-second client request timeout. Worker telemetry inserts use the same server-side execution bound and a 10-second client request timeout. Focused tests assert the configured limits. This is an implementation-level safeguard only: tests were authored but not executed, and ClickHouse integration/runtime behavior remains unverified.
+
+### 2026-11-03 alert evaluation lease hardening
+
+Merged PR #43. Alert rules now use an atomic token-owned evaluation lease with a five-minute expiry, preserving the once-per-minute cadence while preventing a second Cron invocation from claiming an active evaluation. Claims return the current row; consecutive-count writes require the same lease token, fencing off stale workers after lease reclamation. The lease is conditionally released in `finally` for success, no-data, query errors, and unexpected failures; expiry recovers after Worker termination. Migration `0010_alert_evaluation_leases.sql` is required before deployment. Focused helper tests cover lease-expiry semantics and consecutive-count progression but were not executed. GitHub Actions run #213 failed before workflow steps; no source checks ran. Manual/runtime validation remains outstanding.
 
 ## Continuity rules
 
