@@ -17,12 +17,14 @@ describe("ClickHouse telemetry adapter", () => {
 
   it("derives tenant and project dimensions from the trusted queue envelope", () => {
     const row = toRow(message, {
+      eventId: "evt_123",
       type: "error",
       name: "checkout.failed",
       message: "Payment failed",
       value: 2,
       attributes: { route: "/checkout" },
     });
+    expect(row.event_id).toBe("evt_123");
     expect(row.organization_id).toBe("org_123");
     expect(row.project_id).toBe("project_123");
     expect(row.environment_id).toBe("env_123");
@@ -42,7 +44,7 @@ describe("ClickHouse telemetry adapter", () => {
       CLICKHOUSE_TOKEN: "test-token",
     }, [{
       ...message,
-      events: [{ type: "event", name: "signup" }],
+      events: [{ eventId: "evt_signup", type: "event", name: "signup" }],
     }]);
     expect(fetchMock).toHaveBeenCalledOnce();
     const [, init] = fetchMock.mock.calls[0]!;
