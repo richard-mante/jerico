@@ -637,6 +637,7 @@ app.get("/api/v1/notification-channels", async (context) => withOrganization(con
     target: notificationChannels.target,
     verifiedAt: notificationChannels.verifiedAt,
     enabled: notificationChannels.enabled,
+    lastVerificationErrorCode: notificationChannels.lastVerificationErrorCode,
     createdAt: notificationChannels.createdAt,
   }).from(notificationChannels).where(eq(notificationChannels.organizationId, organizationId)).orderBy(desc(notificationChannels.createdAt));
   return context.json({ data });
