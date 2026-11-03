@@ -104,7 +104,7 @@ export async function queryTelemetry<T>(
     filters.push("(timestamp, event_id) < (parseDateTime64BestEffort({cursorTimestamp:String}, 3, 'UTC'), {cursorEventId:String})");
   }
 
-  const query = `SELECT event_id AS eventId, toString(timestamp) AS timestamp, environment_id AS environmentId, event_type AS eventType, name, message, value, attributes FROM ${database}.${table} WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC, event_id DESC LIMIT {limit:UInt16} FORMAT JSON`;
+  const query = `SELECT event_id AS eventId, formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS timestamp, environment_id AS environmentId, event_type AS eventType, name, message, value, attributes FROM ${database}.${table} WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC, event_id DESC LIMIT {limit:UInt16} FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   const params: Record<string, string> = {
