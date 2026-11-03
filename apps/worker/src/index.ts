@@ -167,7 +167,7 @@ async function processUptimeDeadLetterBatch(batch: MessageBatch<UptimeProbeMessa
     const body = message.body;
     const valid = body?.schemaVersion === 1
       && body.type === "uptime.probe"
-      && /^[0-9a-f-]{36}$/i.test(body.checkId)
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.checkId)
       && typeof body.monitorId === "string" && body.monitorId.length > 0 && body.monitorId.length <= 128
       && typeof body.organizationId === "string" && body.organizationId.length > 0 && body.organizationId.length <= 128
       && typeof body.projectId === "string" && body.projectId.length > 0 && body.projectId.length <= 128;
