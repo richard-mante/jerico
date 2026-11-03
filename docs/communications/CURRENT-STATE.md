@@ -86,7 +86,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 
 ## Outstanding work and next sequence
 
-1. **Validation foundation:** obtain a working local/CI runner, generate and commit the pnpm lockfile, install dependencies, run lint/typecheck/tests/build, and fix all findings.
+1. **Validation foundation:** obtain a working local/CI runner, generate and commit the currently missing `pnpm-lock.yaml`, install dependencies, run lint/typecheck/tests/build, and fix all findings. The latest retried Actions run (#191) still fails before runner allocation (`runner_id: 0`, no runner name, no steps); this is not a source-check result.
 2. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
 3. **Telemetry validation:** run ClickHouse integration tests and verify ingestion/query behavior, deduplication, and retention.
 4. **Phase 5 runtime validation:** exercise Cron → uptime queue → public probe → callback → PostgreSQL, and incident → notification queue → email/webhook → callback → delivery history, including retry and DLQ cases.
