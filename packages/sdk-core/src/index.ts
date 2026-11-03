@@ -1,5 +1,6 @@
 export type TelemetryType = "event" | "error" | "log" | "metric" | "span";
 export type TelemetryValue = string | number | boolean | null;
+export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 export type TelemetryEvent = {
   type: TelemetryType;
   name: string;
@@ -77,7 +78,14 @@ export class JericoClient {
   }
 
   log(name: string, message: string, attributes?: Record<string, TelemetryValue>): boolean {
-    return this.enqueue({ type: "log", name, message, attributes });
+    return this.logWithLevel("info", name, message, attributes);
+  }
+
+  logWithLevel(level: LogLevel, name: string, message: string, attributes?: Record<string, TelemetryValue>): boolean {
+    if (!["debug", "info", "warn", "error", "fatal"].includes(level)) {
+      throw new Error("Log level must be debug, info, warn, error, or fatal.");
+    }
+    return this.enqueue({ type: "log", name, message, attributes: { ...attributes, level } });
   }
 
   metric(name: string, value: number, attributes?: Record<string, TelemetryValue>): boolean {
