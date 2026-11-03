@@ -837,6 +837,32 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (con
   return context.json({ data: updated });
 }));
 
+
+app.get("/api/v1/projects/:projectId/notification-deliveries", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const limit = parseQueryLimit(context.req.query("limit"));
+  if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
+  const data = await database.select({
+    id: notificationDeliveries.id,
+    incidentId: notificationDeliveries.incidentId,
+    channelId: notificationDeliveries.channelId,
+    eventType: notificationDeliveries.eventType,
+    status: notificationDeliveries.status,
+    attempts: notificationDeliveries.attempts,
+    lastErrorCode: notificationDeliveries.lastErrorCode,
+    lastAttemptAt: notificationDeliveries.lastAttemptAt,
+    sentAt: notificationDeliveries.sentAt,
+    createdAt: notificationDeliveries.createdAt,
+  }).from(notificationDeliveries).where(and(
+    eq(notificationDeliveries.organizationId, organizationId),
+    eq(notificationDeliveries.projectId, projectId),
+  )).orderBy(desc(notificationDeliveries.createdAt)).limit(limit);
+  return context.json({ data });
+}));
+
 app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
