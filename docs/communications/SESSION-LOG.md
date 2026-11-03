@@ -308,3 +308,10 @@
 - Added query-adapter test coverage for fingerprint parameter binding (authored, not executed).
 - Updated grouped error cards to expand and load the latest 20 occurrences with timestamp, event ID, and message. Cached occurrence data resets when the time/environment filters change.
 - No lint, typecheck, tests, build, ClickHouse execution, or browser/API integration validation was run.
+
+
+## 2026-11-03 — Phase 4 route authorization tests
+
+- Created `feat/phase-4-api-route-tests` from `main` after merging PR #21.
+- Added `apps/api/src/index.test.ts` with mocked auth/database adapters to exercise unauthenticated rejection, organization-member write denial, cross-organization project isolation, and owner status updates through Hono routes.
+- Tests are authored but not executed. No dependency install, lint, typecheck, test run, build, PostgreSQL integration, ClickHouse integration, or browser validation was performed.

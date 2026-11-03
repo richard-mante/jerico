@@ -224,3 +224,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-error-occurrences` adds a tenant-scoped, cursor-paginated endpoint filtered by the same error-group fingerprint and an expandable latest-20 occurrence list in the Errors tab.
 - Occurrence UI currently shows timestamp, event ID, and message; per-occurrence stack/attributes and UI pagination remain open.
 - PR #21 is the occurrence drill-down follow-up. Validation remains outstanding.
+
+
+### Phase 4 route authorization tests (PR #22)
+
+- PR #21 merged grouped error occurrence drill-down into `main` (merge commit `89f7c8ad75a7d0566b9a5de3f6878c7dedbb3ebe`).
+- Branch `feat/phase-4-api-route-tests` adds Hono route tests for unauthenticated access, member write denial, cross-organization project isolation, and owner status updates using mocked session/database adapters.
+- These tests are authored but not executed and do not replace PostgreSQL/ClickHouse integration validation.
+- PR #22 is the route-authorization test follow-up.

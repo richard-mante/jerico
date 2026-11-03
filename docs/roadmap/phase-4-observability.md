@@ -126,3 +126,8 @@ Error group status is persisted in PostgreSQL per project/fingerprint with `open
 ## Error occurrence drill-down
 
 The API exposes `GET /api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/occurrences` with the same tenant/project/environment/time-range checks and opaque keyset pagination as other telemetry lists. The fingerprint filter is bound as a ClickHouse parameter and matches the same `cityHash64(name, message)` grouping key used by the catalogue. The Errors tab can expand a group to load the latest 20 occurrences with timestamps, event IDs, and messages. The first UI slice does not yet expose occurrence pagination or full per-occurrence stack/attribute details.
+
+
+## Route authorization test slice
+
+`apps/api/src/index.test.ts` now exercises the Hono routes with mocked session/database adapters: unauthenticated requests are rejected before tenant data access, organization members cannot mutate error-group status, a project outside the active organization returns 404, and an owner can update status. These are route-level authorization tests with mocked persistence, not PostgreSQL integration tests. ClickHouse SQL still requires execution against a real ClickHouse instance.
