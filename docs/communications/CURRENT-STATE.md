@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #60 — `db98488928d6f04fc683427697a0720fa14b22d4`  
-**Latest main merge:** PR #60 — `db98488928d6f04fc683427697a0720fa14b22d4`  
+**Latest feature merge:** PR #64 — `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`  
+**Latest main merge:** PR #64 — `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`  
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -42,9 +42,9 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5C — alert rules and incidents | #31 | Merged |
 | Phase 5D — verified email notifications | #32 | Merged |
 | Phase 5E — signed webhook notifications | #33 | Merged |
-| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing | #39, #41, #43–#44, #49, #53, #56, #58, #60 | Merged |
+| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64 | Merged |
 
-Latest reliability milestone: [PR #60 — fence stale uptime probe results](https://github.com/richard-mante/jerico/pull/60). Merge commit: `db98488928d6f04fc683427697a0720fa14b22d4`.
+Latest reliability milestone: [PR #64 — deduplicate ClickHouse telemetry reads](https://github.com/richard-mante/jerico/pull/64). Merge commit: `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`.
 
 ### Phase 5 notification capabilities
 
@@ -152,3 +152,12 @@ At the end of each substantial session, update this file and append a session-lo
 ### 2026-11-03 uptime result fencing
 
 Merged PR #60. Uptime monitors now store the active scheduled check ID. The scheduler persists the token as part of its atomic due-time claim and uses it for the queue message; failed enqueue rollback only clears the matching claim. Result callbacks still write valid results to history, but update current monitor state only when the result matches the active token, then clear it. Monitor edits invalidate in-flight tokens, public monitor responses omit the internal token, and last-checked timestamps remain monotonic. Migration `0014_uptime_active_check_fencing.sql` is required. Scheduler and API route tests were added but not executed; manual PostgreSQL/Queue concurrency validation remains outstanding.
+
+
+### 2026-11-03 notification channel deletion fencing
+
+Merged PR #62. Before a Worker begins provider delivery, the API checks that the delivery's channel still exists, is enabled, is verified, and belongs to the same organization. Missing/disabled/unverified channels are terminally failed with `channel_unavailable`, and queued messages are fenced by clearing their enqueue token. Channel deletion transactionally invalidates failed retries and queued deliveries that have not started, while preserving already in-flight attempts and sent history. Tokenless legacy callbacks cannot revive channel-unavailable deliveries. API tests were added but not executed; manual queue/delete race validation remains outstanding.
+
+### 2026-11-03 ClickHouse read-time deduplication
+
+Merged PR #64. Every telemetry query family now uses ClickHouse `FINAL` for the ReplacingMergeTree table, including nested series subqueries and alert error counts. This prevents at-least-once queue retries and ambiguous insert outcomes from temporarily inflating dashboard counts before background merges. Unit query-family coverage and duplicate-row ClickHouse integration fixtures were added but not executed. Read-time FINAL increases query cost; verify it against the retained 7/30-day data and existing 8-second server/10-second client limits during manual ClickHouse testing.
