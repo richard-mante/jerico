@@ -182,3 +182,5 @@
 - No package install, lint, typecheck, tests, build, PostgreSQL integration, ClickHouse query, or route authorization integration test was executed. GitHub Actions runner allocation remains an unresolved blocker.
 - Next: review type and SQL compatibility, add project overview aggregates plus metrics/spans query support, then wire the web dashboard to real endpoints. Do not call Phase 4 complete until the dashboard and cross-tenant integration tests pass.
 
+
+- Extended the first slice with metrics and spans list routes and a project overview aggregation endpoint covering counts for all five telemetry types and latest event time. Added overview query tests and documented the fact that ReplacingMergeTree counts may temporarily include duplicate queue deliveries before background merges.
