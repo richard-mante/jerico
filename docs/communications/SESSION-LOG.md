@@ -647,3 +647,19 @@
 
 ### Next
 - Continue the Worker egress, queue DLQ/retention, and remaining tenant-isolation reviews. Keep migration and runtime validation as the release gate.
+
+
+## 2026-11-03 — Notification and uptime dead-letter finalization
+
+- Reviewed Cloudflare Queue consumer configuration and found that the source notification and uptime queues routed exhausted messages to DLQs, but those DLQs had no configured consumers. Cloudflare documents that DLQs are ordinary queues, require their own consumer, and messages without a consumer are retained only for a limited period.
+- Added Worker consumers for `jerico-notifications-dlq` and `jerico-uptime-probes-dlq`, each configured with up to 100 retries for API finalization callbacks.
+- Added an authenticated, bounded API callback to mark a matching active notification enqueue as `failed / queue_retry_exhausted`. The update is fenced by enqueue token, treats deleted/superseded rows as stale, and never downgrades a sent delivery.
+- Dead-lettered webhook verification messages now record `endpoint_unavailable`; stale/replaced challenges are acknowledged without overwriting current channel state.
+- Exhausted uptime probes now submit a terminal `down` result with `network_error`, retaining the original check ID so duplicate DLQ delivery is idempotent and the monitor can progress to down/alert evaluation.
+- Kept the telemetry DLQ operator-managed for inspection/replay rather than automatically discarding or replaying failed telemetry.
+- Added API/contract tests and a Worker uptime dead-letter result test. Parsed `wrangler.jsonc` successfully during review.
+- Opened and merged [PR #58](https://github.com/richard-mante/jerico/pull/58); merge commit: `e76d1892c12f7fc2a74aabc75639bf889098b99b`. Issue #57 closed.
+- Tests, typecheck, lint, build, and Cloudflare Queue/PostgreSQL runtime checks were not executed. The user will handle manual testing. No migration or lockfile changes.
+
+### Next
+- Continue the remaining cross-tenant authorization, queue retention/replay, and deployed Worker egress reviews. Keep manual runtime validation as the release gate.
