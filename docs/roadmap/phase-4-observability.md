@@ -111,3 +111,8 @@ The API exposes `GET /api/v1/projects/:projectId/telemetry/events/catalogue`, re
 ## Event detail disclosure
 
 Each event catalogue row now includes the latest event message and up to 4 KiB of the latest event's serialized attributes. The Events tab exposes those fields in a collapsed, scrollable text disclosure, alongside the latest event ID. The payload is truncated at the query layer to bound response size and rendered as text. This is a latest-occurrence preview, not an event search/detail API; older occurrences and full payload retrieval remain future work.
+
+
+## Event volume time series
+
+The API exposes `GET /api/v1/projects/:projectId/telemetry/events/series`, aggregating event counts into fixed 1/15/60/360-minute buckets based on the selected time range. The query is scoped by organization, project, optional verified environment, and time window, and returns up to eight most frequently sampled event names with at most 1,200 bucket rows. The Events tab now renders responsive SVG volume charts above the top-event catalogue. Counts may include duplicate queue deliveries until ClickHouse background merges complete.
