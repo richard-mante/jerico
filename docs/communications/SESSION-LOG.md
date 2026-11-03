@@ -83,3 +83,9 @@
 - Run all workspace checks and PostgreSQL integration tests.
 - Provision and exercise the complete Cloudflare Queue → ClickHouse path, including retries and DLQ.
 - Add idempotency and quota enforcement; implement self-hosted queue adapter before declaring the ingestion pipeline deployment-neutral.
+
+
+- Follow-up hardening in the same Phase 2B branch: added `project_ingestion_usage` with migration `0002_project_ingestion_usage.sql`, an atomic per-credential daily counter (default 100,000 events per UTC day), 429 responses with reset guidance, and quota refund when queue publication fails. Added unit tests for UTC date boundaries, reset countdown, and limit configuration.
+- Added explicit JSON content-type enforcement and inline secret-assignment redaction coverage.
+- Updated Phase 2B docs, roadmap, current-state handover, and PR #3 description to reflect daily quota behavior. Monthly plan tiers/billing metering remain out of scope.
+- Latest validation remains pending; no local package install or automated checks were executed.
