@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview } from "./telemetry-query";
+import { queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance } from "./telemetry-query";
 import type { TelemetryQueryBindings } from "./telemetry-query";
 
 const testUrl = process.env.CLICKHOUSE_TEST_URL;
@@ -56,6 +56,8 @@ describe.skipIf(!testUrl)("ClickHouse telemetry query integration", () => {
       { event_id: "log-1", timestamp: timestamp(-9000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-5", event_type: "log", name: "api.request", message: "Slow request", value: null, attributes: JSON.stringify({ level: "warn" }) },
       { event_id: "metric-1", timestamp: timestamp(-8000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-6", event_type: "metric", name: "http.request.duration", message: "", value: 100, attributes: JSON.stringify({ unit: "ms", rating: "good" }) },
       { event_id: "metric-2", timestamp: timestamp(-7000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-7", event_type: "metric", name: "http.request.duration", message: "", value: 101, attributes: JSON.stringify({ unit: "ms", rating: "good" }) },
+      { event_id: "vital-lcp-1", timestamp: timestamp(-6500), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-9", event_type: "metric", name: "web.vitals.lcp", message: "", value: 2200, attributes: JSON.stringify({ path: "/checkout", unit: "ms", rating: "good" }) },
+      { event_id: "vital-cls-1", timestamp: timestamp(-6400), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-10", event_type: "metric", name: "web.vitals.cls", message: "", value: 0.08, attributes: JSON.stringify({ path: "/checkout", unit: "score", rating: "good" }) },
       { event_id: "span-1", timestamp: timestamp(-6000), accepted_at: timestamp(0), organization_id: organizationId, project_id: projectId, environment_id: environmentId, credential_id: "cred", request_id: "req-8", event_type: "span", name: "http.request", message: "", value: 20, attributes: JSON.stringify({ traceId: "trace-1", spanId: "span-1" }) },
     ];
     await execute("INSERT INTO " + database + "." + table + " FORMAT JSONEachRow", rows.map((row) => JSON.stringify(row)).join("\n"));
@@ -67,7 +69,7 @@ describe.skipIf(!testUrl)("ClickHouse telemetry query integration", () => {
 
   it("runs overview, grouped errors, and fingerprint occurrence queries against ClickHouse", async () => {
     const overview = await queryTelemetryOverview(bindings, { organizationId, projectId, environmentId, from, to });
-    expect(overview).toMatchObject({ total: 8, events: 2, errors: 2, logs: 1, metrics: 2, spans: 1 });
+    expect(overview).toMatchObject({ total: 10, events: 2, errors: 2, logs: 1, metrics: 4, spans: 1 });
     const groups = await queryTelemetryErrorGroups(bindings, { organizationId, projectId, environmentId, from, to, limit: 20 });
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({ name: "TypeError", occurrences: 2, latestStack: "TypeError: latest stack" });
@@ -99,6 +101,16 @@ describe.skipIf(!testUrl)("ClickHouse telemetry query integration", () => {
     });
     expect(spans).toHaveLength(1);
     expect(spans[0]).toMatchObject({ eventId: "span-1", eventType: "span", name: "http.request" });
+  });
+
+  it("runs tenant-scoped route performance aggregation against ClickHouse", async () => {
+    const routes = await queryTelemetryRoutePerformance(bindings, { organizationId, projectId, environmentId, from, to });
+    expect(routes).toHaveLength(1);
+    expect(routes[0].path).toBe("/checkout");
+    expect(routes[0].metrics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "web.vitals.lcp", samples: 1, unit: "ms", rating: "good" }),
+      expect.objectContaining({ name: "web.vitals.cls", samples: 1, unit: "score", rating: "good" }),
+    ]));
   });
 
 });
