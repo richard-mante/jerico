@@ -96,4 +96,19 @@ export const uptimeProbeResultSchema = z.object({
 export type UptimeProbeResult = z.infer<typeof uptimeProbeResultSchema>;
 
 
+
+export const createAlertRuleSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  metric: z.enum(["error_count", "uptime_down", "response_time"]),
+  comparison: z.enum(["gt", "gte"]).default("gte"),
+  threshold: z.number().int().min(1).max(1_000_000),
+  windowSeconds: z.number().int().min(60).max(86400).default(300),
+  consecutiveBreaches: z.number().int().min(1).max(10).default(1),
+  enabled: z.boolean().default(true),
+}).strict();
+export const updateAlertRuleSchema = createAlertRuleSchema.partial().strict()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one field to update.");
+export type CreateAlertRule = z.infer<typeof createAlertRuleSchema>;
+export type UpdateAlertRule = z.infer<typeof updateAlertRuleSchema>;
+
 export const API_VERSION = "v1" as const;
