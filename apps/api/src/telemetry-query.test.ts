@@ -91,7 +91,7 @@ describe("ClickHouse query adapter", () => {
   it("groups errors within the same tenant, project, and environment scope", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
       fingerprint: "12345", name: "TypeError", latestMessage: "Cannot read property", occurrences: "4",
-      firstSeen: "2026-11-03T10:00:00.000Z", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-4",
+      firstSeen: "2026-11-03T10:00:00.000Z", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-4", latestStack: "TypeError: stack",
     }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const groups = await queryTelemetryErrorGroups(
@@ -100,7 +100,7 @@ describe("ClickHouse query adapter", () => {
     );
     expect(groups[0]).toEqual({
       fingerprint: "12345", name: "TypeError", latestMessage: "Cannot read property", occurrences: 4,
-      firstSeen: "2026-11-03T10:00:00.000Z", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-4",
+      firstSeen: "2026-11-03T10:00:00.000Z", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-4", latestStack: "TypeError: stack",
     });
     const [url] = fetchMock.mock.calls[0] as [URL];
     const parsed = new URL(url);

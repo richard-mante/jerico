@@ -221,3 +221,12 @@
 - Added timeline-relative duration bars using the existing span `value` in milliseconds, plus span ID and parent-span indicators when supplied in attributes.
 - No API changes or new dependencies were needed. No lint, typecheck, tests, build, or browser validation was run.
 - Limitation: the SDK does not automatically create or propagate trace/span IDs; this view is best-effort and limited to loaded rows.
+
+
+## 2026-11-03 — Phase 4 error stack details
+
+- Created `feat/phase-4-error-stack-details` from `main` after merging PR #12.
+- Extended `queryTelemetryErrorGroups` to extract the latest event's `attributes.stack` using ClickHouse JSON extraction and return it as `latestStack`.
+- Added unit test fixture/assertion for latest stack extraction (authored, not executed).
+- Updated grouped error cards with a collapsed, scrollable stack-trace disclosure. Stack content is rendered as text.
+- No lint, typecheck, tests, build, ClickHouse SQL execution, or browser validation was run.
