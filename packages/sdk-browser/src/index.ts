@@ -31,7 +31,7 @@ export class BrowserJericoClient extends JericoClient {
     }
   }
 
-  capturePageView(attributes?: Record<string, TelemetryValue>): boolean {
+  override log(): never {\n    throw new Error("Browser credentials cannot submit logs; use a secret key from a trusted server.");\n  }\n\n  override metric(): never {\n    throw new Error("Browser credentials cannot submit metrics; use a secret key from a trusted server.");\n  }\n\n  override span(): never {\n    throw new Error("Browser credentials cannot submit spans; use a secret key from a trusted server.");\n  }\n\n  capturePageView(attributes?: Record<string, TelemetryValue>): boolean {
     return this.track("page.view", {
       path: window.location.pathname,
       title: document.title,
