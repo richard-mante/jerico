@@ -38,4 +38,16 @@ describe("JericoClient", () => {
     const client = new JericoClient({ apiKey: "key", endpoint: "https://ingest.example.test", flushIntervalMs: 0 });
     expect(() => client.metric("latency", Number.NaN)).toThrow();
   });
+  it("adds a validated severity to structured logs", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }));
+    const client = new JericoClient({ apiKey: "jk_sec_test", endpoint: "https://ingest.example.test", fetch: fetcher, flushIntervalMs: 0 });
+    client.log("request.completed", "Request completed", { route: "/health" });
+    client.logWithLevel("warn", "request.slow", "Request took too long", { durationMs: 1200 });
+    await client.flush();
+    const events = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)).events;
+    expect(events[0].attributes.level).toBe("info");
+    expect(events[1].attributes.level).toBe("warn");
+    expect(events[1].attributes.durationMs).toBe(1200);
+    await client.close();
+  });
 });

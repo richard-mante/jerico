@@ -1,4 +1,4 @@
-import { JericoClient, type JericoClientOptions, type TelemetryValue } from "@jerico/sdk-core";
+import { JericoClient, type JericoClientOptions, type LogLevel, type TelemetryValue } from "@jerico/sdk-core";
 
 export type BrowserJericoOptions = JericoClientOptions & {
   capturePageViews?: boolean;
@@ -83,6 +83,10 @@ export class BrowserJericoClient extends JericoClient {
     throw new Error("Browser credentials cannot submit logs; use a secret key from a trusted server.");
   }
 
+  override logWithLevel(_level: LogLevel, _name: string, _message: string, _attributes?: Record<string, TelemetryValue>): never {
+    throw new Error("Browser credentials cannot submit logs; use a secret key from a trusted server.");
+  }
+
   override metric(_name: string, _value: number, _attributes?: Record<string, TelemetryValue>): never {
     throw new Error("Browser credentials cannot submit metrics; use a secret key from a trusted server.");
   }
@@ -110,4 +114,4 @@ export function createBrowserClient(options: BrowserJericoOptions): BrowserJeric
   return new BrowserJericoClient(options);
 }
 
-export type { TelemetryValue } from "@jerico/sdk-core";
+export type { LogLevel, TelemetryValue } from "@jerico/sdk-core";
