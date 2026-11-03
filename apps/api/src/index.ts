@@ -1307,7 +1307,6 @@ app.post("/internal/uptime-results", async (context) => {
           eq(uptimeMonitors.projectId, result.projectId),
           eq(uptimeMonitors.enabled, true),
           eq(uptimeMonitors.activeCheckId, result.checkId),
-          or(isNull(uptimeMonitors.lastCheckedAt), lte(uptimeMonitors.lastCheckedAt, checkedAt)),
         ));
       }
       return { accepted: true, duplicate: false };
