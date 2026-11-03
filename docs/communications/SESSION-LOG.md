@@ -335,3 +335,14 @@
 - Added a query-adapter unit test and a gated ClickHouse integration test for retrieving spans for one trace.
 - Updated the Traces tab with a trace-detail action, paginated detail rows, span IDs/parent indicators, timestamps, messages, and durations.
 - No lint, typecheck, unit tests, build, ClickHouse integration, route integration, or browser validation was run. The feature is in an open PR and must not be treated as verified.
+
+
+## 2026-11-03 — Browser Core Web Vitals implementation
+
+- Confirmed PR #24 merged into `main` (merge commit `0b2e358c3559f47def075ab1ce10489790ccc0de`).
+- Created `feat/browser-core-web-vitals` from current `main`.
+- Added opt-in `captureWebVitals` to `@jerico/sdk-browser`. It observes TTFB/FCP, LCP, CLS session windows, and estimates INP from interaction duration entries; page-finalized metrics trigger a best-effort flush.
+- Browser callers still cannot invoke arbitrary metric submission. Internal browser metric recording uses a five-name allowlist.
+- Updated the ingestion Worker to accept public-key metric events only for the exact allowlisted `web.vitals.*` names. Public custom metrics, logs, and spans remain denied.
+- Added pure allowlist tests for the browser SDK and ingestion service, plus README, Next.js example, Phase 3/4 roadmap, and handover updates.
+- No lint, typecheck, tests, build, browser run, or ClickHouse integration was executed. The native INP/CLS calculations need validation against the official `web-vitals` library and across browser support matrices.
