@@ -261,6 +261,8 @@ export const alertRules = pgTable("alert_rules", {
   enabled: boolean("enabled").notNull().default(true),
   consecutiveCount: integer("consecutive_count").notNull().default(0),
   lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
+  evaluationLeaseToken: text("evaluation_lease_token"),
+  evaluationLeaseExpiresAt: timestamp("evaluation_lease_expires_at", { withTimezone: true }),
   createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -271,9 +273,11 @@ export const alertRules = pgTable("alert_rules", {
   check("alert_rules_window_check", sql`${t.windowSeconds} BETWEEN 60 AND 86400`),
   check("alert_rules_consecutive_breaches_check", sql`${t.consecutiveBreaches} BETWEEN 1 AND 10`),
   check("alert_rules_consecutive_count_check", sql`${t.consecutiveCount} >= 0`),
+  check("alert_rules_evaluation_lease_pair_check", sql`(${t.evaluationLeaseToken} IS NULL AND ${t.evaluationLeaseExpiresAt} IS NULL) OR (${t.evaluationLeaseToken} IS NOT NULL AND ${t.evaluationLeaseExpiresAt} IS NOT NULL)`),
   uniqueIndex("alert_rules_id_org_project_unique").on(t.id, t.organizationId, t.projectId),
   foreignKey({ name: "alert_rules_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
   index("alert_rules_project_idx").on(t.organizationId, t.projectId, t.enabled),
+  index("alert_rules_evaluation_lease_idx").on(t.enabled, t.evaluationLeaseExpiresAt, t.lastEvaluatedAt),
 ]);
 
 export const incidents = pgTable("incidents", {
