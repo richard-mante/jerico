@@ -995,7 +995,24 @@ app.post("/api/v1/projects/:projectId/uptime-monitors", async (context) => withO
     expectedStatusCode: parsed.data.expectedStatusCode,
     enabled: parsed.data.enabled,
     createdBy: userId,
-  }).returning();
+  }).returning({
+    id: uptimeMonitors.id,
+    organizationId: uptimeMonitors.organizationId,
+    projectId: uptimeMonitors.projectId,
+    name: uptimeMonitors.name,
+    url: uptimeMonitors.url,
+    method: uptimeMonitors.method,
+    intervalSeconds: uptimeMonitors.intervalSeconds,
+    timeoutMs: uptimeMonitors.timeoutMs,
+    expectedStatusCode: uptimeMonitors.expectedStatusCode,
+    enabled: uptimeMonitors.enabled,
+    nextCheckAt: uptimeMonitors.nextCheckAt,
+    lastCheckedAt: uptimeMonitors.lastCheckedAt,
+    lastStatus: uptimeMonitors.lastStatus,
+    createdBy: uptimeMonitors.createdBy,
+    createdAt: uptimeMonitors.createdAt,
+    updatedAt: uptimeMonitors.updatedAt,
+  });
   return context.json({ data: created, checksEnabled: Boolean(context.env.UPTIME_PROBES) }, 201);
 }));
 
