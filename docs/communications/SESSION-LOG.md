@@ -38,3 +38,24 @@
 - Generate and commit the pnpm lockfile; run lint/typecheck/tests/build.
 - Add PostgreSQL-backed Better Auth and tenancy integration tests and apply the migration to a disposable database.
 - Continue organization management/switching, project management, audit logging, and API-key lifecycle after Phase 1 validation.
+
+
+## 2026-11-03 — Phase 2A project ingestion credentials
+
+- Confirmed Phase 1 PR #2 is merged into `main` as `5952c67ead9868783a7d764d06ca78bf3d4fa37b`.
+- Created `feat/phase-2-ingestion-credentials` from the merged `main` branch.
+- Added `project_ingestion_keys` Drizzle schema and SQL migration `0001_project_ingestion_keys.sql`. Credentials are constrained to the same organization/project/environment through composite foreign keys; a composite unique index was added to environments for the environment ownership FK.
+- Added `createIngestionKeySchema` to shared contracts and validation tests.
+- Added Web Crypto credential generation in `apps/api/src/ingestion-keys.ts`: 256-bit random values with `jk_pub_` and `jk_sec_` prefixes; only SHA-256 hash and short prefix are stored.
+- Added project credential API routes: list, create, and soft revoke. Membership is checked through the existing organization guard; owner/admin roles can create/revoke, members can list metadata. Raw credentials are returned only in the create response.
+- Added a web project credential manager at `/dashboard/projects/[projectId]/keys`, with environment/type selection, one-time credential display/copy, metadata listing, and revocation. Added a dashboard link from each project row.
+- Added `docs/roadmap/phase-2-credentials.md`, linked it from the implementation roadmap, updated the root README and current-state handover.
+- Current feature branch: `feat/phase-2-ingestion-credentials`. Phase 2A implementation is not yet validated or merged.
+- No dependency install, lockfile generation, lint, typecheck, unit tests, build, PostgreSQL migration, or API integration test has been run. GitHub Actions runner allocation remains unresolved.
+- The ingestion service remains intentionally disabled. No telemetry write endpoint, queue, ClickHouse storage, rate limiting, quota enforcement, or redaction is implemented in this milestone.
+
+### Next
+- Review the full Phase 2A diff for schema/migration consistency, authorization, and UI behavior.
+- Establish a working validation environment; generate the pnpm lockfile and run lint/typecheck/tests/build.
+- Apply migration to disposable PostgreSQL and test tenant/project/environment isolation and credential revocation.
+- Only then open/merge Phase 2A PR and proceed to authenticated telemetry ingestion.
