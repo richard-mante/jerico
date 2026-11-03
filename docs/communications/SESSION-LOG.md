@@ -548,3 +548,20 @@
 - CI run #208 failed before runner allocation; job had no steps and its log download returned `BlobNotFound`. No source checks executed. No lockfile was generated or modified.
 - Migration 0009 must be applied before deploying this change. Queue/database concurrency and end-to-end delivery still require non-production validation.
 - Next review: inspect alert evaluator overlap/claim semantics and ClickHouse query resource limits, then continue the release validation gate.
+
+
+## 2026-11-03 — Alert evaluation overlap protection
+
+- Investigated Issue #42 and reviewed the alert evaluator, alert-rule schema, existing migration journal, and current tests.
+- Added an atomic per-rule lease claim with a unique token and five-minute expiry. The expiry is measured from each rule's actual claim time, not from the start of a potentially long batch evaluation.
+- The claim returns the latest rule row; consecutive-count updates are conditional on the same lease token so an evaluator whose lease was reclaimed cannot overwrite newer state. The lease is released conditionally in `finally` across success, no-data, query-error, and unexpected-error paths. Expiry provides recovery after Worker termination.
+- Preserved the existing once-per-minute cadence through `last_evaluated_at` while separating it from lease ownership.
+- Added Drizzle lease fields, pair constraint, index, migration `0010_alert_evaluation_leases.sql`, and journal entry.
+- Added focused helper tests for active/expired lease semantics and consecutive-count progression. These tests were not executed.
+- Opened and merged [PR #43](https://github.com/richard-mante/jerico/pull/43); merge commit: `e48c9095f2f15fcca83c5bd2228fd207dd53f288`. Issue #42 was completed by this change.
+- CI run [#213](https://github.com/richard-mante/jerico/actions/runs/41640848052) failed before recording workflow steps. No tests, lint, typecheck, build, or migration execution ran. The user will handle manual testing. No lockfile was generated or modified.
+- Apply migrations through `0010_alert_evaluation_leases.sql` before deployment.
+
+### Next
+- Manually validate concurrent Cron invocations, lease expiry/recovery, query failure release, and consecutive-breach progression.
+- Continue the remaining scheduler/tenant-isolation/Workerd egress review and the broader release validation gate.
