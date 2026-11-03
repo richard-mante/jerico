@@ -1,84 +1,81 @@
 # Jerico — Current Project Handover
 
 **Last updated:** 2026-11-03  
-**Status:** Phase 0 merged; Phase 1 identity and tenancy implementation in review  
 **Repository:** https://github.com/richard-mante/jerico  
-**Working branch:** feat/phase-1-identity-tenancy  
-**Base branch:** main  
-**Phase 1 PR:** https://github.com/richard-mante/jerico/pull/2
+**Main branch:** `main`  
+**Current work branch:** `feat/phase-2-ingestion-credentials`  
+**Current milestone:** Phase 2A — Project Ingestion Credentials
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
 ## Product direction
 
-Jerico is an extensible open-source Founder Operating System. The first independently useful release is Jerico Observability. It must support managed cloud and self-hosted deployments, monitor Jerico itself, and let external developers instrument their own applications. TypeScript browser and Node SDKs are the initial developer experience.
+Jerico is an extensible open-source Founder Operating System. The first independently useful product is Jerico Observability. It must support managed cloud and self-hosted deployments, monitor Jerico itself, and let external developers instrument their own applications. TypeScript browser and Node SDKs are the initial developer experience.
 
 ## Confirmed architecture
 
-- Monorepo: pnpm + Turborepo.
-- Web dashboard: Next.js + React + TypeScript.
-- Desktop client: Tauri 2 + Vite + React + TypeScript.
-- Backend APIs: Hono, designed for Cloudflare Workers and future self-hosted runtime adapters.
-- Transactional data: PostgreSQL through Drizzle ORM.
-- Cloudflare Hyperdrive: Worker-to-PostgreSQL connectivity/pooling layer; code can consume the `HYPERDRIVE` binding, but no production binding ID has been provisioned/configured yet.
-- Telemetry analytics: ClickHouse (not yet implemented).
-- Authentication: Better Auth, self-hosted inside the Hono API Worker, using the Drizzle/PostgreSQL adapter and organization plugin. No separate Better Auth hosting subscription or managed auth service is required.
-- Shared contracts and UI: workspace packages.
-- Desktop is a separate client of the same APIs; monitoring must continue when desktop is closed.
+- pnpm + Turborepo monorepo.
+- Next.js + React + TypeScript web dashboard.
+- Tauri 2 + Vite + React + TypeScript desktop client.
+- Hono APIs designed for Cloudflare Workers and future self-hosted runtime adapters.
+- PostgreSQL + Drizzle for transactional/configuration data.
+- Cloudflare Hyperdrive for managed Worker-to-PostgreSQL connectivity.
+- ClickHouse for telemetry analytics (not yet implemented).
+- Better Auth self-hosted inside the Hono API Worker; no separate authentication hosting subscription.
+- Cloudflare Queues planned behind a queue adapter; self-hosted broker implementation still to be selected and validated.
+- Cloudflare-specific services must remain behind adapters so self-hosted deployments are viable.
 
-## Phase 0 status
+## Phase 0 and Phase 1 status
 
-Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository contains the pnpm/Turborepo scaffold, Next.js web shell, Tauri desktop shell, Hono management and ingestion Workers, shared UI/contracts, CI workflow, and contribution/security docs.
+- Phase 0 foundation merged to `main`.
+- Phase 1 identity and tenancy PR #2 merged to `main` as `5952c67ead9868783a7d764d06ca78bf3d4fa37b`.
+- Phase 1 code includes Better Auth email/password authentication, PostgreSQL/Drizzle schema and migration, organization/membership/invitation support, organization-scoped product/project/environment APIs, basic web onboarding, and invitation acceptance.
+- Better Auth is a self-hosted open-source library running inside the Hono API Worker. It is not a separate hosted service.
+- Hyperdrive-aware request-scoped `pg.Client` lifecycle is implemented. A real Hyperdrive resource/binding has not been provisioned.
 
-**Verification remains incomplete:** GitHub Actions attempts on the Phase 0 and Phase 1 pull requests have failed before any workflow step was recorded; job logs are unavailable. The repository still needs a generated lockfile plus a complete install/lint/typecheck/test/build run. The Phase 0 PR was merged at the user's explicit request; this is not evidence of passing checks.
+**Verification remains incomplete:** the repository still has no generated pnpm lockfile; install, lint, typecheck, tests, and builds have not been successfully run. The PostgreSQL migration has not been applied to a real/disposable database. GitHub Actions jobs have repeatedly failed before runner allocation (`runner_id: 0`, no steps/logs); pinning Ubuntu 24.04 did not resolve it. Do not treat this as evidence that code checks pass or fail.
 
-## Phase 1 implementation in review
+## Phase 2A — Project ingestion credentials
 
-Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest implementation commit: `70a7e4d7399008e287bb17722f1d49f62b3ca421`; subsequent commits update continuity documentation. Consult PR #2 for the exact current branch head.
+Branch: `feat/phase-2-ingestion-credentials`. Implementation is underway; open PR status should be checked before resuming.
 
-Implemented:
-- Better Auth identity, session, account, verification, organization, membership, and invitation schema.
-- Drizzle database package and initial PostgreSQL migration.
-- Email/password auth requiring email verification; Resend adapter and optional Google OAuth configuration.
-- Organization-scoped product, project, and environment endpoints with membership checks.
-- Composite database foreign keys for same-organization product/project/environment relationships.
-- Explicit owner/admin write-permission helper with tests; members remain read-only and unknown roles are denied.
-- Web sign-in/sign-up pages and first-run organization/project onboarding, including Development and Production environment creation.
-- Shared Zod request contracts and validation tests.
-- Organization invitation acceptance page at `apps/web/src/app/accept-invitation/[id]/page.tsx`; signed-in users can accept via Better Auth, and signed-out users are instructed to sign in and reopen the invitation link.
-- Updated `withDatabase` lifecycle: a request-scoped `pg.Client` is created per Worker invocation; Hyperdrive clients are not explicitly ended because Workers clean up the edge connection, while local direct PostgreSQL clients are closed after use.
-- CI runner label pinned to `ubuntu-24.04` rather than the moving `ubuntu-latest` alias.
+Implemented on the branch:
+- Added `project_ingestion_keys` Drizzle schema and SQL migration `0001_project_ingestion_keys.sql`.
+- Credentials are bound to organization, project, and environment with composite foreign-key constraints.
+- Added public (`jk_pub_`) and secret (`jk_sec_`) credential generation using 256-bit Web Crypto randomness.
+- Store only SHA-256 hashes and a short display prefix; return the raw credential once at creation.
+- Added authenticated project key list/create/revoke endpoints. Owners/admins create and revoke; organization members can view metadata.
+- Added shared Zod request contract and unit tests for key generation and request validation.
+- Added web credential management page at `/dashboard/projects/[projectId]/keys`, linked from project cards. Supports create, copy-once display, list, and revoke.
+- Added Phase 2A implementation/security/validation documentation.
 
-These capabilities remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
+**Not yet implemented:** telemetry ingestion authentication/acceptance, public-vs-secret permission enforcement, payload contracts and limits, redaction, rate limits/quotas, durable queue adapter/consumers, ClickHouse schemas/writes, retries/DLQ/backpressure, and last-used timestamp updates.
 
-## Required environment
+## Important security semantics
 
-- Local: PostgreSQL, DATABASE_URL, BETTER_AUTH_SECRET, email provider configuration.
-- Cloudflare API Worker: provisioned Hyperdrive binding named HYPERDRIVE; Worker secrets for Better Auth and email delivery; exact web origin in WEB_APP_URL.
-- Google OAuth is optional and requires provider credentials.
-- The Hyperdrive binding ID must be added to `apps/api/wrangler.jsonc` after the actual Hyperdrive resource exists.
-- Never commit credentials or real connection strings.
-
-## Not implemented yet
-
-ClickHouse telemetry storage, queueing, SDKs, ingestion credential lifecycle, observability dashboard, alerts, uptime probes, self-hosted Docker distribution, API key management, audit logging, production deployment, complete organization management/switching, and full project CRUD.
+- A public credential is intentionally usable by browser code but must only authorize the restricted event-ingestion capabilities defined by the ingestion service.
+- A secret credential is server-only and must never be exposed to browser bundles.
+- Both values are shown only once. Never log, commit, or return a raw key from list/revoke endpoints.
+- Tenant/project/environment identity must be derived from the matched credential at ingestion time, never trusted from telemetry payload fields.
+- Revocation is represented by `revoked_at`; ingestion must reject revoked credentials.
 
 ## Validation blockers
 
-- No successful dependency install or committed pnpm lockfile.
-- No lint/typecheck/test/build run.
-- No PostgreSQL migration execution or Better Auth/tenancy integration test.
-- GitHub Actions runs fail before runner allocation. The latest run using the pinned `ubuntu-24.04` label (run #20, workflow commit `70a7e4d`) reports `runner_id: 0`, an empty runner name, and no steps; its logs are unavailable. Pinning the runner image did not resolve the startup failure. This is not a diagnosed source-code failure; the GitHub-hosted runner issue remains unresolved.
-- No production Hyperdrive resource/binding ID or email/OAuth secrets configured.
+- No dependency install or pnpm lockfile.
+- No lint/typecheck/unit test/build run for Phase 1 or Phase 2A.
+- No PostgreSQL migration execution or API integration tests.
+- No real Hyperdrive binding or production secrets.
+- CI hosted runner allocation issue remains unresolved.
+- Phase 2A is not production-ready and must not be merged until validation is possible and database/tenant-isolation tests pass.
 
 ## Next actions
 
-1. Establish a runnable CI/local validation environment and resolve the GitHub Actions runner allocation issue.
-2. Generate and commit the pnpm lockfile; run lint, typecheck, tests, and builds.
-3. Provision disposable PostgreSQL, validate/apply the migration, and add Better Auth + tenant-isolation integration tests.
-4. Provision Hyperdrive only when a real PostgreSQL resource and binding ID are available; test the Worker connection path.
-5. Improve organization switching/member/invitation management and project CRUD.
-6. Add audit logging and scoped API key lifecycle, then build the telemetry ingestion pipeline.
+1. Review Phase 2A diff, run lint/typecheck/tests/build in a working environment, and test migration + tenant isolation against PostgreSQL.
+2. Merge Phase 2A only after validation.
+3. Implement the ingestion request contract and credential authentication, including public-vs-secret capability enforcement, revocation checks, payload limits, redaction, rate limiting, and quotas.
+4. Select and implement a durable queue adapter for Cloudflare and self-hosted deployments.
+5. Add ClickHouse schemas, consumers, retry/DLQ/backpressure handling, and integration tests.
+6. Build browser and Node TypeScript SDKs after the ingestion API is stable.
 
 ## Continuity rules
 
