@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #64 — `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`  
-**Latest main merge:** PR #64 — `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`  
+**Latest feature merge:** PR #66 — `fdfd55f86e03a9a5fd6af0a48ebe1c9d41b54e67`  
+**Latest main merge:** PR #66 — `fdfd55f86e03a9a5fd6af0a48ebe1c9d41b54e67`  
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -42,9 +42,9 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5C — alert rules and incidents | #31 | Merged |
 | Phase 5D — verified email notifications | #32 | Merged |
 | Phase 5E — signed webhook notifications | #33 | Merged |
-| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64 | Merged |
+| Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66 | Merged |
 
-Latest reliability milestone: [PR #64 — deduplicate ClickHouse telemetry reads](https://github.com/richard-mante/jerico/pull/64). Merge commit: `7fc2e42aa3cd5b193b9c30ad16c0f8fcc7afa285`.
+Latest reliability milestone: [PR #66 — bound future client event timestamps](https://github.com/richard-mante/jerico/pull/66). Merge commit: `fdfd55f86e03a9a5fd6af0a48ebe1c9d41b54e67`.
 
 ### Phase 5 notification capabilities
 
@@ -161,3 +161,8 @@ Merged PR #62. Before a Worker begins provider delivery, the API checks that the
 ### 2026-11-03 ClickHouse read-time deduplication
 
 Merged PR #64. Every telemetry query family now uses ClickHouse `FINAL` for the ReplacingMergeTree table, including nested series subqueries and alert error counts. This prevents at-least-once queue retries and ambiguous insert outcomes from temporarily inflating dashboard counts before background merges. Unit query-family coverage and duplicate-row ClickHouse integration fixtures were added but not executed. Read-time FINAL increases query cost; verify it against the retained 7/30-day data and existing 8-second server/10-second client limits during manual ClickHouse testing.
+
+
+### 2026-11-03 ingestion timestamp bounds
+
+Merged PR #66. Ingestion now rejects a telemetry batch if any client-supplied event timestamp is more than 60 seconds ahead of the same server-generated `acceptedAt` written to the queue envelope. Historical timestamps remain accepted for offline/backfilled events; events without timestamps remain server-timestamped downstream. The check runs before daily quota reservation and queue publication. Unit tests cover the boundary, future, historical, absent, and offset-aware timestamps. Tests were added but not executed; manual ingestion/ClickHouse validation remains outstanding. No migration was required.
