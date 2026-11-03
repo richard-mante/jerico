@@ -50,6 +50,8 @@
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until the database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
 
 ## Phase 3 — TypeScript SDKs
+
+See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
 - [x] Build shared SDK core: bounded in-memory batching, transport, explicit flush, and error reporting. Automatic retries are intentionally disabled until server-side request idempotency is available.
 - [ ] Browser SDK: custom events, anonymous/session IDs, identify/reset, navigation, JS errors, unhandled rejections, and Core Web Vitals. (Initial package supports custom events, page views, and JS error/unhandled-rejection capture; session identity, identify/reset, and Core Web Vitals remain.)
 - [ ] Node SDK: custom events, errors, structured logs, custom metrics, explicit flush, and graceful shutdown. (Initial package supports custom events, errors, logs, metrics, spans, flush, and close; production shutdown guidance and broader instrumentation remain.)
