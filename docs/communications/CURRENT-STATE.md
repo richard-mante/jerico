@@ -248,3 +248,17 @@ At the end of each substantial session, update this file and append a session-lo
 - Added a dashboard action to load a trace independently of the initial project-wide span page, render its span details, and load subsequent pages.
 - Added query-adapter unit coverage and a gated real-ClickHouse integration case for trace-scoped retrieval. Tests are authored but not executed.
 - This is a trace detail list, not a service map or cross-project trace search. No lint, typecheck, tests, build, ClickHouse integration, or browser validation has run for this slice.
+
+
+### Phase 4 trace detail drill-down — merged PR #24
+
+- PR #24 merged into `main` (merge commit `0b2e358c3559f47def075ab1ce10489790ccc0de`).
+- The authenticated spans query accepts a bound trace ID filter and retains organization/project/environment/time/cursor constraints. The Traces tab can load a trace independently and paginate through its spans.
+- Query-adapter unit and gated ClickHouse integration coverage were added, but tests have not been executed and browser validation remains outstanding.
+
+### Browser Core Web Vitals — current open work
+
+- Branch `feat/browser-core-web-vitals` adds opt-in `captureWebVitals` to the browser SDK.
+- It observes TTFB, FCP, LCP, CLS session windows, and an INP estimate. Metrics are recorded internally; browser callers still cannot submit arbitrary custom metrics.
+- Public-key ingestion permits only five exact `web.vitals.*` metric names alongside events/errors. Custom metrics, logs, and spans remain restricted to secret credentials.
+- Added allowlist tests for the SDK and ingestion helper. No lint, typecheck, unit tests, build, integration test, or browser test has been run. INP/CLS behavior still needs comparison against the official `web-vitals` library.

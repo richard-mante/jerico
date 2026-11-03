@@ -66,7 +66,7 @@ See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
 - [ ] Validate workspace install, lint, typecheck, tests, and builds.
 - [ ] Validate request-level ingestion idempotency against PostgreSQL and Cloudflare Queues before enabling automatic retries.
 - [ ] Ensure SDK failures never crash the host application through integration tests.
-- [ ] Add route-change instrumentation and Core Web Vitals (requires a deliberate public-key metric permission decision).
+- [x] Add opt-in browser Core Web Vitals capture with a server-side allowlist for five public-key performance metrics. Route-change instrumentation and validation against the official `web-vitals` implementation remain open.
 - [ ] Add richer Node instrumentation and framework adapters.
 - [x] Add Next.js App Router and Express/Node integration examples (documentation only; sample apps not executed).
 - [ ] Add installation, privacy, redaction, troubleshooting, package build, and release documentation.
@@ -78,11 +78,11 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [x] Tenant-safe query APIs for events, errors, logs, metrics, and spans (implemented; tests and PostgreSQL/ClickHouse integration validation pending).
 - [x] Project overview aggregates (implemented; query validation pending).
 - [x] First project explorer UI with environment/time filters, overview cards, signal tabs, and pagination (implemented; browser validation pending).
-- [ ] Event catalogue, top events, and time-series charts.
-- [x] First query-time error grouping endpoint (name + message fingerprint, occurrence count, first/last seen); persisted issue identity, stack traces, occurrence history, resolve/ignore actions remain open.
-- [ ] Metric charts, Core Web Vitals, route performance, and percentiles.
+- [x] Event catalogue, top events, and time-series charts.
+- [x] Error grouping, latest stack details, persisted open/resolved/ignored status, and paginated occurrence drill-down (assignment, comments, notifications, and audit history remain open).
+- [x] Initial metric time-series charts and browser Core Web Vitals capture. Route performance breakdowns, percentile aggregation, and validation against official field-metric calculations remain open.
 - [x] Initial span waterfall and trace detail drill-down (trace-scoped query + paginated spans); service maps and cross-project trace search remain future work.
-- [ ] Structured log explorer with severity and time filters.
+- [x] Structured log explorer with severity and time filters.
 
 **Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization.
 

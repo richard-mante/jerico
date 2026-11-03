@@ -9,6 +9,7 @@ import { hashPresentedCredential, readBearerCredential } from "./credentials";
 import { redactTelemetryEvent } from "./redaction";
 import { DailyQuotaExceeded, dailyEventLimit, secondsUntilUtcMidnight, utcUsageDate } from "./quota";
 import { createStableEventId, hashTelemetryRequest, isValidIdempotencyKey } from "./idempotency";
+import { isAllowedPublicMetric } from "./public-metrics";
 
 const MAX_BODY_BYTES = 96 * 1024;
 const MAX_BATCH_EVENTS = 100;
@@ -216,8 +217,10 @@ app.post("/ingest/v1/events", async (context) => {
       }
     }
 
-    if (credential.keyType === "public" && parsed.data.events.some((event) => !["event", "error"].includes(event.type))) {
-      return context.json({ error: { code: "INSUFFICIENT_CREDENTIAL_SCOPE", message: "Public credentials may submit only events and errors. Use a server-side secret credential for logs, metrics, and spans.", requestId } }, 403);
+    if (credential.keyType === "public" && parsed.data.events.some((event) =>
+      !["event", "error"].includes(event.type) && !(event.type === "metric" && isAllowedPublicMetric(event.name))
+    )) {
+      return context.json({ error: { code: "INSUFFICIENT_CREDENTIAL_SCOPE", message: "Public credentials may submit events, errors, and allowlisted Core Web Vitals metrics only. Use a server-side secret credential for logs, spans, and custom metrics.", requestId } }, 403);
     }
 
     const idempotencyHeader = context.req.header("idempotency-key");

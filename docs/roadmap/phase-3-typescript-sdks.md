@@ -16,7 +16,7 @@ All packages are TypeScript-first workspace packages. They are intentionally pri
 
 The SDK requires both a project ingestion key and an explicit endpoint. No hosted Jerico ingest domain is assumed.
 
-- Browser applications must use a `jk_pub_` key. Public keys can submit events and errors only.
+- Browser applications must use a `jk_pub_` key. Public keys can submit events, errors, and only the allowlisted `web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, and `web.vitals.ttfb` metrics. Other browser metrics, logs, and spans remain blocked.
 - Node.js applications must use a `jk_sec_` key. Secret keys must never be exposed to browser code.
 - The browser SDK captures pathname and document title for page views; it does not collect query strings or URL fragments.
 - Automatic browser error capture is enabled by default and can be disabled.
@@ -29,7 +29,7 @@ The SDK requires both a project ingestion key and an explicit endpoint. No hoste
 - Call `flush()` to explicitly send pending events and `close()` during graceful shutdown.
 - A failed batch is retained in memory and reported through `onError`. Automatic retries are deliberately disabled after a failed request until server-side request idempotency exists; an ambiguous response may mean the server accepted the batch.
 - The queue is not persisted. A process/browser crash can lose buffered events.
-- Browser logs, metrics, and spans are blocked because the current public-key ingestion policy permits only events and errors.
+- Browser logs, custom metrics, and spans are blocked. With `captureWebVitals: true`, the browser SDK internally records only the five allowlisted Core Web Vitals metrics. It observes TTFB/FCP when available, accumulates CLS session windows, tracks LCP, and estimates INP from interaction-duration entries. Final page metrics are flushed best-effort when the document becomes hidden or closes.
 - Redaction is performed by the ingestion service; SDK-side redaction and configurable sampling are future work.
 
 ## Integration examples
@@ -44,7 +44,7 @@ These examples are documentation only; they have not yet been run in sample appl
 1. Validate workspace install, lint, typecheck, tests, and builds.
 2. Add integration tests against the ingestion Worker and ClickHouse.
 3. Add request-level idempotency to the ingestion API before automatic SDK retries.
-4. Add browser route navigation instrumentation and Core Web Vitals (after deciding whether/how public keys may submit bounded performance metrics).
+4. Add browser route navigation instrumentation and validate Core Web Vitals against the official `web-vitals` implementation across supported browsers.
 5. Add richer Node instrumentation and framework adapters.
 6. Add Astro/React examples and execute all sample apps.
 7. Add OpenTelemetry-compatible export/ingestion and package build/release workflows.

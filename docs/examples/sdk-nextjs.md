@@ -12,6 +12,7 @@ export const jerico = createBrowserClient({
   apiKey: process.env.NEXT_PUBLIC_JERICO_PUBLIC_KEY!,
   endpoint: process.env.NEXT_PUBLIC_JERICO_INGEST_URL!,
   captureErrors: true,
+  captureWebVitals: true,
 });
 ```
 
@@ -36,7 +37,7 @@ export function JericoPageView() {
 }
 ```
 
-Render `<JericoPageView />` once inside the root layout. Do not also enable `capturePageViews` on the client when using this route component, or the initial page will be counted twice.
+Set `captureWebVitals: true` to opt into allowlisted browser performance metrics (LCP, CLS, INP, FCP, and TTFB). Delivery of page-finalized metrics is best-effort. Render `<JericoPageView />` once inside the root layout. Do not also enable `capturePageViews` on the client when using this route component, or the initial page will be counted twice.
 
 Use only a public key in `NEXT_PUBLIC_*` variables. Never put a `jk_sec_` key in a Next.js client bundle. User identification is opt-in:
 
