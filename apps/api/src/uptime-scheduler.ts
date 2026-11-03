@@ -1,5 +1,5 @@
-import { and, asc, eq, lte } from "drizzle-orm";
-import { uptimeMonitors } from "@jerico/database/schema";
+import { and, asc, eq, lt, lte } from "drizzle-orm";
+import { uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { withDatabase, type ApiBindings } from "./database";
 
 type UptimeProbeMessage = {
@@ -66,5 +66,12 @@ export async function scheduleDueUptimeMonitors(env: ApiBindings): Promise<numbe
       }
     }
     return enqueued;
+  });
+}
+
+export async function pruneUptimeCheckHistory(env: ApiBindings, now = new Date()): Promise<void> {
+  await withDatabase(env, async (database) => {
+    const retentionCutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    await database.delete(uptimeCheckResults).where(lt(uptimeCheckResults.checkedAt, retentionCutoff));
   });
 }
