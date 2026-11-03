@@ -181,4 +181,6 @@
 - Updated the implementation roadmap and current-state handover.
 - No package install, lint, typecheck, tests, build, PostgreSQL integration, ClickHouse query, or route authorization integration test was executed. GitHub Actions runner allocation remains an unresolved blocker.
 - Extended the first slice with metrics and spans list routes and a project overview aggregation endpoint covering counts for all five telemetry types and latest event time. Added overview query tests and documented the fact that ReplacingMergeTree counts may temporarily include duplicate queue deliveries before background merges.
-- Next: wire the web dashboard to these real endpoints, add route-level tenant isolation tests, and verify ClickHouse SQL behavior. Do not call Phase 4 complete until the dashboard and cross-tenant integration tests pass.
+- Added the first live web explorer at `/dashboard/projects/:projectId/observability`, linked from project cards. It loads the user's organizations, project environments, overview counts, and selected telemetry stream; supports organization/environment/time filters, five telemetry tabs, cursor-based pagination, and loading/empty/error/unauthenticated states.
+- Updated the Phase 4 roadmap and current-state handover to reflect the API and UI slice.
+- Next: add route-level tenant isolation tests, verify ClickHouse SQL against a real instance, and improve the explorer with error grouping, metric charts, and trace detail. Do not call Phase 4 complete until browser and cross-tenant integration tests pass.
