@@ -20,7 +20,7 @@ type QueueMessage = {
   projectId: string;
   environmentId: string;
   acceptedAt: string;
-  events: TelemetryEvent[];
+  events: Array<TelemetryEvent & { eventId: string }>;
 };
 type QueueBinding = { send(message: QueueMessage): Promise<void> };
 type RateLimitBinding = { limit(options: { key: string }): Promise<{ success: boolean }> };
@@ -229,7 +229,11 @@ app.post("/ingest/v1/events", async (context) => {
         .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
     });
 
-    const events = parsed.data.events.map(redactTelemetryEvent);
+    const events = parsed.data.events.map((event) => ({
+      ...redactTelemetryEvent(event),
+      // Generated once before queue publication; retries/redeliveries retain this ID.
+      eventId: crypto.randomUUID(),
+    }));
     await queue.send({
       schemaVersion: 1,
       requestId,
