@@ -3,6 +3,7 @@ export type UptimeProbeInput = {
   method: "GET" | "HEAD";
   timeoutMs: number;
   expectedStatusCode: number;
+  blockedHosts?: string[];
 };
 
 export type UptimeProbeResult = {
@@ -22,14 +23,14 @@ const BLOCKED_HOSTS = new Set([
   "instance-data",
 ]);
 
-export function validateProbeUrl(value: string): URL | null {
+export function validateProbeUrl(value: string, blockedHosts: string[] = []): URL | null {
   let url: URL;
   try { url = new URL(value); } catch { return null; }
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   if (url.username || url.password) return null;
   if (url.hostname.startsWith("[") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname)) return null;
   const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (!hostname.includes(".") || BLOCKED_HOSTS.has(hostname)) return null;
+  if (!hostname.includes(".") || BLOCKED_HOSTS.has(hostname) || blockedHosts.some((blocked) => blocked.toLowerCase() === hostname)) return null;
   if ([".localhost", ".local", ".internal", ".home.arpa", ".lan", ".corp", ".home", ".intranet", ".private", ".arpa", ".test", ".invalid", ".example", ".onion"].some((suffix) => hostname.endsWith(suffix))) return null;
   if (!ALLOWED_PORTS.has(url.port)) return null;
   url.hash = "";
@@ -45,7 +46,7 @@ export async function probeEndpoint(
   fetcher: typeof fetch = fetch,
 ): Promise<UptimeProbeResult> {
   const startedAt = performance.now();
-  let currentUrl = validateProbeUrl(input.url);
+  let currentUrl = validateProbeUrl(input.url, input.blockedHosts);
   if (!currentUrl) return failed("unsafe_target", 0);
 
   const controller = new AbortController();
@@ -68,7 +69,7 @@ export async function probeEndpoint(
         await response.body?.cancel().catch(() => undefined);
         if (!location || redirectCount === 3) return failed("redirect_limit", elapsed);
         let nextUrl: URL | null = null;
-        try { nextUrl = validateProbeUrl(new URL(location, currentUrl).toString()); } catch { /* Invalid Location header. */ }
+        try { nextUrl = validateProbeUrl(new URL(location, currentUrl).toString(), input.blockedHosts); } catch { /* Invalid Location header. */ }
         if (!nextUrl) return failed("unsafe_redirect", elapsed);
         currentUrl = nextUrl;
         continue;
