@@ -6,13 +6,13 @@ describe("telemetry redaction", () => {
     const result = redactTelemetryEvent({
       type: "error",
       name: "checkout.failed",
-      message: "Contact user@example.com using Bearer abc.def",
+      message: "Contact user@example.com using Bearer abc.def with token=topsecret",
       attributes: { password: "do-not-store", detail: "sent to user@example.com", count: 3 },
     });
     expect(result.attributes?.password).toBe("[REDACTED]");
     expect(result.attributes?.detail).toBe("sent to [REDACTED_EMAIL]");
     expect(result.message).not.toContain("user@example.com");
-    expect(result.message).not.toContain("Bearer abc.def");
+    expect(result.message).not.toContain("Bearer abc.def");\n    expect(result.message).not.toContain("token=topsecret");
     expect(result.attributes?.count).toBe(3);
   });
 });
