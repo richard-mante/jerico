@@ -39,6 +39,7 @@ export function ProjectUptimeManager() {
   const { data: session, isPending } = authClient.useSession();
   const organizationId = session?.session.activeOrganizationId ?? "";
   const [monitors, setMonitors] = useState<UptimeMonitor[]>([]);
+  const [checksEnabled, setChecksEnabled] = useState(false);
   const [name, setName] = useState("Website availability");
   const [url, setUrl] = useState("https://example.com");
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
@@ -78,6 +79,7 @@ export function ProjectUptimeManager() {
     if (!organizationId || !projectId) return;
     const payload = await request(`/api/v1/projects/${encodeURIComponent(projectId)}/uptime-monitors`);
     setMonitors((payload.data ?? []) as UptimeMonitor[]);
+    setChecksEnabled(Boolean(payload.checksEnabled));
   }
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export function ProjectUptimeManager() {
           enabled: true,
         }),
       });
-      setNotice("Monitor configuration saved. Scheduled checks are not active yet.");
+      setNotice(checksEnabled ? "Monitor saved. The next scheduled cycle will pick it up." : "Monitor configuration saved. The scheduler is not configured yet.");
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create monitor.");
@@ -159,7 +161,7 @@ export function ProjectUptimeManager() {
         method: "PATCH",
         body: JSON.stringify({ enabled: !monitor.enabled }),
       });
-      setNotice(monitor.enabled ? "Monitor paused." : "Monitor enabled for the upcoming probe scheduler.");
+      setNotice(monitor.enabled ? "Monitor paused." : checksEnabled ? "Monitor enabled for the next scheduled probe." : "Monitor enabled; scheduler configuration is still pending.");
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update monitor.");
@@ -214,9 +216,9 @@ export function ProjectUptimeManager() {
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[#929aaa]">Configure the endpoints you want Jerico to monitor. Checks, scheduling, and incident transitions are the next implementation slice.</p>
         </header>
 
-        <div role="status" className="mt-6 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] px-4 py-3 text-sm text-amber-100">
-          <p className="font-semibold">Configuration mode</p>
-          <p className="mt-1 text-xs leading-5 text-amber-100/70">Monitor definitions and history storage are ready, but scheduled probes are not running yet. No endpoint is currently being checked and no uptime status is inferred.</p>
+        <div role="status" className={checksEnabled ? "mt-6 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/[0.04] px-4 py-3 text-sm text-[#d9f36a]" : "mt-6 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] px-4 py-3 text-sm text-amber-100"}>
+          <p className="font-semibold">{checksEnabled ? "Scheduled checks enabled" : "Configuration mode"}</p>
+          <p className="mt-1 text-xs leading-5 opacity-75">{checksEnabled ? "The API scheduler is connected to the probe queue. New enabled monitors will be checked on the next scheduling cycle; the first result may take up to a minute." : "Monitor definitions and history storage are ready, but the probe queue is not configured. No endpoint is currently being checked and no uptime status is inferred."}</p>
         </div>
         {error && <p role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">{error}</p>}
         {notice && <p role="status" className="mt-5 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/5 px-4 py-3 text-sm text-[#d9f36a]">{notice}</p>}
@@ -239,7 +241,7 @@ export function ProjectUptimeManager() {
           <div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-semibold">Configured monitors</h2><p className="mt-1 text-xs text-[#758091]">Project-scoped monitor definitions</p></div><span className="text-xs text-[#929aaa]">{monitors.length} total</span></div>
           {monitors.length ? <div className="mt-4 space-y-3">{monitors.map((monitor) => <article key={monitor.id} className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold">{monitor.name}</h3><span className="rounded-full border border-white/10 px-2 py-1 text-[9px] uppercase tracking-wider text-[#a8afbd]">{monitor.enabled ? "Enabled" : "Paused"}</span><span className="rounded-full border border-amber-300/20 px-2 py-1 text-[9px] uppercase tracking-wider text-amber-100">Not checked yet</span></div><p className="mt-2 break-all font-mono text-xs text-[#929aaa]">{monitor.method} · {monitor.url}</p><p className="mt-2 text-[10px] text-[#667181]">Every {monitor.intervalSeconds}s · {monitor.timeoutMs}ms timeout · expected HTTP {monitor.expectedStatusCode}</p></div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold">{monitor.name}</h3><span className="rounded-full border border-white/10 px-2 py-1 text-[9px] uppercase tracking-wider text-[#a8afbd]">{monitor.enabled ? "Enabled" : "Paused"}</span><span className="rounded-full border border-amber-300/20 px-2 py-1 text-[9px] uppercase tracking-wider text-amber-100">{monitor.lastCheckedAt ? (monitor.lastStatus === "up" ? "Up" : "Down") : checksEnabled ? "Waiting for first check" : "Not checked yet"}</span></div><p className="mt-2 break-all font-mono text-xs text-[#929aaa]">{monitor.method} · {monitor.url}</p><p className="mt-2 text-[10px] text-[#667181]">Every {monitor.intervalSeconds}s · {monitor.timeoutMs}ms timeout · expected HTTP {monitor.expectedStatusCode}</p></div>
               <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => void toggleHistory(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">History</button><button type="button" disabled={busy} onClick={() => beginEdit(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">Edit</button><button type="button" disabled={busy} onClick={() => void toggleMonitor(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">{monitor.enabled ? "Pause" : "Enable"}</button><button type="button" disabled={busy} onClick={() => void deleteMonitor(monitor)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 hover:bg-red-400/5 disabled:opacity-50">Delete</button></div>
             </div>
             {editingMonitor === monitor.id && <form onSubmit={saveEdit} className="mt-4 grid gap-3 border-t border-white/[0.07] pt-4 md:grid-cols-2">
