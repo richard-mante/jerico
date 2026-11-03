@@ -134,7 +134,8 @@ function createVerificationToken(): string {
   const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
-\nfunction makeSlug(value: string): string {
+
+function makeSlug(value: string): string {
   const slug = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
   return slug || "resource";
