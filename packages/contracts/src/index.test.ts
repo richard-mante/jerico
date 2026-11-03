@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAlertRuleSchema, updateAlertRuleSchema, createNotificationChannelSchema, verifyNotificationChannelSchema, notificationDeliveryResultSchema, createWebhookNotificationChannelSchema, webhookVerificationResultSchema, isAllowedWebhookUrl, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
+import { createAlertRuleSchema, updateAlertRuleSchema, createNotificationChannelSchema, verifyNotificationChannelSchema, notificationDeliveryResultSchema, notificationDeadLetterResultSchema, createWebhookNotificationChannelSchema, webhookVerificationResultSchema, isAllowedWebhookUrl, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
 
 describe("resource request contracts", () => {
   it("accepts a standalone project without a product", () => {
@@ -111,6 +111,25 @@ describe("email notification contracts", () => {
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "sent", providerMessageId: "msg_123" }).success).toBe(true);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed" }).success).toBe(false);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed", errorCode: "private endpoint response" }).success).toBe(false);
+  });
+});
+
+describe("notification dead-letter contracts", () => {
+  it("accepts delivery IDs with optional enqueue tokens", () => {
+    expect(notificationDeadLetterResultSchema.safeParse({
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+    }).success).toBe(true);
+    expect(notificationDeadLetterResultSchema.safeParse({
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+    }).success).toBe(true);
+  });
+  it("rejects malformed dead-letter identities", () => {
+    expect(notificationDeadLetterResultSchema.safeParse({ deliveryId: "not-a-uuid" }).success).toBe(false);
+    expect(notificationDeadLetterResultSchema.safeParse({
+      deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      enqueueToken: "not-a-uuid",
+    }).success).toBe(false);
   });
 });
 

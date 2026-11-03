@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { escapeIdentifier, isValidNotificationMessage, toRow, writeToClickHouse } from "./index";
+import { buildUptimeDeadLetterResult, escapeIdentifier, isValidNotificationMessage, toRow, writeToClickHouse } from "./index";
 
 const message = {
   schemaVersion: 1 as const,
@@ -68,6 +68,32 @@ describe("ClickHouse telemetry adapter", () => {
     await expect(writeToClickHouse({
       CLICKHOUSE_URL: "https://clickhouse.example",
     }, [{ ...message, events: [{ type: "event", name: "signup" }] }])).rejects.toThrow("503");
+  });
+});
+
+describe("uptime dead-letter results", () => {
+  it("creates a terminal down result with a stable check ID", () => {
+    const result = buildUptimeDeadLetterResult({
+      schemaVersion: 1,
+      type: "uptime.probe",
+      checkId: "550e8400-e29b-41d4-a716-446655440000",
+      monitorId: "monitor-a",
+      organizationId: "org-a",
+      projectId: "project-a",
+      url: "https://status.example.com",
+      method: "GET",
+      timeoutMs: 10000,
+      expectedStatusCode: 200,
+    }, "2026-11-03T14:00:00.000Z");
+    expect(result).toMatchObject({
+      checkId: "550e8400-e29b-41d4-a716-446655440000",
+      monitorId: "monitor-a",
+      status: "down",
+      statusCode: null,
+      responseTimeMs: null,
+      errorCode: "network_error",
+      checkedAt: "2026-11-03T14:00:00.000Z",
+    });
   });
 });
 

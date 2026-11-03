@@ -7,6 +7,7 @@ import {
   webhookVerificationResultSchema,
   verifyNotificationChannelSchema,
   notificationDeliveryResultSchema,
+  notificationDeadLetterResultSchema,
   createAlertRuleSchema,
   updateAlertRuleSchema,
   createEnvironmentSchema,
@@ -1155,6 +1156,54 @@ app.post("/internal/notification-delivery-results", async (context) => {
   });
   if (!accepted.accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
   return context.json({ data: { accepted: true, active: accepted.active } }, 202);
+});
+
+app.post("/internal/notification-dead-letter-results", async (context) => {
+  const secret = context.env.NOTIFICATION_DELIVERY_SECRET;
+  const supplied = context.req.header("x-jerico-notification-secret") ?? "";
+  if (!secret || secret.length < 32) return context.json({ error: { code: "NOTIFICATION_CALLBACK_UNAVAILABLE", message: "Notification callback is not configured." } }, 503);
+  if (!constantTimeEqual(secret, supplied)) return context.json({ error: { code: "UNAUTHORIZED", message: "Invalid internal credential." } }, 401);
+  let body: unknown;
+  try { body = await readBoundedJson(context.req.raw, 2048); }
+  catch (error) {
+    const tooLarge = error instanceof RangeError;
+    return context.json({ error: { code: tooLarge ? "PAYLOAD_TOO_LARGE" : "INVALID_JSON", message: "The dead-letter result payload is invalid." } }, tooLarge ? 413 : 400);
+  }
+  const parsed = notificationDeadLetterResultSchema.safeParse(body);
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The dead-letter result is invalid." } }, 400);
+  const result = parsed.data;
+  const outcome = await withDatabase(context.env, async (database) => {
+    const [updated] = await database.update(notificationDeliveries).set({
+      status: "failed",
+      lastErrorCode: "queue_retry_exhausted",
+      nextEnqueueAt: null,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(notificationDeliveries.id, result.deliveryId),
+      result.enqueueToken
+        ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken)
+        : isNull(notificationDeliveries.activeEnqueueToken),
+      ne(notificationDeliveries.status, "sent"),
+    )).returning({ id: notificationDeliveries.id });
+    if (updated) return { found: true, accepted: true, stale: false };
+
+    const [existing] = await database.select({
+      id: notificationDeliveries.id,
+      status: notificationDeliveries.status,
+      activeEnqueueToken: notificationDeliveries.activeEnqueueToken,
+      lastErrorCode: notificationDeliveries.lastErrorCode,
+    }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+    if (!existing) return { found: false, accepted: true, stale: true };
+    if (existing.status === "sent") return { found: true, accepted: true, stale: true };
+    if (result.enqueueToken && existing.activeEnqueueToken !== result.enqueueToken) return { found: true, accepted: true, stale: true };
+    if (!result.enqueueToken && existing.activeEnqueueToken !== null) return { found: true, accepted: true, stale: true };
+    if (existing.status === "failed" && existing.lastErrorCode === "queue_retry_exhausted") {
+      return { found: true, accepted: true, stale: true };
+    }
+    return { found: true, accepted: false, stale: false };
+  });
+  if (!outcome.accepted) return context.json({ error: { code: "CALLBACK_CONFLICT", message: "The notification delivery could not be finalized." } }, 409);
+  return context.json({ data: { accepted: true, stale: outcome.stale } }, 202);
 });
 
 app.post("/internal/uptime-results", async (context) => {
