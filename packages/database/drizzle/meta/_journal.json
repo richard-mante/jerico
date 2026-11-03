@@ -92,6 +92,13 @@
       "when": 1793704200000,
       "tag": "0012_notification_delivery_enqueued_at",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793704500000,
+      "tag": "0012_notification_outbox_enqueue_leases",
+      "breakpoints": true
     }
   ]
 }
