@@ -8,7 +8,7 @@ import {
   createProductSchema,
   createProjectSchema,
 } from "@jerico/contracts";
-import { environments, member, products, projectIngestionKeys, projects } from "@jerico/database/schema";
+import { environments, member, products, projectErrorGroupStates, projectIngestionKeys, projects } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
@@ -226,7 +226,7 @@ app.get("/api/v1/projects/:projectId/telemetry/logs", (context) => listProjectTe
 app.get("/api/v1/projects/:projectId/telemetry/metrics", (context) => listProjectTelemetry(context, "metric"));
 app.get("/api/v1/projects/:projectId/telemetry/spans", (context) => listProjectTelemetry(context, "span"));
 
-app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) => withOrganization(context, async (database, organizationId) => {
+app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) => withOrganization(context, async (database, organizationId, role) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
@@ -243,8 +243,12 @@ app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) =
   const limit = parseQueryLimit(context.req.query("limit"));
   if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
   try {
-    const data = await queryTelemetryErrorGroups(context.env, { organizationId, projectId, environmentId, ...range, limit });
-    return context.json({ data, filters: { ...range, environmentId: environmentId ?? null }, limit });
+    const groups = await queryTelemetryErrorGroups(context.env, { organizationId, projectId, environmentId, ...range, limit });
+    const states = await database.select({ fingerprint: projectErrorGroupStates.fingerprint, status: projectErrorGroupStates.status })
+      .from(projectErrorGroupStates).where(and(eq(projectErrorGroupStates.organizationId, organizationId), eq(projectErrorGroupStates.projectId, projectId)));
+    const stateByFingerprint = new Map(states.map((state) => [state.fingerprint, state.status]));
+    const data = groups.map((group) => ({ ...group, status: stateByFingerprint.get(group.fingerprint) ?? "open" }));
+    return context.json({ data, canManage: canManageOrganizationResources(role), filters: { ...range, environmentId: environmentId ?? null }, limit });
   } catch (error) {
     console.error("Jerico telemetry error-group query failed", {
       requestId: context.get("requestId"),
@@ -255,6 +259,32 @@ app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) =
   }
 }));
 
+app.post("/api/v1/projects/:projectId/telemetry/errors/groups/:fingerprint/status", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can change error group status." } }, 403);
+  const projectId = context.req.param("projectId");
+  const fingerprint = context.req.param("fingerprint");
+  if (!/^[0-9]{1,20}$/.test(fingerprint)) return context.json({ error: { code: "INVALID_FINGERPRINT", message: "The error group fingerprint is invalid." } }, 400);
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const body = await context.req.json().catch(() => null) as { status?: unknown } | null;
+  const allowedStatuses = ["open", "resolved", "ignored"] as const;
+  if (!body || typeof body.status !== "string" || !allowedStatuses.includes(body.status as typeof allowedStatuses[number])) {
+    return context.json({ error: { code: "INVALID_ERROR_GROUP_STATUS", message: "Status must be open, resolved, or ignored." } }, 400);
+  }
+  const status = body.status as typeof allowedStatuses[number];
+  try {
+    await database.insert(projectErrorGroupStates).values({ organizationId, projectId, fingerprint, status, updatedBy: userId, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [projectErrorGroupStates.projectId, projectErrorGroupStates.fingerprint],
+        set: { organizationId, status, updatedBy: userId, updatedAt: new Date() },
+      });
+    return context.json({ data: { fingerprint, status } });
+  } catch (error) {
+    console.error("Jerico error group status update failed", { requestId: context.get("requestId"), projectId, error: error instanceof Error ? error.message : String(error) });
+    return context.json({ error: { code: "ERROR_GROUP_UPDATE_FAILED", message: "Error group status could not be updated." } }, 502);
+  }
+}));
 app.get("/api/v1/projects/:projectId/telemetry/metrics/series", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)

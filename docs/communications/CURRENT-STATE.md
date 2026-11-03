@@ -208,3 +208,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-event-series` adds tenant-scoped event count aggregation at adaptive 1/15/60/360-minute intervals and SVG charts for the top eight event names.
 - The Events tab shows time-series charts plus the catalogue and latest-event details. Counts can temporarily include duplicate queue deliveries.
 - PR #19 is the event trend visualization follow-up. Validation remains outstanding.
+
+
+### Phase 4 error group lifecycle (PR #20)
+
+- PR #19 merged event-volume time-series charts into `main` (merge commit `cd05481b93f5d63425f91c87a5a5bbe6b816fec2`).
+- Branch `feat/phase-4-error-lifecycle` adds a PostgreSQL state table for project/fingerprint status (`open`, `resolved`, `ignored`), merges state into grouped-error responses, and adds owner/admin-only status updates.
+- Members can read status but cannot change it. No assignment, comments, notifications, or audit trail are included.
+- PR #20 is the error lifecycle follow-up. Migration `0004_project_error_group_states.sql` and runtime integration are not validated.
