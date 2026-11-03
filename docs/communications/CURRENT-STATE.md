@@ -61,7 +61,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 
 **No successful end-to-end validation is confirmed for the repository's Phase 0–5 work.** Tests have been authored, but do not assume they pass.
 
-- CI jobs have repeatedly failed before runner allocation. Latest run #195 (push to main) and PR run #194 both failed before runner allocation. Run #195's job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. This is an Actions runner allocation/startup failure, not evidence that source checks passed or failed. This is an Actions runner startup/allocation failure, not evidence that source checks passed or failed.
+- CI jobs have repeatedly failed before runner allocation. Latest run #195 (push to main) and PR run #194 both failed before runner allocation. Run #195's job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. This is an Actions runner allocation/startup failure, not evidence that source checks passed or failed.
 - No completed workspace dependency install, lint, typecheck, unit-test run, or full build has been verified.
 - No disposable PostgreSQL migration run or Better Auth/tenant integration test has been verified.
 - ClickHouse integration tests are gated and have not been observed passing against a real service.
