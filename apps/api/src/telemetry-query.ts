@@ -119,7 +119,7 @@ export async function queryTelemetry<T>(
     filters.push("(timestamp, event_id) < (parseDateTime64BestEffort({cursorTimestamp:String}, 3, 'UTC'), {cursorEventId:String})");
   }
 
-  const query = `SELECT event_id AS eventId, formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS timestamp, environment_id AS environmentId, event_type AS eventType, name, message, value, attributes FROM ${database}.${table} WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC, event_id DESC LIMIT {limit:UInt16} FORMAT JSON`;
+  const query = `SELECT event_id AS eventId, formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS timestamp, environment_id AS environmentId, event_type AS eventType, name, message, value, attributes FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC, event_id DESC LIMIT {limit:UInt16} FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   const params: Record<string, string> = {
@@ -179,7 +179,7 @@ export async function queryTelemetryOverview(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT count() AS total, countIf(event_type = 'event') AS events, countIf(event_type = 'error') AS errors, countIf(event_type = 'log') AS logs, countIf(event_type = 'metric') AS metrics, countIf(event_type = 'span') AS spans, if(count() = 0, NULL, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC')) AS lastEventAt FROM ${database}.${table} WHERE ${filters.join(" AND ")} FORMAT JSON`;
+  const query = `SELECT count() AS total, countIf(event_type = 'event') AS events, countIf(event_type = 'error') AS errors, countIf(event_type = 'log') AS logs, countIf(event_type = 'metric') AS metrics, countIf(event_type = 'span') AS spans, if(count() = 0, NULL, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC')) AS lastEventAt FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -236,7 +236,7 @@ export async function queryTelemetryErrorGroups(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT toString(cityHash64(name, message)) AS fingerprint, name, argMax(message, (timestamp, event_id)) AS latestMessage, count() AS occurrences, formatDateTime(min(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS firstSeen, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId, JSONExtractString(argMax(attributes, (timestamp, event_id)), 'stack') AS latestStack FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY fingerprint, name ORDER BY max(timestamp) DESC LIMIT {limit:UInt16} FORMAT JSON`;
+  const query = `SELECT toString(cityHash64(name, message)) AS fingerprint, name, argMax(message, (timestamp, event_id)) AS latestMessage, count() AS occurrences, formatDateTime(min(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS firstSeen, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId, JSONExtractString(argMax(attributes, (timestamp, event_id)), 'stack') AS latestStack FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} GROUP BY fingerprint, name ORDER BY max(timestamp) DESC LIMIT {limit:UInt16} FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -285,7 +285,7 @@ export async function queryTelemetryMetricSeries(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, avg(value) AS average, min(value) AS minimum, max(value) AS maximum, quantileTDigest(0.50)(value) AS p50, quantileTDigest(0.75)(value) AS p75, quantileTDigest(0.95)(value) AS p95, count() AS samples, argMax(JSONExtractString(attributes, 'unit'), timestamp) AS unit, argMax(JSONExtractString(attributes, 'rating'), timestamp) AS rating FROM ${database}.${table} WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
+  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, avg(value) AS average, min(value) AS minimum, max(value) AS maximum, quantileTDigest(0.50)(value) AS p50, quantileTDigest(0.75)(value) AS p75, quantileTDigest(0.95)(value) AS p95, count() AS samples, argMax(JSONExtractString(attributes, 'unit'), timestamp) AS unit, argMax(JSONExtractString(attributes, 'rating'), timestamp) AS rating FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -340,7 +340,7 @@ export async function queryTelemetryEventCatalogue(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT name, count() AS occurrences, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId, argMax(message, (timestamp, event_id)) AS latestMessage, substring(argMax(attributes, (timestamp, event_id)), 1, 4096) AS latestAttributes FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY occurrences DESC, max(timestamp) DESC LIMIT 100 FORMAT JSON`;
+  const query = `SELECT name, count() AS occurrences, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId, argMax(message, (timestamp, event_id)) AS latestMessage, substring(argMax(attributes, (timestamp, event_id)), 1, 4096) AS latestAttributes FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY occurrences DESC, max(timestamp) DESC LIMIT 100 FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -385,7 +385,7 @@ export async function queryTelemetryEventSeries(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, count() AS occurrences FROM ${database}.${table} WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
+  const query = `SELECT name, formatDateTime(toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE), '%Y-%m-%dT%H:%i:%S.000Z', 'UTC') AS timestamp, count() AS occurrences FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} AND name IN (SELECT name FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} GROUP BY name ORDER BY count() DESC LIMIT 8) GROUP BY name, toStartOfInterval(timestamp, INTERVAL ${input.bucketMinutes} MINUTE) ORDER BY name ASC, timestamp ASC LIMIT 1200 FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -439,7 +439,7 @@ export async function queryTelemetryRoutePerformance(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT JSONExtractString(attributes, 'path') AS path, name, count() AS samples, quantileTDigest(0.75)(value) AS p75, quantileTDigest(0.95)(value) AS p95, argMax(JSONExtractString(attributes, 'unit'), timestamp) AS unit, argMax(JSONExtractString(attributes, 'rating'), timestamp) AS rating FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY path, name ORDER BY samples DESC, path ASC LIMIT 100 FORMAT JSON`;
+  const query = `SELECT JSONExtractString(attributes, 'path') AS path, name, count() AS samples, quantileTDigest(0.75)(value) AS p75, quantileTDigest(0.95)(value) AS p95, argMax(JSONExtractString(attributes, 'unit'), timestamp) AS unit, argMax(JSONExtractString(attributes, 'rating'), timestamp) AS rating FROM ${database}.${table} FINAL WHERE ${filters.join(" AND ")} GROUP BY path, name ORDER BY samples DESC, path ASC LIMIT 100 FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -482,7 +482,7 @@ export async function queryTelemetryErrorCount(
   if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
   const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
   const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
-  const query = `SELECT count() AS total FROM ${database}.${table} WHERE organization_id = {organizationId:String} AND project_id = {projectId:String} AND event_type = 'error' AND timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC') AND timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC') FORMAT JSON`;
+  const query = `SELECT count() AS total FROM ${database}.${table} FINAL WHERE organization_id = {organizationId:String} AND project_id = {projectId:String} AND event_type = 'error' AND timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC') AND timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC') FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
