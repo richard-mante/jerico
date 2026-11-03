@@ -148,3 +148,6 @@
 
 
 - CI follow-up for PR #6: run #82 (ID `41562084344`) completed as failure before runner assignment. The job response again reports `steps: null` and no downloadable logs. This is not evidence of a source-level failure, and no SDK checks have run.
+
+
+- Added documentation-only Next.js App Router and Express/Node integration examples under `docs/examples/`. The examples are not yet executed in sample applications; the Next.js page-view example explicitly avoids double-counting the initial route.
