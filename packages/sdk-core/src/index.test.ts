@@ -50,4 +50,32 @@ describe("JericoClient", () => {
     expect(events[1].attributes.durationMs).toBe(1200);
     await client.close();
   });
+  it("creates correlated parent and child spans with measured durations", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }));
+    const client = new JericoClient({ apiKey: "jk_sec_test", endpoint: "https://ingest.example.test", fetch: fetcher, flushIntervalMs: 0 });
+    const parent = client.startSpan("http.request", { method: "GET" });
+    const childContext = await client.withSpan("database.query", () => "ok", { table: "users" }, parent.context);
+    expect(parent.end({ status: "ok" })).toBe(true);
+    expect(parent.end()).toBe(false);
+    await client.flush();
+    const events = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)).events;
+    expect(events).toHaveLength(2);
+    expect(events[0].attributes.traceId).toBe(parent.context.traceId);
+    expect(events[0].attributes.parentSpanId).toBe(parent.context.spanId);
+    expect(events[0].attributes.spanId).toBe(childContext.spanId);
+    expect(events[0].value).toEqual(expect.any(Number));
+    expect(events[1].attributes.spanId).toBe(parent.context.spanId);
+    expect(events[1].attributes.traceId).toBe(parent.context.traceId);
+    await client.close();
+  });
+
+  it("marks a span as failed when a traced operation throws", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }));
+    const client = new JericoClient({ apiKey: "jk_sec_test", endpoint: "https://ingest.example.test", fetch: fetcher, flushIntervalMs: 0 });
+    await expect(client.withSpan("job.run", () => { throw new Error("failed"); })).rejects.toThrow("failed");
+    await client.flush();
+    const event = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)).events[0];
+    expect(event.attributes.status).toBe("error");
+    await client.close();
+  });
 });
