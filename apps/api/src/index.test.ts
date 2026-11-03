@@ -16,6 +16,7 @@ vi.mock("./database", () => ({
     select: mocks.select,
     insert: mocks.insert,
     update: mocks.update,
+    transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback({ select: mocks.select, insert: mocks.insert, update: mocks.update }),
   }),
 }));
 
@@ -112,6 +113,65 @@ describe("project observability route authorization", () => {
     }, { UPTIME_RESULTS_SECRET: "s".repeat(40) });
     expect(response.status).toBe(401);
     expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("updates monitor status only for the currently active check ID", async () => {
+    const checkId = "550e8400-e29b-41d4-a716-446655440000";
+    const monitorId = "550e8400-e29b-41d4-a716-446655440001";
+    const organizationId = "550e8400-e29b-41d4-a716-446655440002";
+    const projectId = "550e8400-e29b-41d4-a716-446655440003";
+    setSelectResults([{ id: monitorId, enabled: true, activeCheckId: checkId }]);
+    mocks.insert.mockReturnValue({
+      values: () => ({
+        onConflictDoNothing: () => ({
+          returning: async () => [{ id: checkId }],
+        }),
+      }),
+    });
+    const set = vi.fn().mockReturnValue({ where: async () => [{ id: monitorId }] });
+    mocks.update.mockReturnValue({ set });
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/uptime-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-uptime-secret": secret },
+      body: JSON.stringify({
+        checkId, monitorId, organizationId, projectId,
+        status: "up", statusCode: 200, responseTimeMs: 25,
+        checkedAt: "2026-11-03T12:00:00.000Z",
+      }),
+    }, { UPTIME_RESULTS_SECRET: secret });
+    expect(response.status).toBe(202);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      lastStatus: "up",
+      activeCheckId: null,
+    }));
+  });
+
+  it("stores a stale probe result without changing the newer active monitor state", async () => {
+    const staleCheckId = "550e8400-e29b-41d4-a716-446655440000";
+    const currentCheckId = "550e8400-e29b-41d4-a716-446655440004";
+    const monitorId = "550e8400-e29b-41d4-a716-446655440001";
+    const organizationId = "550e8400-e29b-41d4-a716-446655440002";
+    const projectId = "550e8400-e29b-41d4-a716-446655440003";
+    setSelectResults([{ id: monitorId, enabled: true, activeCheckId: currentCheckId }]);
+    mocks.insert.mockReturnValue({
+      values: () => ({
+        onConflictDoNothing: () => ({
+          returning: async () => [{ id: staleCheckId }],
+        }),
+      }),
+    });
+    const response = await app.request("/internal/uptime-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-uptime-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        checkId: staleCheckId, monitorId, organizationId, projectId,
+        status: "down", statusCode: null, responseTimeMs: null,
+        errorCode: "network_error", checkedAt: "2026-11-03T12:01:00.000Z",
+      }),
+    }, { UPTIME_RESULTS_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("validates internal uptime result payloads before touching the database", async () => {
