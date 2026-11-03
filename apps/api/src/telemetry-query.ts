@@ -402,3 +402,65 @@ export async function queryTelemetryEventSeries(
   }
   return Array.from(grouped, ([name, points]) => ({ name, points }));
 }
+
+export type TelemetryRouteMetric = {
+  name: string;
+  samples: number;
+  p75: number;
+  p95: number;
+  unit: string;
+  rating: string;
+};
+export type TelemetryRoutePerformance = { path: string; metrics: TelemetryRouteMetric[] };
+
+export async function queryTelemetryRoutePerformance(
+  env: TelemetryQueryBindings,
+  input: Omit<TelemetryQuery, "limit" | "cursor" | "eventType">,
+): Promise<TelemetryRoutePerformance[]> {
+  if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
+  const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
+  const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
+  const filters = [
+    "organization_id = {organizationId:String}",
+    "project_id = {projectId:String}",
+    "event_type = 'metric'",
+    "name IN ('web.vitals.lcp', 'web.vitals.cls', 'web.vitals.inp', 'web.vitals.fcp', 'web.vitals.ttfb')",
+    "JSONExtractString(attributes, 'path') != ''",
+    "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+    "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
+  ];
+  if (input.environmentId) filters.push("environment_id = {environmentId:String}");
+  const query = `SELECT JSONExtractString(attributes, 'path') AS path, name, count() AS samples, quantileTDigest(0.75)(value) AS p75, quantileTDigest(0.95)(value) AS p95, argMax(JSONExtractString(attributes, 'unit'), timestamp) AS unit, argMax(JSONExtractString(attributes, 'rating'), timestamp) AS rating FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY path, name ORDER BY samples DESC, path ASC LIMIT 100 FORMAT JSON`;
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("param_organizationId", input.organizationId);
+  url.searchParams.set("param_projectId", input.projectId);
+  url.searchParams.set("param_from", input.from);
+  url.searchParams.set("param_to", input.to);
+  if (input.environmentId) url.searchParams.set("param_environmentId", input.environmentId);
+  const headers = new Headers();
+  if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
+  else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
+    headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`ClickHouse route-performance query failed with status ${response.status}.`);
+  const result = await response.json() as { data?: Array<Record<string, unknown>> };
+  if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid route-performance result.");
+  const grouped = new Map<string, TelemetryRouteMetric[]>();
+  for (const row of result.data) {
+    const path = String(row.path ?? "");
+    if (!path) continue;
+    const metrics = grouped.get(path) ?? [];
+    metrics.push({
+      name: String(row.name),
+      samples: Number(row.samples ?? 0),
+      p75: Number(row.p75 ?? 0),
+      p95: Number(row.p95 ?? 0),
+      unit: String(row.unit ?? ""),
+      rating: String(row.rating ?? ""),
+    });
+    grouped.set(path, metrics);
+  }
+  return Array.from(grouped, ([path, metrics]) => ({ path, metrics }));
+}
