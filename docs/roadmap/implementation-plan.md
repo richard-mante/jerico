@@ -36,7 +36,7 @@
 
 ## Phase 2 — Credentials and telemetry ingestion
 
-**Current milestones:** [Phase 2A — Project Ingestion Credentials](phase-2-credentials.md) and [Phase 2B — Authenticated Telemetry Ingestion](phase-2-ingestion.md) are implemented on the draft PR branch; validation, infrastructure provisioning, and review are pending.
+**Current milestones:** [Phase 2A — Project Ingestion Credentials](phase-2-credentials.md) and [Phase 2B — Authenticated Telemetry Ingestion](phase-2-ingestion.md) are merged. Event-level queue-redelivery deduplication is also merged. Validation and infrastructure provisioning remain pending.
 - [ ] Generate project/environment-scoped ingestion keys.
 - [ ] Store credential hashes only; show raw key once; support revocation.
 - [ ] Separate public ingestion credentials from server-only secrets.
@@ -50,9 +50,9 @@
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until the database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
 
 ## Phase 3 — TypeScript SDKs
-- [ ] Build shared SDK core: batching, transport, bounded retries, flush, sampling, and redaction.
-- [ ] Browser SDK: custom events, anonymous/session IDs, identify/reset, navigation, JS errors, unhandled rejections, and Core Web Vitals.
-- [ ] Node SDK: custom events, errors, structured logs, custom metrics, explicit flush, and graceful shutdown.
+- [x] Build shared SDK core: bounded in-memory batching, transport, explicit flush, and error reporting. Automatic retries are intentionally disabled until server-side request idempotency is available.
+- [ ] Browser SDK: custom events, anonymous/session IDs, identify/reset, navigation, JS errors, unhandled rejections, and Core Web Vitals. (Initial package supports custom events, page views, and JS error/unhandled-rejection capture; session identity, identify/reset, and Core Web Vitals remain.)
+- [ ] Node SDK: custom events, errors, structured logs, custom metrics, explicit flush, and graceful shutdown. (Initial package supports custom events, errors, logs, metrics, spans, flush, and close; production shutdown guidance and broader instrumentation remain.)
 - [ ] Ensure SDK failures never crash the host application.
 - [ ] Add Next.js, Astro, React, and Express examples.
 - [ ] Add installation, configuration, privacy, redaction, and troubleshooting documentation.
