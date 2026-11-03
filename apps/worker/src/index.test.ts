@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { escapeIdentifier, toRow, writeToClickHouse } from "./index";
+import { escapeIdentifier, isValidNotificationMessage, toRow, writeToClickHouse } from "./index";
 
 const message = {
   schemaVersion: 1 as const,
@@ -66,5 +66,24 @@ describe("ClickHouse telemetry adapter", () => {
     await expect(writeToClickHouse({
       CLICKHOUSE_URL: "https://clickhouse.example",
     }, [{ ...message, events: [{ type: "event", name: "signup" }] }])).rejects.toThrow("503");
+  });
+});
+
+describe("notification queue contract", () => {
+  it("accepts bounded email delivery messages", () => {
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
+    })).toBe(true);
+  });
+  it("rejects unsafe or oversized queue payloads", () => {
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.email", deliveryId: "not-a-uuid",
+      to: "ops@example.com", subject: "Incident opened", text: "An incident needs attention.",
+    })).toBe(false);
+    expect(isValidNotificationMessage({
+      schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+      to: "not-an-email", subject: "Incident opened", text: "An incident needs attention.",
+    })).toBe(false);
   });
 });
