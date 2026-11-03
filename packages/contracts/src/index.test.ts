@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
+import { createAlertRuleSchema, updateAlertRuleSchema, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
 
 describe("resource request contracts", () => {
   it("accepts a standalone project without a product", () => {
@@ -68,5 +68,28 @@ describe("internal uptime probe result contract", () => {
       status: "down", statusCode: null, responseTimeMs: null, errorCode: "internal database password leaked",
       checkedAt: "2026-11-03T05:00:00.000Z",
     }).success).toBe(false);
+  });
+});
+
+
+describe("alert rule contracts", () => {
+  it("applies bounded defaults for an error-count alert", () => {
+    expect(createAlertRuleSchema.parse({ name: "High error volume", metric: "error_count", threshold: 20 })).toMatchObject({
+      comparison: "gte", windowSeconds: 300, consecutiveBreaches: 1, enabled: true,
+    });
+  });
+  it("accepts uptime and response-time rules", () => {
+    expect(createAlertRuleSchema.safeParse({ name: "Failed checks", metric: "uptime_down", threshold: 2 }).success).toBe(true);
+    expect(createAlertRuleSchema.safeParse({ name: "Slow responses", metric: "response_time", threshold: 1500, windowSeconds: 900 }).success).toBe(true);
+  });
+  it("rejects unsupported metrics and unbounded thresholds", () => {
+    expect(createAlertRuleSchema.safeParse({ name: "Unknown", metric: "cpu", threshold: 10 }).success).toBe(false);
+    expect(createAlertRuleSchema.safeParse({ name: "Too many", metric: "error_count", threshold: 0 }).success).toBe(false);
+    expect(createAlertRuleSchema.safeParse({ name: "Too frequent", metric: "error_count", threshold: 10, windowSeconds: 10 }).success).toBe(false);
+    expect(createAlertRuleSchema.safeParse({ name: "Too many confirmations", metric: "error_count", threshold: 10, consecutiveBreaches: 11 }).success).toBe(false);
+  });
+  it("requires a non-empty partial update", () => {
+    expect(updateAlertRuleSchema.safeParse({}).success).toBe(false);
+    expect(updateAlertRuleSchema.safeParse({ enabled: false }).success).toBe(true);
   });
 });
