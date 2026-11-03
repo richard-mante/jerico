@@ -110,7 +110,8 @@ describe("email notification contracts", () => {
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", attemptId: "550e8400-e29b-41d4-a716-446655440001", enqueueAttempt: 1, queueAttempt: 1, status: "attempting" }).success).toBe(true);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", attemptId: "550e8400-e29b-41d4-a716-446655440001", enqueueAttempt: 1, queueAttempt: 1, status: "sent", providerMessageId: "msg_123" }).success).toBe(true);
     expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", attemptId: "550e8400-e29b-41d4-a716-446655440001", enqueueAttempt: 1, queueAttempt: 1, status: "failed" }).success).toBe(false);
-    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", attemptId: "550e8400-e29b-41d4-a716-446655440001", enqueueAttempt: 1, queueAttempt: 1, status: "failed", errorCode: "private endpoint response" }).success).toBe(false);\n    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "attempting" }).success).toBe(false);
+    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", attemptId: "550e8400-e29b-41d4-a716-446655440001", enqueueAttempt: 1, queueAttempt: 1, status: "failed", errorCode: "private endpoint response" }).success).toBe(false);
+    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "attempting" }).success).toBe(false);
   });
 });
 
