@@ -401,3 +401,11 @@
 - Added Worker queue consumer, retry handling, and `jerico-uptime-probes-dlq` configuration.
 - Added a shared-secret internal result callback with constant-time comparison, strict schema validation, a bounded 4 KiB body, transactional check history insertion, and check-ID idempotency.
 - Added unit tests for target validation/redirects, contract tests for internal results, API callback authentication tests, and scheduler missing-binding test. No tests, lint, typecheck, build, migration, Cloudflare provisioning, or deployed probe run was executed.
+
+
+### Phase 5B follow-up — egress guard and retention
+
+- Enabled Workerd `global_fetch_strictly_public` on the probe Worker and required `PROBE_WORKER_HOST` so the Worker cannot probe itself. No VPC binding or custom route is configured.
+- Added a checked-at index and daily 30-day check-history retention.
+- Expanded internal result response-time bounds to tolerate scheduler delay.
+- Cloudflare queue/secret provisioning and deployed Workerd egress verification remain outstanding.
