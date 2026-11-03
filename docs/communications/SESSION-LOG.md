@@ -122,3 +122,35 @@
 - Review the branch diff and open a focused PR for event-level deduplication.
 - Validate ClickHouse `ReplacingMergeTree` behavior and query semantics against a real ClickHouse instance; run the workspace checks when a local environment is available.
 - Continue with SDK design only after ingestion contracts and runtime validation are stable.
+
+
+## 2026-11-03 — Phase 3 TypeScript SDK foundation
+
+- Merged PR #5 to `main` as `b6515688db8dc9e688e70b52635019848ed0967c`. The merged ingestion pipeline now assigns event IDs before queue publication and ClickHouse uses `ReplacingMergeTree` to eventually collapse queue-redelivery duplicates.
+- Started `feat/phase-3-typescript-sdk-foundation`.
+- Added `@jerico/sdk-core` with bounded in-memory buffering, batch transport, explicit flush/close, custom events, errors, logs, metrics, spans, and transport error reporting.
+- Added `@jerico/sdk-browser` with public-key enforcement, page-view capture (pathname/title only), window error and unhandled promise rejection capture. It blocks logs/metrics/spans because public credentials are restricted to event/error types by the ingest API.
+- Added `@jerico/sdk-node` with secret-key enforcement, telemetry methods, and opt-in unhandled rejection capture.
+- Added package-level unit tests and initial SDK usage/privacy documentation. SDK packages require an explicit endpoint; no unverified hosted ingest domain is assumed.
+- Automatic SDK retries are deliberately disabled: the API does not yet provide request-level idempotency, so retrying an ambiguous request could duplicate accepted telemetry. Failed batches are retained in memory for explicit flush; the SDK is not a durable local spool.
+- No dependency installation, lockfile generation, lint, typecheck, tests, builds, or runtime integration tests were run. GitHub Actions runner allocation remains a blocker, so package code is not yet verified.
+- Follow-up: inspect SDK diff, fix any local validation failures when the workspace can be installed, add browser session/identify/reset and Core Web Vitals, and provide Next.js/Astro/React/Express examples.
+
+### Next
+- Validate the SDK packages with a real pnpm install, lint, typecheck, tests, and builds.
+- Add integration coverage against the ingestion Worker and a local queue/ClickHouse stack.
+- Add request-level idempotency before introducing automatic retries.
+
+
+- Follow-up Phase 3 hardening: added client-side payload bounds matching the ingestion contract (event names, attribute keys/values, and messages); isolated user-supplied SDK error callbacks so they cannot crash the host application.
+- Added browser anonymous session IDs stored in `sessionStorage` with an in-memory fallback, plus explicit `identify()` and `reset()` APIs. User identity is never collected automatically.
+- Updated browser SDK and Phase 3 documentation. These additions are still unvalidated because package installation and automated checks have not run.
+
+
+- CI follow-up for PR #6: run #82 (ID `41562084344`) completed as failure before runner assignment. The job response again reports `steps: null` and no downloadable logs. This is not evidence of a source-level failure, and no SDK checks have run.
+
+
+- Added documentation-only Next.js App Router and Express/Node integration examples under `docs/examples/`. The examples are not yet executed in sample applications; the Next.js page-view example explicitly avoids double-counting the initial route.
+
+
+- After adding the Next.js and Express examples, latest PR #6 CI run #94 (ID `41562241700`) also failed before runner assignment; GitHub returned `steps: null` and no logs. No lint, typecheck, tests, or build steps executed.

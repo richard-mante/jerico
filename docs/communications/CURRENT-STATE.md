@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Current work branch:** `feat/phase-2c-queue-deduplication`  
-**Current milestone:** Phase 2C — validation and infrastructure readiness
+**Current work branch:** `feat/phase-3-typescript-sdk-foundation`  
+**Current milestone:** Phase 3 — TypeScript SDK foundation (validation pending); Phase 2C infrastructure validation remains outstanding
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
@@ -51,11 +51,13 @@ Includes:
 - Per-project daily event quota (default 100,000 events per UTC day) with transactional reservation and refund when queue publication fails.
 - Cloudflare Queue producer/consumer, ClickHouse HTTP JSONEachRow writer, retry/DLQ configuration, and initial ClickHouse retention schema.
 
-## Phase 2C — Validation and infrastructure readiness (current)
+PR #5 merged to `main` as `b6515688db8dc9e688e70b52635019848ed0967c`. It assigns server-generated event IDs before queue publication and uses ClickHouse `ReplacingMergeTree` to mitigate duplicates from queue redelivery. This is eventual deduplication during background merges, not strict immediate uniqueness. Existing ClickHouse tables require a deliberate migration/rebuild; rerunning the initial `CREATE TABLE IF NOT EXISTS` will not change an existing table engine.
+
+## Phase 2C — Validation and infrastructure readiness (ongoing)
 
 **No automated checks are currently confirmed passing.** The repository has no committed `pnpm-lock.yaml`; dependency installation, lint, typecheck, tests, builds, and PostgreSQL integration tests remain outstanding.
 
-The latest main-branch CI run after PR #3 merged is run #73 (ID `41559078138`). It failed within seconds. The job endpoint returned no runner assignment, no steps, and no logs (`steps: null`). Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
+The latest main-branch CI run before this SDK branch was run #73 (ID `41559078138`). The Phase 2C PR #5 CI run #78 (ID `41560761906`) and Phase 3 PR #6 latest CI run #94 (ID `41562241700`) both failed before runner assignment, with no steps or logs. Earlier runs show the same pattern. This is consistent with a hosted-runner allocation/startup failure, but the precise platform-side cause is unknown. It is not evidence that source checks passed or failed.
 
 Database migrations have not been applied to a disposable or production PostgreSQL instance. Cloudflare Hyperdrive, Queue, Rate Limiting bindings, and ClickHouse have not been provisioned or exercised end-to-end. No production deployment has been verified.
 
@@ -71,15 +73,24 @@ Database migrations have not been applied to a disposable or production PostgreS
 ### Known product gaps
 
 - Dashboard telemetry query APIs and observability views are not implemented.
-- TypeScript browser and Node SDKs are not implemented.
+- SDK foundation is in an unmerged Phase 3 branch; it is not validated or production-ready.
 - Alerts, notification channels, and full uptime monitoring are not implemented.
 - Monthly plan tiers, billing metering, adaptive backpressure, and configurable retention are not implemented.
 - A self-hosted durable queue/runtime adapter and Docker Compose deployment are not implemented. The current ingestion runtime is Cloudflare-specific; do not claim self-hosted ingestion support yet.
 
+## Phase 3 — TypeScript SDK foundation (current)
+
+Branch `feat/phase-3-typescript-sdk-foundation` introduces three workspace packages:
+- `@jerico/sdk-core`: bounded in-memory queue, batch transport, explicit flush/close, metrics/logs/spans/events/errors, and error reporting.
+- `@jerico/sdk-browser`: public-key-only browser client, anonymous session IDs, explicit identify/reset, page-view capture, window errors, and unhandled promise rejections.
+- `@jerico/sdk-node`: secret-key-only Node client, telemetry methods, and opt-in unhandled-rejection capture.
+
+The SDK requires an explicit ingestion endpoint; no hosted Jerico endpoint is assumed. Failed batches remain in memory for explicit flush. Automatic retries are intentionally disabled because the ingestion API does not yet support request-level idempotency and retrying ambiguous requests could duplicate accepted events. These packages are not yet validated by install/typecheck/tests/build and are not production-ready. Core Web Vitals, route-change instrumentation, OpenTelemetry integrations, framework examples, build artifacts, and published package release remain outstanding.
+
 ## Next milestones after Phase 2C
 
 1. Stabilize the ingestion pipeline and its contracts.
-2. Build the TypeScript browser and Node SDKs with integration examples.
+2. Complete and validate the TypeScript browser and Node SDKs, then add integration examples.
 3. Build dashboard query APIs and the Observability UI (events/errors/logs/metrics/traces).
 4. Add uptime checks, alert rules, and notification channels.
 5. Add usage metering/billing and production operational safeguards.
