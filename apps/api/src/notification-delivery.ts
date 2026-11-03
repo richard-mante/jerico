@@ -240,6 +240,13 @@ export async function retryFailedNotificationEnqueues(
       eq(notificationDeliveries.id, delivery.id),
       eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
       eligible,
+      sql`EXISTS (
+        SELECT 1 FROM "notification_channels"
+        WHERE "notification_channels"."id" = ${notificationDeliveries.channelId}
+          AND "notification_channels"."organization_id" = ${notificationDeliveries.organizationId}
+          AND "notification_channels"."enabled" = TRUE
+          AND "notification_channels"."verified_at" IS NOT NULL
+      )`,
     )).returning({
       id: notificationDeliveries.id,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
