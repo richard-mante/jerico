@@ -36,7 +36,7 @@ app.use("/api/*", cors({
 }));
 
 app.get("/", (context) => context.json({
-  name: "Jerico API", version: "v1", status: "phase-1",
+  name: "Jerico API", version: "v1", status: "phase-4-query-api",
   documentation: "https://github.com/richard-mante/jerico",
 }));
 app.get("/health", (context) => context.json({
