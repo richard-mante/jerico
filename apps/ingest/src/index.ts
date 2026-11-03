@@ -7,6 +7,7 @@ import { telemetryBatchSchema, type TelemetryEvent } from "@jerico/contracts";
 import { projectIngestionKeys, projectIngestionUsage, schema } from "@jerico/database/schema";
 import { hashPresentedCredential, readBearerCredential } from "./credentials";
 import { redactTelemetryEvent } from "./redaction";
+import { DailyQuotaExceeded, dailyEventLimit, secondsUntilUtcMidnight, utcUsageDate } from "./quota";
 
 const MAX_BODY_BYTES = 96 * 1024;
 const MAX_BATCH_EVENTS = 100;
@@ -98,37 +99,13 @@ async function withCredentialDatabase<T>(
   }
 }
 
-class DailyQuotaExceeded extends Error {
-  constructor(readonly retryAfter: number) {
-    super("The daily event quota has been reached.");
-    this.name = "DailyQuotaExceeded";
-  }
-}
-
-function utcUsageDate(now = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
-
-function secondsUntilUtcMidnight(now = new Date()): number {
-  const nextMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-  return Math.max(1, Math.ceil((nextMidnight - now.getTime()) / 1000));
-}
-
-function dailyEventLimit(env: Bindings): number {
-  const configured = Number(env.INGEST_DAILY_EVENT_LIMIT ?? 100000);
-  if (!Number.isSafeInteger(configured) || configured < 1) {
-    throw new Error("INGEST_DAILY_EVENT_LIMIT must be a positive safe integer.");
-  }
-  return configured;
-}
-
 async function reserveDailyQuota(
   env: Bindings,
   credentialId: string,
   usageDate: string,
   eventCount: number,
 ): Promise<void> {
-  const limit = dailyEventLimit(env);
+  const limit = dailyEventLimit(env.INGEST_DAILY_EVENT_LIMIT);
   await withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
     const [usage] = await transaction.insert(projectIngestionUsage).values({
       credentialId,
