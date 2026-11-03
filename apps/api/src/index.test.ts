@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
+  delete: vi.fn(),
 }));
 
 vi.mock("./auth", () => ({
@@ -16,7 +17,8 @@ vi.mock("./database", () => ({
     select: mocks.select,
     insert: mocks.insert,
     update: mocks.update,
-    transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback({ select: mocks.select, insert: mocks.insert, update: mocks.update }),
+    delete: mocks.delete,
+    transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback({ select: mocks.select, insert: mocks.insert, update: mocks.update, delete: mocks.delete }),
   }),
 }));
 
@@ -487,6 +489,42 @@ describe("notification dead-letter callbacks", () => {
   });
 });
 
+describe("notification channel deletion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getSession.mockResolvedValue({
+      user: { id: "user-a" },
+      session: { activeOrganizationId: "org-a" },
+    });
+    mocks.update.mockReset();
+    mocks.delete.mockReset();
+  });
+
+  it("invalidates non-sent deliveries in the same organization and preserves sent history", async () => {
+    setSelectResults([{ role: "owner" }]);
+    const updateSet = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) });
+    mocks.update.mockReturnValue({ set: updateSet });
+    const deleteWhere = vi.fn().mockReturnValue({
+      returning: async () => [{ id: "channel-a" }],
+    });
+    mocks.delete.mockReturnValue({ where: deleteWhere });
+
+    const response = await app.request("/api/v1/notification-channels/channel-a", {
+      method: "DELETE",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({
+      status: "failed",
+      lastErrorCode: "channel_unavailable",
+      nextEnqueueAt: null,
+      activeEnqueueToken: null,
+    }));
+    expect(deleteWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("notification delivery callback attempt fencing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -494,6 +532,10 @@ describe("notification delivery callback attempt fencing", () => {
   });
 
   it("records a new consumer attempt once with its enqueue token", async () => {
+    setSelectResults([
+      { channelId: "channel-a", organizationId: "org-a" },
+      { id: "channel-a" },
+    ]);
     const set = vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         returning: async () => [{ id: "delivery-a" }],
@@ -520,6 +562,17 @@ describe("notification delivery callback attempt fencing", () => {
 
 
   it("acknowledges duplicate attempting callbacks without incrementing again", async () => {
+    setSelectResults([
+      { channelId: "channel-a", organizationId: "org-a" },
+      { id: "channel-a" },
+      {
+        id: "delivery-a",
+        status: "queued",
+        activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        activeConsumerAttempt: 2,
+        lastErrorCode: null,
+      },
+    ]);
     mocks.update.mockReturnValue({
       set: () => ({
         where: () => ({
@@ -549,6 +602,10 @@ describe("notification delivery callback attempt fencing", () => {
   });
 
   it("increments cumulative attempts when a later enqueue generation starts at consumer attempt one", async () => {
+    setSelectResults([
+      { channelId: "channel-a", organizationId: "org-a" },
+      { id: "channel-a" },
+    ]);
     const set = vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         returning: async () => [{ id: "delivery-a" }],
@@ -573,6 +630,69 @@ describe("notification delivery callback attempt fencing", () => {
     // Cumulative provider attempts must be an atomic SQL increment, not the
     // per-enqueue consumer sequence (which restarts at one).
     expect(set.mock.calls[0]?.[0].attempts).toBeDefined();
+  });
+
+  it("skips a queued attempt when its channel is deleted, disabled, or unverified", async () => {
+    setSelectResults([
+      { channelId: "channel-a", organizationId: "org-a" },
+      [],
+    ]);
+    const set = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: async () => [{ id: "delivery-a" }],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+        attemptNumber: 1,
+        status: "attempting",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true, active: false } });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      status: "failed",
+      lastErrorCode: "channel_unavailable",
+      activeEnqueueToken: null,
+      nextEnqueueAt: null,
+    }));
+  });
+
+  it("does not revive a tokenless legacy delivery after channel deletion", async () => {
+    setSelectResults([
+      { channelId: "channel-a", organizationId: "org-a" },
+      [],
+      {
+        id: "delivery-a",
+        status: "failed",
+        activeEnqueueToken: null,
+        activeConsumerAttempt: 1,
+        lastErrorCode: "channel_unavailable",
+      },
+    ]);
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        attemptNumber: 2,
+        status: "attempting",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true, active: false } });
   });
 
   it("completes only the active notification consumer attempt", async () => {
