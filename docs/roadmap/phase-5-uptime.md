@@ -109,7 +109,7 @@ Project-scoped alert rules support:
 - `uptime_down`: count failed uptime check results in the rolling window. If no check results exist, the evaluator skips the rule instead of treating missing data as recovery.
 - `response_time`: calculate the nearest-rank p95 from up to the 10,000 most recent check response-time samples in the rolling window. This is based on uptime probes, not application request spans.
 
-Rules support `gt` and `gte` comparisons, thresholds, 1–10 consecutive minute evaluations, enable/pause, and owner/admin-only create/update/delete. Every evaluation is project- and organization-scoped. Error counts come from ClickHouse; uptime and response-time signals come from PostgreSQL check history.
+Rules support `gt` and `gte` comparisons, thresholds, 1–10 consecutive minute evaluations, enable/pause, and owner/admin-only create/update/delete. Every evaluation is project- and organization-scoped. Error counts come from ClickHouse (and can temporarily include queue redeliveries until ReplacingMergeTree merges); uptime and response-time signals come from PostgreSQL check history.
 
 ### Incident lifecycle
 
