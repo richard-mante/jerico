@@ -1102,6 +1102,8 @@ app.post("/internal/notification-delivery-results", async (context) => {
       providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
       lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
       lastAttemptAt: new Date(),
+      enqueuedAt: new Date(),
+      nextEnqueueAt: null,
       sentAt: result.status === "sent" ? new Date() : null,
       updatedAt: new Date(),
     }).where(and(eq(notificationDeliveries.id, result.deliveryId), ne(notificationDeliveries.status, "sent"))).returning({ id: notificationDeliveries.id });
@@ -1194,7 +1196,7 @@ export default {
     context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
       console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
     }));
-    context.waitUntil(retryFailedNotificationEnqueues(env, new Date()).catch((error) => {
+    context.waitUntil(withDatabase(env, (database) => retryFailedNotificationEnqueues(database, env, new Date())).catch((error) => {
       console.error("Jerico notification enqueue reconciliation failed", error instanceof Error ? error.message : String(error));
     }));
     if (controller.cron === "0 3 * * *") {
