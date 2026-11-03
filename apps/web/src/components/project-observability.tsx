@@ -270,8 +270,8 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
           {loading ? <div className="px-5 py-16 text-center text-sm text-[#8f98a7]">Loading telemetry…</div> : tab === "spans" && rows.length ? (
             <div className="space-y-4 p-4">
               {traceGroups.map((group) => {
-                const start = Math.min(...group.spans.map((span) => new Date(span.timestamp).getTime()));
-                const end = Math.max(...group.spans.map((span) => new Date(span.timestamp).getTime() + Math.max(0, span.value ?? 0)));
+                const start = Math.min(...group.spans.map((span) => new Date(span.timestamp).getTime() - Math.max(0, span.value ?? 0)));
+                const end = Math.max(...group.spans.map((span) => new Date(span.timestamp).getTime()));
                 const duration = Math.max(1, end - start);
                 return <article key={group.traceId ?? group.spans[0].eventId} className="overflow-hidden rounded-xl border border-white/10 bg-black/10">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3">
@@ -281,8 +281,9 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
                   <div className="space-y-3 p-4">
                     {group.spans.map((span) => {
                       const metadata = spanMetadata(span);
-                      const spanStart = new Date(span.timestamp).getTime();
+                      const spanEnd = new Date(span.timestamp).getTime();
                       const spanDuration = Math.max(0, span.value ?? 0);
+                      const spanStart = spanEnd - spanDuration;
                       const left = Math.max(0, ((spanStart - start) / duration) * 100);
                       const width = Math.max(1.2, (spanDuration / duration) * 100);
                       return <div key={span.eventId} className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)_90px] sm:items-center">
