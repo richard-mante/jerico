@@ -326,7 +326,7 @@ At the end of each substantial session, update this file and append a session-lo
 - Added a project Alerts & Incidents UI and dashboard link, plus contract, query adapter, evaluator helper, and mocked tenant/role tests.
 - Notifications, escalation, incident assignment/comments/audit history, full database integration, migrations, and deployment verification remain outstanding. No lint, typecheck, tests, build, or browser validation has been run.
 
-### Phase 5D — verified email notifications (PR in progress)
+### Phase 5D — verified email notifications (merged PR #32)
 
 - Added migration 0007 for organization email channels and incident notification delivery history. Delivery rows retain a recipient snapshot so removing a channel does not erase history.
 - Added owner/admin-only email channel management, one-time verification tokens (256-bit random, SHA-256 hash at rest, 24-hour expiry), resend, and removal.
@@ -335,3 +335,4 @@ At the end of each substantial session, update this file and append a session-lo
 - Added an Alerts & Incidents UI section for verified email channels and recent delivery history, plus a verification landing page.
 - Required provisioning: jerico-notifications, jerico-notifications-dlq, matching NOTIFICATION_DELIVERY_SECRET on API/Worker, and RESEND_API_KEY + EMAIL_FROM on both. Migration 0007 must be applied.
 - Tests are authored but not executed. No lint, typecheck, unit tests, build, migration, Resend delivery, Cloudflare queue, callback, or browser validation has run. Webhook channels remain outstanding.
+- PR #32 merged into main (merge commit `40654eecd4c76583d849a741ac497af65e23e54e`). The code is in main; provisioning and runtime verification remain outstanding.
