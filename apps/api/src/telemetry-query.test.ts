@@ -58,6 +58,8 @@ describe("ClickHouse query adapter", () => {
     expect(parsedUrl.searchParams.get("param_environmentId")).toBe("env-a");
     expect(parsedUrl.searchParams.get("param_eventType")).toBe("error");
     expect(parsedUrl.searchParams.get("param_limit")).toBe("51");
+    expect(parsedUrl.searchParams.get("max_execution_time")).toBe("8");
+    expect(init.signal).toBeDefined();
     expect(parsedUrl.searchParams.get("query")).toContain("organization_id = {organizationId:String}");
     expect(new Headers(init.headers).get("authorization")).toBe("Bearer test-token");
   });
