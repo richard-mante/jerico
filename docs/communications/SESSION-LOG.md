@@ -439,3 +439,23 @@
 - PR #32 merged into main (merge commit `40654eecd4c76583d849a741ac497af65e23e54e`).
 - Verified email channels, verification flow, notification queue producer/consumer, Resend idempotency key, callback attempt tracking, delivery history, and dashboard controls are now in main.
 - Runtime setup still requires migration 0007, notification and DLQ queues, matching callback secret, and Resend credentials on API and Worker. No tests or runtime delivery validation have been executed.
+
+## 2026-11-03 — Phase 5E signed webhook notifications merged
+
+- Resumed from the existing `feat/phase-5-webhook-notifications` branch, which was already based on the then-current `main` and contained an initial API/Worker implementation but no PR.
+- Completed webhook incident enqueueing, timestamped HMAC-SHA256 signatures, dashboard channel creation/verification/secret display, one-time AES-GCM secret encryption, bounded public HTTPS endpoint verification/delivery, and queue message validation.
+- Added migration `0008_webhook_notification_channels.sql` and Drizzle fields for encrypted signing secrets, verification errors, and a hashed consumed-challenge receipt.
+- Hardened verification callback idempotency so a duplicate successful callback does not retry after the one-time challenge has been consumed. Prevented late notification callbacks from downgrading a delivery already marked sent.
+- Added contract tests for reserved hostnames, API authorization/validation and duplicate verification callback coverage, AES-GCM encryption tests, Worker queue validation tests, and webhook signature/delivery/URL-guard tests. These tests were authored but not executed.
+- Updated Phase 5 and implementation roadmap documentation, plus the current-state handover.
+- Opened [PR #33](https://github.com/richard-mante/jerico/pull/33), reviewed the changed files and diff, found no external review comments, and merged it by squash.
+- Merge commit: `9d45571e0639d418914b0d0fdbc34e6cf484e321`. Main HEAD was verified at this commit after merge.
+- CI run #185 and its retry failed before runner allocation (`runner_id: 0`, no runner name, no steps). This is not a code-test result. No local install, lint, typecheck, unit tests, build, migration, Cloudflare queue, endpoint verification, email delivery, webhook delivery, or browser validation was executed.
+- Required deployment setup: apply migration 0008; reuse the existing notification and DLQ queues; set matching API/Worker `WEBHOOK_ENCRYPTION_KEY` (same random 32-byte base64url key); retain the callback secret and Worker's public-only egress configuration.
+
+### Next
+
+- Establish a working local or CI validation environment and run the full workspace checks.
+- Apply migrations through 0008 to disposable PostgreSQL and provision non-production Cloudflare/ClickHouse resources.
+- Exercise uptime and notification pipelines end-to-end, including webhook challenge verification, HMAC receiver validation, retry/idempotency, and DLQ behavior.
+- Then proceed to Phase 6 self-hosting implementation.
