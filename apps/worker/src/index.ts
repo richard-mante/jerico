@@ -88,15 +88,18 @@ export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryM
   const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
   const rows = messages.flatMap((message) => message.events.map((event, index) => toRow(message, event, index)));
   if (!rows.length) return;
-  const query = encodeURIComponent(`INSERT INTO ${database}.${table} FORMAT JSONEachRow`);
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", `INSERT INTO ${database}.${table} FORMAT JSONEachRow`);
+  url.searchParams.set("max_execution_time", "8");
   const headers = new Headers({ "content-type": "application/x-ndjson" });
   if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(`${env.CLICKHOUSE_URL.replace(/\/$/, "")}/?query=${query}`, {
+  const response = await fetch(url, {
     method: "POST",
     headers,
+    signal: AbortSignal.timeout(10_000),
     body: rows.map((row) => JSON.stringify(row)).join("\n") + "\n",
   });
   if (!response.ok) {
