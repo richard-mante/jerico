@@ -243,9 +243,10 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
   }, [organizationId, session, projectId, tab, environmentId, queryWindow, logLevel]);
 
   async function toggleErrorOccurrences(fingerprint: string) {
+    if (loadingOccurrences) return;
     if (expandedErrorGroup === fingerprint) { setExpandedErrorGroup(null); return; }
     setExpandedErrorGroup(fingerprint);
-    if (errorOccurrences[fingerprint] || !organizationId || loadingOccurrences) return;
+    if (errorOccurrences[fingerprint] || !organizationId) return;
     setLoadingOccurrences(fingerprint);
     try {
       const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to, limit: "20" });
