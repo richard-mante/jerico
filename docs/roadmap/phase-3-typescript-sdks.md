@@ -27,7 +27,7 @@ The SDK requires both a project ingestion key and an explicit endpoint. No hoste
 - Events are buffered in memory, with a configurable maximum queue size and batch size (1–100).
 - The default batch size is 50 and the default periodic flush interval is 10 seconds.
 - Call `flush()` to explicitly send pending events and `close()` during graceful shutdown.
-- A failed batch is retained in memory and reported through `onError`. Automatic retries are deliberately disabled after a failed request until server-side request idempotency exists; an ambiguous response may mean the server accepted the batch.
+- A failed batch is retained in memory and reported through `onError`. The in-progress request-idempotency branch adds a stable key to each batch and reuses the exact key/body on explicit retry. Until that server change is merged and validated, do not assume retries are safe.
 - The queue is not persisted. A process/browser crash can lose buffered events.
 - Browser logs, metrics, and spans are blocked because the current public-key ingestion policy permits only events and errors.
 - Redaction is performed by the ingestion service; SDK-side redaction and configurable sampling are future work.
@@ -43,7 +43,7 @@ These examples are documentation only; they have not yet been run in sample appl
 
 1. Validate workspace install, lint, typecheck, tests, and builds.
 2. Add integration tests against the ingestion Worker and ClickHouse.
-3. Add request-level idempotency to the ingestion API before automatic SDK retries.
+3. Merge and validate request-level idempotency in the ingestion API before enabling automatic SDK retries.
 4. Add browser route navigation instrumentation and Core Web Vitals (after deciding whether/how public keys may submit bounded performance metrics).
 5. Add richer Node instrumentation and framework adapters.
 6. Add Astro/React examples and execute all sample apps.
