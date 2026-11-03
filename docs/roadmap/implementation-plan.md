@@ -74,9 +74,13 @@ See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
 
 ## Phase 4 — Observability dashboard
 See [Phase 4 query API plan](phase-4-observability.md).
-- [x] First tenant-safe query API slice for events, errors, and logs (implemented; tests and PostgreSQL/ClickHouse integration validation pending).
-- [ ] Project overview aggregates, metrics, and trace queries.
-- [ ] Tenant-safe query APIs for metrics and traces.
+- [x] Tenant-safe query APIs for events, errors, logs, metrics, and spans (implemented; tests and PostgreSQL/ClickHouse integration validation pending).
+- [x] Project overview aggregates (implemented; query validation pending).
+- [x] First project explorer UI with environment/time filters, overview cards, signal tabs, and pagination (implemented; browser validation pending).
+- [ ] Error grouping, stack traces, and occurrence history.
+- [ ] Metric charts, route performance, and percentiles.
+- [ ] Span waterfall and trace detail views.
+- [ ] Structured log severity filters and detail view.
 - [ ] Project overview with time range and environment filters.
 - [ ] Event explorer, event catalogue, top events, and time-series.
 - [ ] Error grouping, stack traces, occurrence history, resolve/ignore actions.
