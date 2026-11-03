@@ -4,7 +4,8 @@ import { and, asc, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
   verifyNotificationChannelSchema,
-  notificationDeliveryResultSchema,\n  createAlertRuleSchema,
+  notificationDeliveryResultSchema,
+  createAlertRuleSchema,
   updateAlertRuleSchema,
   createEnvironmentSchema,
   createIngestionKeySchema,
