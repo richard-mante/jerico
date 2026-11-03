@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorCount, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance } from "./telemetry-query";
 
 describe("telemetry query validation", () => {
   it("defaults to one hour and rejects ranges over 31 days", () => {
@@ -236,4 +236,21 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("query")).toContain("quantileTDigest(0.95)(value)");
   });
 
+});
+
+describe("alert metric query", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("counts only errors in the requested organization and project", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ total: "17" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(queryTelemetryErrorCount(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z" },
+    )).resolves.toBe(17);
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_organizationId")).toBe("org-a");
+    expect(parsed.searchParams.get("param_projectId")).toBe("project-a");
+    expect(parsed.searchParams.get("query")).toContain("event_type = 'error'");
+  });
 });
