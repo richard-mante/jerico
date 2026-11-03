@@ -315,3 +315,12 @@
 - Created `feat/phase-4-api-route-tests` from `main` after merging PR #21.
 - Added `apps/api/src/index.test.ts` with mocked auth/database adapters to exercise unauthenticated rejection, organization-member write denial, cross-organization project isolation, and owner status updates through Hono routes.
 - Tests are authored but not executed. No dependency install, lint, typecheck, test run, build, PostgreSQL integration, ClickHouse integration, or browser validation was performed.
+
+
+## 2026-11-03 — ClickHouse integration harness
+
+- Created `feat/phase-4-clickhouse-integration-tests` from `main` after merging PR #22.
+- Added `apps/api/src/telemetry-query.integration.test.ts`, a gated suite that creates a uniquely named ClickHouse table, inserts tenant-scoped fixtures, exercises overview/grouping/fingerprint/event/metric/log queries against a real ClickHouse HTTP endpoint, and drops the table afterward.
+- Added `docker-compose.integration.yml` with a local ClickHouse service and `@jerico/api` `test:integration` script.
+- Updated CI to provision ClickHouse and run the integration suite.
+- The integration suite is authored and wired but not executed here. No local Docker, lint, typecheck, unit tests, build, or successful CI result has been observed.
