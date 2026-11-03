@@ -7,3 +7,11 @@ RESEND_API_KEY=
 EMAIL_FROM=Jerico <no-reply@example.com>
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
+# ClickHouse query access for the observability API
+CLICKHOUSE_URL=http://localhost:8123
+CLICKHOUSE_DATABASE=jerico
+CLICKHOUSE_TABLE=telemetry_events
+CLICKHOUSE_USERNAME=default
+CLICKHOUSE_PASSWORD=
+CLICKHOUSE_TOKEN=
