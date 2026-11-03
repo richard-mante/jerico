@@ -118,7 +118,7 @@ Rules support `gt` and `gte` comparisons, thresholds, 1–10 consecutive minute 
 - Continued breaches update the active incident's latest value and timestamp.
 - Recovery automatically resolves an active incident.
 - Organization members can acknowledge or manually resolve incidents; rules remain owner/admin managed.
-- Deleting a rule cascades its incident history. There are no notifications, escalation policies, assignments, comments, or audit timeline yet.
+- Deleting a rule cascades its incident history. Webhook channels, escalation policies, assignments, comments, and an incident audit timeline remain open.
 
 ### API
 
@@ -129,3 +129,41 @@ Rules support `gt` and `gte` comparisons, thresholds, 1–10 consecutive minute 
 - `POST /api/v1/projects/:projectId/incidents/:incidentId/resolve`
 
 The API Cron Trigger evaluates enabled rules every minute. Error-count rules require ClickHouse configuration; uptime and response-time rules require persisted probe results. This implementation is authored but still needs runtime validation and alert delivery integrations.
+
+## Phase 5D: verified email notifications
+
+### Channels and verification
+
+- Organization owners/admins can add email notification channels.
+- Email addresses are normalized and stored per organization; only a successful one-time verification can activate delivery.
+- Verification tokens contain 256 bits of randomness, are stored as SHA-256 hashes, expire after 24 hours, and are cleared after successful verification.
+- Owners/admins can resend verification or remove a channel.
+- A delivery stores a recipient snapshot so deleting a channel does not erase already-created delivery history.
+
+### Delivery pipeline
+
+- Incident opened, acknowledged, and resolved events create one delivery per verified enabled email channel.
+- A unique incident/channel/event index prevents duplicate delivery records for the same lifecycle event.
+- The API publishes delivery jobs to the jerico-notifications Cloudflare Queue.
+- The Worker sends email through Resend and reports the result to an internal API callback protected by a separate shared secret.
+- Resend requests use the delivery ID as an idempotency key so queue redelivery does not intentionally create duplicate emails.
+- Queue retries are configured for five attempts with a dead-letter queue. Delivery history records status, callback attempt count, provider message ID, safe error code, and timestamps.
+- The dashboard exposes channel verification state and the latest 25 delivery records.
+
+### Configuration and provisioning
+
+Create the notification queue and dead-letter queue:
+```bash
+pnpm --filter @jerico/api exec wrangler queues create jerico-notifications
+pnpm --filter @jerico/worker exec wrangler queues create jerico-notifications-dlq
+```
+
+Configure matching NOTIFICATION_DELIVERY_SECRET values on API and Worker (at least 32 random characters). Configure RESEND_API_KEY and EMAIL_FROM on both API (for verification messages) and Worker (for incident messages). Worker also needs the existing public HTTPS API_URL.
+
+Apply migration 0007_email_notification_channels.sql before deploying. The code and queue wiring are authored but not provisioned or runtime-verified.
+
+### Remaining
+
+- Webhook channel support and endpoint verification.
+- Delivery preferences by event type, quiet hours, escalation policies, and retry controls.
+- Real Resend delivery, queue retry/DLQ, callback idempotency, and database integration verification.
