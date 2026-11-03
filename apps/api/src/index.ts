@@ -13,7 +13,7 @@ import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryOverview, type TelemetryOverview, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryOverview, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
 type AppEnvironment = { Bindings: ApiBindings & TelemetryQueryBindings; Variables: Variables };
