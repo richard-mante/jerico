@@ -16,6 +16,9 @@ export class BrowserJericoClient extends JericoClient {
   private readonly interactionDurations = new Map<number, number>();
   private largestContentfulPaint = 0;
   private cumulativeLayoutShift = 0;
+  private clsSessionValue = 0;
+  private clsSessionStart = 0;
+  private clsLastShiftTime = 0;
   private webVitalsSent = false;
   private captureWebVitalsEnabled = false;
 
@@ -153,7 +156,14 @@ export class BrowserJericoClient extends JericoClient {
       if (this.webVitalsSent) return;
       for (const entry of entries) {
         const shift = entry as PerformanceEntry & { value?: number; hadRecentInput?: boolean };
-        if (!shift.hadRecentInput) this.cumulativeLayoutShift += shift.value ?? 0;
+        if (shift.hadRecentInput) continue;
+        if (!this.clsSessionStart || shift.startTime - this.clsLastShiftTime > 1000 || shift.startTime - this.clsSessionStart > 5000) {
+          this.clsSessionValue = 0;
+          this.clsSessionStart = shift.startTime;
+        }
+        this.clsSessionValue += shift.value ?? 0;
+        this.cumulativeLayoutShift = Math.max(this.cumulativeLayoutShift, this.clsSessionValue);
+        this.clsLastShiftTime = shift.startTime;
       }
     });
     this.observePerformance("event", (entries) => {
@@ -180,6 +190,7 @@ export class BrowserJericoClient extends JericoClient {
     this.recordWebVital("web.vitals.cls", this.cumulativeLayoutShift, attributes);
     if (this.interactionDurations.size > 0) {
       const interactions = Array.from(this.interactionDurations.values()).sort((a, b) => b - a);
+      // Approximate the field p98 interaction latency from the interaction-duration sample.
       const p98Index = Math.min(interactions.length - 1, Math.floor(interactions.length / 50));
       this.recordWebVital("web.vitals.inp", interactions[p98Index], { ...attributes, interactionCount: interactions.length });
     }
