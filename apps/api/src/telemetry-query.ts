@@ -200,6 +200,7 @@ export type TelemetryErrorGroup = {
   firstSeen: string;
   lastSeen: string;
   latestEventId: string;
+  latestStack: string;
 };
 
 export async function queryTelemetryErrorGroups(
@@ -217,7 +218,7 @@ export async function queryTelemetryErrorGroups(
     "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
   ];
   if (input.environmentId) filters.push("environment_id = {environmentId:String}");
-  const query = `SELECT toString(cityHash64(name, message)) AS fingerprint, name, argMax(message, (timestamp, event_id)) AS latestMessage, count() AS occurrences, formatDateTime(min(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS firstSeen, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY fingerprint, name ORDER BY max(timestamp) DESC LIMIT {limit:UInt16} FORMAT JSON`;
+  const query = `SELECT toString(cityHash64(name, message)) AS fingerprint, name, argMax(message, (timestamp, event_id)) AS latestMessage, count() AS occurrences, formatDateTime(min(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS firstSeen, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId, JSONExtractString(argMax(attributes, (timestamp, event_id)), 'stack') AS latestStack FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY fingerprint, name ORDER BY max(timestamp) DESC LIMIT {limit:UInt16} FORMAT JSON`;
   const url = new URL(env.CLICKHOUSE_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("param_organizationId", input.organizationId);
@@ -243,6 +244,7 @@ export async function queryTelemetryErrorGroups(
     firstSeen: String(row.firstSeen),
     lastSeen: String(row.lastSeen),
     latestEventId: String(row.latestEventId),
+    latestStack: String(row.latestStack ?? ""),
   }));
 }
 
