@@ -78,11 +78,16 @@ These are initial defaults, not yet user-configurable retention policies.
 
 Before deploying the Workers:
 
-1. Create the queues `jerico-telemetry` and `jerico-telemetry-dlq` using Wrangler.
-2. Create a Hyperdrive configuration for the PostgreSQL database and add its returned ID as the `HYPERDRIVE` binding in `apps/ingest/wrangler.jsonc`.
+1. Create the queues (run from the repository root):
+
+   ```bash
+   pnpm --filter @jerico/ingest exec wrangler queues create jerico-telemetry
+   pnpm --filter @jerico/worker exec wrangler queues create jerico-telemetry-dlq
+   ```
+2. Create a Hyperdrive configuration for PostgreSQL (for example, `wrangler hyperdrive create jerico-postgres --connection-string=\"$DATABASE_URL\"`) and add its returned ID as the `HYPERDRIVE` binding in `apps/ingest/wrangler.jsonc`. Configure the same binding for the core API when deploying it.
 3. Create a Cloudflare Rate Limiting binding named `INGEST_RATE_LIMITER` with an initial per-credential policy (for example, 120 requests per 60 seconds). Confirm the selected limit in load tests before production.
 4. Set `APP_ENV=production` for the production Worker.
-5. Configure ClickHouse URL and credentials on `apps/worker` using Worker variables/secrets. Never commit credentials.
+5. Configure ClickHouse URL/database/table as Worker variables and credentials as secrets. For example: `wrangler secret put CLICKHOUSE_TOKEN --config apps/worker/wrangler.jsonc`. Never commit credentials. Local examples are in `apps/ingest/.dev.vars.example` and `apps/worker/.dev.vars.example`.
 6. Apply the ClickHouse SQL schema.
 7. Deploy the consumer Worker before enabling the ingestion Worker.
 
