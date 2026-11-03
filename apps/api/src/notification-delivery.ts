@@ -130,6 +130,7 @@ export async function queueIncidentNotifications(
         status: "failed",
         lastErrorCode: "configuration_missing",
         nextEnqueueAt: null,
+        enqueuedAt: new Date(),
         updatedAt: new Date(),
       }).where(and(eq(notificationDeliveries.id, delivery.id), eq(notificationDeliveries.status, "queued")));
       continue;
@@ -144,7 +145,7 @@ export async function queueIncidentNotifications(
       // A successful send completes the outbox lease. If the Worker dies
       // before this write, the lease expires and reconciliation re-enqueues
       // the same stable delivery ID.
-      await database.update(notificationDeliveries).set({ nextEnqueueAt: null, updatedAt: new Date() }).where(and(
+      await database.update(notificationDeliveries).set({ nextEnqueueAt: null, enqueuedAt: new Date(), updatedAt: new Date() }).where(and(
         eq(notificationDeliveries.id, delivery.id),
         eq(notificationDeliveries.status, "queued"),
         eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
@@ -169,7 +170,7 @@ export async function retryFailedNotificationEnqueues(
 ): Promise<number> {
   if (!env.NOTIFICATIONS) return 0;
 
-  const staleQueuedCutoff = new Date(now.getTime() - NOTIFICATION_ENQUEUE_LEASE_MS);
+  
   // A queued row with an expired lease may represent a Worker termination
   // between the DB insert and queue send (or after queue acceptance but
   // before the lease-clear write). Preserve the stable delivery ID on retry.
@@ -181,10 +182,8 @@ export async function retryFailedNotificationEnqueues(
   }).where(and(
     eq(notificationDeliveries.status, "queued"),
     gte(notificationDeliveries.enqueueAttempts, MAX_ENQUEUE_ATTEMPTS),
-    or(
-      lte(notificationDeliveries.nextEnqueueAt, now),
-      and(isNull(notificationDeliveries.nextEnqueueAt), lte(notificationDeliveries.createdAt, staleQueuedCutoff)),
-    ),
+    isNull(notificationDeliveries.enqueuedAt),
+    lte(notificationDeliveries.nextEnqueueAt, now),
   ));
 
   const due = await database.select().from(notificationDeliveries).where(or(
@@ -196,11 +195,9 @@ export async function retryFailedNotificationEnqueues(
     ),
     and(
       eq(notificationDeliveries.status, "queued"),
+      isNull(notificationDeliveries.enqueuedAt),
       lt(notificationDeliveries.enqueueAttempts, MAX_ENQUEUE_ATTEMPTS),
-      or(
-        lte(notificationDeliveries.nextEnqueueAt, now),
-        and(isNull(notificationDeliveries.nextEnqueueAt), lte(notificationDeliveries.createdAt, staleQueuedCutoff)),
-      ),
+      lte(notificationDeliveries.nextEnqueueAt, now),
     ),
   )).orderBy(asc(notificationDeliveries.createdAt)).limit(50);
 
@@ -241,10 +238,8 @@ export async function retryFailedNotificationEnqueues(
       )
       : and(
         eq(notificationDeliveries.status, "queued"),
-        or(
-          lte(notificationDeliveries.nextEnqueueAt, now),
-          and(isNull(notificationDeliveries.nextEnqueueAt), lte(notificationDeliveries.createdAt, staleQueuedCutoff)),
-        ),
+        isNull(notificationDeliveries.enqueuedAt),
+        lte(notificationDeliveries.nextEnqueueAt, now),
       );
     const [claimed] = await database.update(notificationDeliveries).set({
       status: "queued",
