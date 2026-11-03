@@ -91,3 +91,8 @@ The Traces tab now groups the currently loaded span rows by `attributes.traceId`
 ## Error stack trace details
 
 The grouped-error query now extracts the latest event's `attributes.stack` value from the stored JSON attributes, and the Errors tab exposes it in a collapsed, scrollable text disclosure. The stack is rendered as text (not HTML). Groups without a stack trace simply omit the disclosure. This shows the latest stack only; stack-based grouping, occurrence-by-occurrence history, and issue lifecycle actions remain future work.
+
+
+## Structured log severity filters
+
+The Node SDK now supports `logWithLevel(level, name, message, attributes)` with `debug`, `info`, `warn`, `error`, and `fatal`. Existing `log()` calls remain compatible and default to `info`. The API accepts an optional `level` query parameter on the logs route, validates it against the supported set, and filters ClickHouse rows using the JSON `attributes.level` value. Historical logs without a level are treated as `info`. The dashboard exposes a severity selector on the Logs tab and carries the filter into pagination. Browser SDK log submission remains prohibited because public keys cannot submit logs.
