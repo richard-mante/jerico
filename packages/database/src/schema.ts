@@ -341,6 +341,7 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   attempts: integer("attempts").notNull().default(0),
   enqueueAttempts: integer("enqueue_attempts").notNull().default(1),
   nextEnqueueAt: timestamp("next_enqueue_at", { withTimezone: true }),
+  enqueueLeaseExpiresAt: timestamp("enqueue_lease_expires_at", { withTimezone: true }),
   enqueuedAt: timestamp("enqueued_at", { withTimezone: true }),
   providerMessageId: text("provider_message_id"),
   lastErrorCode: text("last_error_code"),
@@ -356,6 +357,7 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   uniqueIndex("notification_deliveries_incident_channel_event_unique").on(t.incidentId, t.channelId, t.eventType),
   index("notification_deliveries_org_created_idx").on(t.organizationId, t.createdAt),
   index("notification_deliveries_status_idx").on(t.status, t.createdAt),
+  index("notification_deliveries_enqueue_lease_idx").on(t.status, t.enqueueLeaseExpiresAt),
   index("notification_deliveries_enqueue_retry_idx").on(t.status, t.lastErrorCode, t.nextEnqueueAt),
   index("notification_deliveries_outbox_lease_idx").on(t.status, t.enqueuedAt, t.nextEnqueueAt),
 ]);
