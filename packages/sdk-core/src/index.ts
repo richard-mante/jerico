@@ -34,7 +34,7 @@ export class JericoClient {
   private queue: TelemetryEvent[] = [];
   private timer: ReturnType<typeof setInterval> | undefined;
   private inFlight: Promise<void> | undefined;
-  private inFlightCount = 0;
+  private retryBatch: { idempotencyKey: string; events: TelemetryEvent[] } | undefined;
   private timerBlocked = false;
   private closed = false;
   private readonly fetcher: typeof fetch;
@@ -100,7 +100,7 @@ export class JericoClient {
       if (typeof value === "number" && !Number.isFinite(value)) throw new Error("Telemetry attribute numbers must be finite.");
     }
     if (event.message && event.message.length > 8192) event = { ...event, message: event.message.slice(0, 8192) };
-    if (this.queue.length + this.inFlightCount >= this.maxQueueSize) {
+    if (this.queue.length + (this.retryBatch?.events.length ?? 0) >= this.maxQueueSize) {
       this.reportError(new Error("Jerico telemetry queue is full; the new event was dropped."));
       return false;
     }
@@ -113,14 +113,17 @@ export class JericoClient {
 
   async flush(): Promise<void> {
     this.timerBlocked = false;
-    while (this.queue.length > 0 || this.inFlight) await this.flushBatch();
+    while (this.queue.length > 0 || this.retryBatch || this.inFlight) await this.flushBatch();
   }
 
   private async flushBatch(): Promise<void> {
     if (this.inFlight) return this.inFlight;
-    if (this.queue.length === 0) return;
-    const batch = this.queue.splice(0, this.maxBatchSize);
-    this.inFlightCount = batch.length;
+    if (!this.retryBatch && this.queue.length === 0) return;
+    const batch = this.retryBatch ?? {
+      idempotencyKey: globalThis.crypto.randomUUID(),
+      events: this.queue.splice(0, this.maxBatchSize),
+    };
+    this.retryBatch = batch;
     this.inFlight = (async () => {
       try {
         const response = await this.fetcher(`${this.endpoint}/ingest/v1/events`, {
@@ -128,8 +131,9 @@ export class JericoClient {
           headers: {
             authorization: `Bearer ${this.options.apiKey}`,
             "content-type": "application/json",
+            "idempotency-key": batch.idempotencyKey,
           },
-          body: JSON.stringify({ events: batch }),
+          body: JSON.stringify({ events: batch.events }),
         });
         if (!response.ok) {
           const retryAfter = Number(response.headers.get("retry-after"));
@@ -139,12 +143,13 @@ export class JericoClient {
             Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
           );
         }
+        this.retryBatch = undefined;
       } catch (error) {
-        this.queue = [...batch, ...this.queue];
+        // Keep the exact key and payload together: explicit retries must be
+        // recognized by the ingestion API as the same logical batch.
         this.timerBlocked = true;
         throw error;
       } finally {
-        this.inFlightCount = 0;
         this.inFlight = undefined;
       }
     })();
