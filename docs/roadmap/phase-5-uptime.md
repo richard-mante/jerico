@@ -64,14 +64,14 @@ The probe pipeline is implemented in code but requires Cloudflare queues/secrets
 
 ### Outbound request security
 
-- The probe runner uses the Worker's global `fetch` only; it does not use `cloudflare:sockets` or direct TCP.
+- The probe runner uses the Worker's global `fetch` only; it does not use `cloudflare:sockets` or direct TCP. The Worker enables the `global_fetch_strictly_public` compatibility flag, which routes global fetch as public Internet traffic.
 - Only HTTP(S), GET/HEAD, and ports 80, 443, 8080, and 8443 are accepted.
 - IP-literal targets, credentials, localhost/internal/reserved hostname suffixes, and unsupported ports are rejected.
 - Redirects are manual, limited to three hops, and every destination is revalidated before following.
 - Each request has a 1–30 second timeout. Response bodies are cancelled immediately; no response body or headers are persisted.
-- Only HTTP status, response time, and a fixed safe error code are sent to the API.
+- Only HTTP status, response time, and a fixed safe error code are sent to the API. The API retains check results for 30 days and prunes older history daily.
 
-**Critical deployment constraint:** Keep `jerico-worker` on its `workers.dev` hostname with no custom-domain routes, VPC bindings, or private outbound network. The DNS-rebinding/private-address safety assumption relies on Cloudflare Workerd's default public-only global fetch egress. Do not enable private-network access on this Worker. Cloudflare documents that private network access is provided through explicit VPC bindings; the probe code deliberately does not use them. If the deployment topology changes, re-review SSRF controls before continuing probes.
+**Critical deployment constraint:** Keep `jerico-worker` on its `workers.dev` hostname with no custom-domain routes, VPC bindings, or private outbound network. The DNS-rebinding/private-address safety assumption relies on Cloudflare Workerd's default public-only global fetch egress, which filters resolved destinations to publicly routable addresses. Do not enable private-network access on this Worker. Cloudflare documents that private network access is provided through explicit VPC bindings; the probe code deliberately does not use them. If the deployment topology changes, re-review SSRF controls before continuing probes.
 
 ### Provisioning
 
@@ -86,9 +86,10 @@ Set the same random secret on API and Worker:
 pnpm --filter @jerico/api exec wrangler secret put UPTIME_RESULTS_SECRET
 pnpm --filter @jerico/worker exec wrangler secret put UPTIME_RESULTS_SECRET
 pnpm --filter @jerico/worker exec wrangler secret put API_URL
+pnpm --filter @jerico/worker exec wrangler secret put PROBE_WORKER_HOST
 ``
 
-Set `API_URL` to the HTTPS `workers.dev` URL of the Jerico API. Provision the API Worker's existing Hyperdrive binding and deploy both Workers. Do not place the probe Worker behind a custom domain or attach a VPC binding.
+Set `API_URL` to the HTTPS `workers.dev` URL of the Jerico API and `PROBE_WORKER_HOST` to the exact hostname of the probe Worker itself. Provision the API Worker's existing Hyperdrive binding and deploy both Workers. Do not place the probe Worker behind a custom domain or attach a VPC binding.
 
 ### Remaining validation
 
