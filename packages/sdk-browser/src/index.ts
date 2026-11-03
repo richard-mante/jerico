@@ -1,10 +1,12 @@
 import { JericoClient, type JericoClientOptions, type LogLevel, type SpanContext, type TelemetryValue } from "@jerico/sdk-core";
 import { isPublicWebVitalMetric, rateWebVital } from "./web-vitals";
+import { normalizeRoutePath } from "./route-path";
 
 export type BrowserJericoOptions = JericoClientOptions & {
   capturePageViews?: boolean;
   captureErrors?: boolean;
   captureWebVitals?: boolean;
+  resolveRoute?: (pathname: string) => string;
 };
 
 const SESSION_STORAGE_KEY = "jerico.session_id";
@@ -22,6 +24,7 @@ export class BrowserJericoClient extends JericoClient {
   private webVitalsSent = false;
   private captureWebVitalsEnabled = false;
   private webVitalsPath = "";
+  private readonly routeResolver: BrowserJericoOptions["resolveRoute"];
 
   private createSessionId(): string {
     const id = crypto.randomUUID();
@@ -61,6 +64,7 @@ export class BrowserJericoClient extends JericoClient {
       throw new Error("The browser SDK requires a public Jerico key (jk_pub_). Never expose secret keys in a browser.");
     }
     super(options);
+    this.routeResolver = options.resolveRoute;
     this.sessionId = this.loadSessionId();
     if (options.capturePageViews) this.capturePageView();
     if (options.captureErrors !== false) {
@@ -122,6 +126,17 @@ export class BrowserJericoClient extends JericoClient {
     throw new Error("Browser credentials cannot submit spans; use a secret key from a trusted server.");
   }
 
+  private currentRoutePath(): string {
+    const pathname = window.location.pathname;
+    try {
+      const resolved = this.routeResolver?.(pathname);
+      if (typeof resolved === "string" && resolved.trim()) return normalizeRoutePath(resolved);
+    } catch {
+      // Fall back to conservative path normalization if the app resolver throws.
+    }
+    return normalizeRoutePath(pathname);
+  }
+
   private observePerformance(type: string, callback: (entries: PerformanceEntry[]) => void): void {
     if (typeof PerformanceObserver === "undefined") return;
     try {
@@ -135,7 +150,7 @@ export class BrowserJericoClient extends JericoClient {
 
   private startWebVitalsCapture(): void {
     this.captureWebVitalsEnabled = true;
-    this.webVitalsPath = window.location.pathname;
+    this.webVitalsPath = this.currentRoutePath();
     window.addEventListener("pagehide", this.onPageHide);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
 
@@ -204,9 +219,9 @@ export class BrowserJericoClient extends JericoClient {
 
   capturePageView(attributes?: Record<string, TelemetryValue>): boolean {
     return this.track("page.view", {
-      path: window.location.pathname,
-      title: document.title.slice(0, 512),
       ...attributes,
+      path: this.currentRoutePath(),
+      title: document.title.slice(0, 512),
     });
   }
 
