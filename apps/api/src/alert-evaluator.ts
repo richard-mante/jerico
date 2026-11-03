@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, lte, or } from "drizzle-orm";
 import { alertRules, incidents, uptimeCheckResults } from "@jerico/database/schema";
 import { withDatabase, type ApiBindings } from "./database";
 import { queryTelemetryErrorCount, type TelemetryQueryBindings } from "./telemetry-query";
@@ -21,7 +21,15 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
     let opened = 0;
     let resolved = 0;
 
+    const evaluationMinute = new Date(Math.floor(now.getTime() / 60000) * 60000);
     for (const rule of rules) {
+      const [claimed] = await database.update(alertRules).set({ lastEvaluatedAt: now, updatedAt: now })
+        .where(and(
+          eq(alertRules.id, rule.id),
+          eq(alertRules.enabled, true),
+          or(isNull(alertRules.lastEvaluatedAt), lt(alertRules.lastEvaluatedAt, evaluationMinute)),
+        )).returning({ id: alertRules.id });
+      if (!claimed) continue;
       const from = new Date(now.getTime() - rule.windowSeconds * 1000);
       let value: number | null = null;
 
@@ -66,7 +74,6 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
       const nextCount = breached ? rule.consecutiveCount + 1 : 0;
       await database.update(alertRules).set({
         consecutiveCount: nextCount,
-        lastEvaluatedAt: now,
         updatedAt: now,
       }).where(eq(alertRules.id, rule.id));
 
