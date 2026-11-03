@@ -120,7 +120,7 @@ app.post("/ingest/v1/events", async (context) => {
 
   const bodyText = await readBoundedBody(context.req.raw, MAX_BODY_BYTES);
   if (bodyText === null) {
-    return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body exceeds 256 KiB.", requestId } }, 413);
+    return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body exceeds 96 KiB.", requestId } }, 413);
   }
   let body: unknown;
   try {
