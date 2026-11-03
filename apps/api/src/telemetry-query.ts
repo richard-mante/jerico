@@ -190,3 +190,58 @@ export async function queryTelemetryOverview(
     lastEventAt: typeof row.lastEventAt === "string" ? row.lastEventAt : null,
   };
 }
+
+
+export type TelemetryErrorGroup = {
+  fingerprint: string;
+  name: string;
+  latestMessage: string;
+  occurrences: number;
+  firstSeen: string;
+  lastSeen: string;
+  latestEventId: string;
+};
+
+export async function queryTelemetryErrorGroups(
+  env: TelemetryQueryBindings,
+  input: Omit<TelemetryQuery, "cursor" | "eventType">,
+): Promise<TelemetryErrorGroup[]> {
+  if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
+  const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
+  const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
+  const filters = [
+    "organization_id = {organizationId:String}",
+    "project_id = {projectId:String}",
+    "event_type = 'error'",
+    "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+    "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
+  ];
+  if (input.environmentId) filters.push("environment_id = {environmentId:String}");
+  const query = `SELECT toString(cityHash64(name, message)) AS fingerprint, name, argMax(message, (timestamp, event_id)) AS latestMessage, count() AS occurrences, formatDateTime(min(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS firstSeen, formatDateTime(max(timestamp), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS lastSeen, argMax(event_id, (timestamp, event_id)) AS latestEventId FROM ${database}.${table} WHERE ${filters.join(" AND ")} GROUP BY fingerprint, name ORDER BY max(timestamp) DESC LIMIT {limit:UInt16} FORMAT JSON`;
+  const url = new URL(env.CLICKHOUSE_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("param_organizationId", input.organizationId);
+  url.searchParams.set("param_projectId", input.projectId);
+  url.searchParams.set("param_from", input.from);
+  url.searchParams.set("param_to", input.to);
+  url.searchParams.set("param_limit", String(input.limit));
+  if (input.environmentId) url.searchParams.set("param_environmentId", input.environmentId);
+  const headers = new Headers();
+  if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
+  else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
+    headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`ClickHouse error-group query failed with status ${response.status}.`);
+  const result = await response.json() as { data?: Array<Record<string, unknown>> };
+  if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid error-group result.");
+  return result.data.map((row) => ({
+    fingerprint: String(row.fingerprint),
+    name: String(row.name ?? "Error"),
+    latestMessage: String(row.latestMessage ?? ""),
+    occurrences: Number(row.occurrences ?? 0),
+    firstSeen: String(row.firstSeen),
+    lastSeen: String(row.lastSeen),
+    latestEventId: String(row.latestEventId),
+  }));
+}
