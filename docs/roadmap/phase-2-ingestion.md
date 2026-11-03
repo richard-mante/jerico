@@ -101,7 +101,7 @@ The current ingestion runtime is implemented as a Cloudflare Worker and uses the
 
 - Redaction covers sensitive attribute names, email addresses, bearer tokens, and JWT-like values. It is a safety layer, not a guarantee that arbitrary user data is anonymous.
 - The rate limiter is optional in local development and mandatory when `APP_ENV=production`; the Cloudflare binding must actually be provisioned.
-- Daily/monthly plan quotas, billing metering, adaptive backpressure, sampling, and per-tenant retention configuration are not implemented yet.
+- Monthly plan quotas, billing metering, adaptive backpressure, sampling, and plan-based per-tenant quota tiers are not implemented yet. The current daily quota is a fixed per-credential limit configured per deployment.
 - Queue delivery is at-least-once. A worker crash after a ClickHouse write but before queue acknowledgement can produce duplicate rows. Query/aggregation layers must account for this; an idempotent event ID strategy is a follow-up.
 - There is no dashboard query API or SDK in this milestone.
 - Database, queue, and ClickHouse integration tests and deployment validation are still required.
