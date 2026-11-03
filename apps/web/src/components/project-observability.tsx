@@ -227,6 +227,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
       } else if (tab === "events") {
         setEventCatalogue((listPayload.data ?? []) as EventSummary[]);
         setEventSeries((seriesPayload.data ?? []) as EventSeries[]);
+        setRoutePerformance([]);
         setErrorGroups([]);
         setMetricSeries([]);
         setRows([]);
@@ -238,6 +239,7 @@ export function ProjectObservability({ initialOrganizationId }: { initialOrganiz
         setEventCatalogue([]);
         setEventSeries([]);
         setMetricSeries([]);
+        setRoutePerformance([]);
         setNextCursor(listPayload.pagination?.nextCursor ?? null);
       }
     }).catch((cause: unknown) => {
