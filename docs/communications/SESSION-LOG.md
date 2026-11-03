@@ -709,3 +709,14 @@
 
 ### Next
 - Continue the remaining ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
+
+
+## 2026-11-03 — Telemetry event-name redaction
+
+- The ingestion privacy review found that `redactTelemetryEvent` sanitized messages and string-valued attributes but returned client-controlled `event.name` unchanged. An accidental email, bearer token, JWT, or password/token/API-key assignment in a name would therefore persist in ClickHouse and appear in event catalogues.
+- Applied the existing deterministic `redactText` patterns to event names, preserving ordinary static names unchanged. Added tests for email plus token assignment, bearer credentials, JWTs, and unchanged static names.
+- Merged [PR #68](https://github.com/richard-mante/jerico/pull/68); merge commit: `fbdda443b48ba6563238c810c3454e4644649f14`. Issue #67 closed.
+- GitHub combined status had no reported checks. Tests, typecheck, lint, build, and ingestion/ClickHouse runtime checks were not executed. The user will manually test. No migration or lockfile changes.
+
+### Next
+- Continue ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
