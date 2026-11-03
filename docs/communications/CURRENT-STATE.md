@@ -298,3 +298,13 @@ At the end of each substantial session, update this file and append a session-lo
 - Added a project uptime management page with create/edit/pause/delete and history disclosure, linked from project cards.
 - Important: this is configuration-only. No scheduler, outbound probes, history writes, uptime status, or incidents exist yet. The UI explicitly says checks are not running. SSRF/DNS/redirect protections must be implemented before enabling probes.
 - Tests are authored but not executed. No migration, lint, typecheck, tests, build, database integration, or browser validation was run.
+
+
+### Phase 5B — scheduled uptime probe pipeline (open PR)
+
+- Added API Cron scheduling every minute. Due monitors are claimed by conditionally advancing `next_check_at`, then sent to `jerico-uptime-probes`.
+- Added a Worker queue consumer that uses bounded HTTP(S) GET/HEAD requests, rejects IP literals/local/internal/reserved hostname suffixes and unsupported ports, follows at most three manually revalidated redirects, enforces timeouts, and cancels response bodies.
+- Added a shared-secret internal API callback with constant-time comparison, a strict result contract, a 4 KiB request-body limit, transactional result persistence, and check-ID idempotency.
+- Added probe queue retries and a dead-letter queue; the UI now distinguishes configured queue from real stored check results.
+- Critical deployment constraint: the probe Worker must remain on workers.dev with no custom-domain route, VPC binding, or private outbound network. Private-address/DNS-rebinding safety relies on Workerd's default public-only global fetch egress. The implementation does not use TCP sockets.
+- Cloudflare queues and secrets are not provisioned; migration 0005, scheduler, queue, and callback have not been executed in a deployed environment. Tests are authored but not run.
