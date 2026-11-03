@@ -592,3 +592,16 @@
 
 ### Next
 - Continue the source-level tenant-isolation and callback lifecycle review, then inspect remaining Worker egress and queue retry/DLQ failure modes.
+
+
+## 2026-11-03 — Notification channel tenant referential integrity
+
+- Reviewed the tenant-scoped schema and found `notification_channels.organization_id` was the exception among organization-owned resources: it was non-null but had no foreign key to Better Auth's `organization` table.
+- Added the organization foreign key with `ON DELETE CASCADE`, mirrored it in the Drizzle schema, and registered migration `0011_notification_channel_organization_fk.sql`.
+- Kept the delivery-history behavior unchanged: deleting an individual channel does not cascade-delete its historical delivery rows.
+- Opened and merged [PR #47](https://github.com/richard-mante/jerico/pull/47); merge commit: `68a503cd94d0ebfea070fa20b243d767bf988ded`.
+- Migration execution and PostgreSQL checks were not run. User will handle manual testing. No lockfile changes.
+
+### Next
+- Continue reviewing cross-tenant constraints and internal callbacks; inspect queue retry/DLQ and Worker egress assumptions.
+- Apply migrations through `0011_notification_channel_organization_fk.sql` before deployment.
