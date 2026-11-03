@@ -5,7 +5,7 @@
 - Inspected GitHub Actions run #18 and its underlying job payload. The job has `runner_id: 0`, an empty `runner_name`, and `steps: []`; it starts and fails within seconds before a hosted runner is assigned. This is stronger evidence of a GitHub Actions runner-startup problem than a source-code/test failure, but the precise platform-side cause remains unknown.
 - Updated `.github/workflows/ci.yml` to pin the runner label from `ubuntu-latest` to `ubuntu-24.04` for a stable, explicit LTS image.
 - Workflow commit: `70a7e4d7399008e287bb17722f1d49f62b3ca421`.
-- A new workflow run has not yet appeared for that workflow-file commit at the time of this entry. Need trigger/observe a run against the updated workflow and inspect whether GitHub assigns a runner.
+- The subsequent run #20 executed against the updated workflow and still failed before runner allocation: `runner_id: 0`, empty runner name, no steps. Pinning the image did not resolve the issue.
 - No CI job has reached checkout, pnpm setup, install, lint, typecheck, tests, or build. Do not report any of those checks as passing or failing.
 - PR #2 remains open and must not be merged until the workspace is actually validated.
 
@@ -34,7 +34,7 @@
 - PR #2 remains open and must not be merged until CI, build, tests, and database integration validation pass.
 
 ### Next
-- Observe a workflow run using the explicit Ubuntu 24.04 runner; if runner allocation still fails, report the platform-level blocker and establish a separate local validation environment.
+- Establish a runnable CI/local validation environment and resolve the GitHub Actions runner allocation issue.
 - Generate and commit the pnpm lockfile; run lint/typecheck/tests/build.
 - Add PostgreSQL-backed Better Auth and tenancy integration tests and apply the migration to a disposable database.
 - Continue organization management/switching, project management, audit logging, and API-key lifecycle after Phase 1 validation.
