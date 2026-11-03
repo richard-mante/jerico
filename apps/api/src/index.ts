@@ -1104,7 +1104,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
     const [updated] = result.status === "attempting"
       ? await database.update(notificationDeliveries).set({
         status: "queued",
-        attempts: result.attemptNumber,
+        attempts: sql`${notificationDeliveries.attempts} + 1`,
         activeConsumerAttempt: result.attemptNumber,
         providerMessageId: null,
         lastErrorCode: null,
