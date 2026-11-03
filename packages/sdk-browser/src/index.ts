@@ -17,6 +17,7 @@ export class BrowserJericoClient extends JericoClient {
   private largestContentfulPaint = 0;
   private cumulativeLayoutShift = 0;
   private webVitalsSent = false;
+  private captureWebVitalsEnabled = false;
 
   private createSessionId(): string {
     const id = crypto.randomUUID();
@@ -101,11 +102,8 @@ export class BrowserJericoClient extends JericoClient {
     throw new Error("Browser credentials cannot submit logs; use a secret key from a trusted server.");
   }
 
-  override metric(name: string, value: number, attributes?: Record<string, TelemetryValue>): boolean {
-    if (!isPublicWebVitalMetric(name)) {
-      throw new Error("Browser credentials may submit only allowlisted Core Web Vitals metrics.");
-    }
-    return super.metric(name, value, { ...attributes, source: "browser-web-vitals", path: window.location.pathname });
+  override metric(_name: string, _value: number, _attributes?: Record<string, TelemetryValue>): never {
+    throw new Error("Browser credentials cannot submit custom metrics; enable captureWebVitals to collect allowlisted browser performance metrics.");
   }
 
   override span(_name: string, _valueMs: number, _attributes?: Record<string, TelemetryValue>): never {
@@ -132,30 +130,34 @@ export class BrowserJericoClient extends JericoClient {
   }
 
   private startWebVitalsCapture(): void {
+    this.captureWebVitalsEnabled = true;
     window.addEventListener("pagehide", this.onPageHide);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
 
     const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     if (navigation && navigation.responseStart >= navigation.requestStart) {
-      this.metric("web.vitals.ttfb", navigation.responseStart - navigation.requestStart, {
+      this.recordWebVital("web.vitals.ttfb", navigation.responseStart - navigation.requestStart, {
         navigationType: navigation.type,
       });
     }
 
     this.observePerformance("paint", (entries) => {
       const fcp = entries.find((entry) => entry.name === "first-contentful-paint");
-      if (fcp) this.metric("web.vitals.fcp", fcp.startTime);
+      if (fcp && !this.webVitalsSent) this.recordWebVital("web.vitals.fcp", fcp.startTime);
     });
     this.observePerformance("largest-contentful-paint", (entries) => {
+      if (this.webVitalsSent) return;
       for (const entry of entries) this.largestContentfulPaint = Math.max(this.largestContentfulPaint, entry.startTime);
     });
     this.observePerformance("layout-shift", (entries) => {
+      if (this.webVitalsSent) return;
       for (const entry of entries) {
         const shift = entry as PerformanceEntry & { value?: number; hadRecentInput?: boolean };
         if (!shift.hadRecentInput) this.cumulativeLayoutShift += shift.value ?? 0;
       }
     });
     this.observePerformance("event", (entries) => {
+      if (this.webVitalsSent) return;
       for (const entry of entries) {
         const interaction = entry as PerformanceEntry & { duration?: number; interactionId?: number };
         if (!interaction.interactionId || !interaction.duration) continue;
@@ -165,16 +167,21 @@ export class BrowserJericoClient extends JericoClient {
     });
   }
 
+  private recordWebVital(name: string, value: number, attributes?: Record<string, TelemetryValue>): boolean {
+    if (!isPublicWebVitalMetric(name)) return false;
+    return super.metric(name, value, { ...attributes, source: "browser-web-vitals", path: window.location.pathname });
+  }
+
   private flushWebVitals(): void {
-    if (this.webVitalsSent) return;
+    if (!this.captureWebVitalsEnabled || this.webVitalsSent) return;
     this.webVitalsSent = true;
     const attributes = { navigationType: (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type ?? "unknown" };
-    if (this.largestContentfulPaint > 0) this.metric("web.vitals.lcp", this.largestContentfulPaint, attributes);
-    this.metric("web.vitals.cls", this.cumulativeLayoutShift, attributes);
+    if (this.largestContentfulPaint > 0) this.recordWebVital("web.vitals.lcp", this.largestContentfulPaint, attributes);
+    this.recordWebVital("web.vitals.cls", this.cumulativeLayoutShift, attributes);
     if (this.interactionDurations.size > 0) {
       const interactions = Array.from(this.interactionDurations.values()).sort((a, b) => b - a);
       const p98Index = Math.min(interactions.length - 1, Math.floor(interactions.length / 50));
-      this.metric("web.vitals.inp", interactions[p98Index], { ...attributes, interactionCount: interactions.length });
+      this.recordWebVital("web.vitals.inp", interactions[p98Index], { ...attributes, interactionCount: interactions.length });
     }
   }
 
