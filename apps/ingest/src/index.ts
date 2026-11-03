@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { telemetryBatchSchema, type TelemetryEvent } from "@jerico/contracts";
-import { projectIngestionKeys, schema } from "@jerico/database/schema";
+import { projectIngestionKeys, projectIngestionUsage, schema } from "@jerico/database/schema";
 import { hashPresentedCredential, readBearerCredential } from "./credentials";
 import { redactTelemetryEvent } from "./redaction";
 
@@ -28,7 +28,7 @@ type Bindings = {
   DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
   TELEMETRY_QUEUE?: QueueBinding;
-  INGEST_RATE_LIMITER?: RateLimitBinding;
+  INGEST_RATE_LIMITER?: RateLimitBinding;\n  INGEST_DAILY_EVENT_LIMIT?: string;
 };
 type Variables = { requestId: string };
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -97,7 +97,73 @@ async function withCredentialDatabase<T>(
   }
 }
 
-app.post("/ingest/v1/events", async (context) => {
+
+class DailyQuotaExceeded extends Error {
+  constructor(readonly retryAfter: number) {
+    super("The daily event quota has been reached.");
+    this.name = "DailyQuotaExceeded";
+  }
+}
+
+function utcUsageDate(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+function secondsUntilUtcMidnight(now = new Date()): number {
+  const nextMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((nextMidnight - now.getTime()) / 1000));
+}
+
+function dailyEventLimit(env: Bindings): number {
+  const configured = Number(env.INGEST_DAILY_EVENT_LIMIT ?? 100000);
+  if (!Number.isSafeInteger(configured) || configured < 1) {
+    throw new Error("INGEST_DAILY_EVENT_LIMIT must be a positive safe integer.");
+  }
+  return configured;
+}
+
+async function reserveDailyQuota(
+  env: Bindings,
+  credentialId: string,
+  usageDate: string,
+  eventCount: number,
+): Promise<void> {
+  const limit = dailyEventLimit(env);
+  await withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
+    const [usage] = await transaction.insert(projectIngestionUsage).values({
+      credentialId,
+      usageDate,
+      eventCount,
+    }).onConflictDoUpdate({
+      target: [projectIngestionUsage.credentialId, projectIngestionUsage.usageDate],
+      set: {
+        eventCount: sql`${projectIngestionUsage.eventCount} + ${eventCount}`,
+        updatedAt: new Date(),
+      },
+    }).returning({ eventCount: projectIngestionUsage.eventCount });
+    if (!usage || usage.eventCount > limit) {
+      throw new DailyQuotaExceeded(secondsUntilUtcMidnight());
+    }
+  }));
+}
+
+async function releaseDailyQuota(
+  env: Bindings,
+  credentialId: string,
+  usageDate: string,
+  eventCount: number,
+): Promise<void> {
+  await withCredentialDatabase(env, async (database) => {
+    await database.update(projectIngestionUsage).set({
+      eventCount: sql`GREATEST(${projectIngestionUsage.eventCount} - ${eventCount}, 0)`,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(projectIngestionUsage.credentialId, credentialId),
+      eq(projectIngestionUsage.usageDate, usageDate),
+    ));
+  });
+}
+\napp.post("/ingest/v1/events", async (context) => {
   const requestId = context.get("requestId");
   const queue = context.env.TELEMETRY_QUEUE;
   if (!queue) {
@@ -193,6 +259,17 @@ app.post("/ingest/v1/events", async (context) => {
 
     return context.json({ data: { accepted: events.length, requestId } }, 202);
   } catch (error) {
+    if (error instanceof DailyQuotaExceeded) {
+      context.header("Retry-After", String(error.retryAfter));
+      return context.json({ error: { code: "DAILY_EVENT_QUOTA_EXCEEDED", message: "This credential has reached its daily event quota. Retry after the UTC day resets.", retryAfter: error.retryAfter, requestId } }, 429);
+    }
+    if (reservedUsage && !queueAccepted) {
+      try {
+        await releaseDailyQuota(context.env, reservedUsage.credentialId, reservedUsage.usageDate, reservedUsage.eventCount);
+      } catch (releaseError) {
+        console.error("Could not release reserved telemetry quota", { requestId, releaseError });
+      }
+    }
     console.error("Jerico ingestion request failed", { requestId, error });
     return context.json({ error: { code: "INGESTION_FAILED", message: "Telemetry could not be accepted. Retry with backoff.", requestId } }, 503);
   }
