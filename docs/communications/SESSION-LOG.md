@@ -565,3 +565,16 @@
 ### Next
 - Manually validate concurrent Cron invocations, lease expiry/recovery, query failure release, and consecutive-breach progression.
 - Continue the remaining scheduler/tenant-isolation/Workerd egress review and the broader release validation gate.
+
+
+## 2026-11-03 — Uptime scheduler current-row claim
+
+- Reviewed `apps/api/src/uptime-scheduler.ts` and its existing tests. Found that the scheduler selected full monitor rows, atomically advanced only the due timestamp, but then constructed the queue message from the pre-claim snapshot. A concurrent monitor edit could therefore enqueue stale URL/method/timeout/expected-status settings or use a stale interval.
+- Changed discovery to select IDs only. The atomic update now computes the next due time from the current database row's `interval_seconds` and returns the claimed row; the queue payload uses that returned configuration.
+- Made failed-enqueue rollback conditional on the exact `next_check_at` timestamp returned by the claim, preventing it from resetting a schedule that was subsequently changed or advanced.
+- No migration required. Opened and merged [PR #44](https://github.com/richard-mante/jerico/pull/44); merge commit: `0c4c16ef605eebf7c7b9d200aabdf0606b0103e9`.
+- Tests, typecheck, lint, build, and database concurrency checks were not executed. User will handle manual testing. No lockfile was generated or modified.
+
+### Next
+- Continue source-level tenant-isolation review, starting with schema-level foreign keys and internal callback/API resource lookups.
+- Continue the remaining Workerd egress and queue retry/DLQ review; retain the manual validation and provisioning release gates.
