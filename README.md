@@ -39,11 +39,11 @@ The longer-term vision is a complete Founder Operating System that combines prod
 
 ## Identity and tenancy
 
-Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are implemented in the Phase 1 merge but remain unverified against a live PostgreSQL deployment. The initial web flow includes sign-up/sign-in and guided organization plus first-project setup. Phase 2A adds project/environment-scoped public and secret ingestion credential management; see [Phase 2A](docs/roadmap/phase-2-credentials.md).
+Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are implemented in the Phase 1 merge but remain unverified against a live PostgreSQL deployment. The initial web flow includes sign-up/sign-in and guided organization plus first-project setup. Phase 2A adds project/environment-scoped public and secret ingestion credentials. Phase 2B adds the first authenticated telemetry ingestion path, queue consumer, ClickHouse table, and redaction/rate-limit hooks; see [Phase 2A](docs/roadmap/phase-2-credentials.md) and [Phase 2B](docs/roadmap/phase-2-ingestion.md).
 
 ## Repository status
 
-The repository has merged the Phase 0 foundation and Phase 1 identity/tenancy implementation. Phase 2A credential management is under review; telemetry ingestion, SDKs, analytics, alerting, and monitoring workflows remain incomplete. Implemented code is not considered production-ready until dependency installation, automated checks, and database integration tests pass.
+The repository has merged the Phase 0 foundation and Phase 1 identity/tenancy implementation. Phase 2A credential management and Phase 2B ingestion pipeline are in draft review and have not been validated or deployed. SDKs, query APIs/dashboard, alerting, uptime monitoring, self-hosted queue runtime, and full quota enforcement remain incomplete. Implemented code is not considered production-ready until dependency installation, automated checks, and database integration tests pass.
 
 ## Getting started
 
