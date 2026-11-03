@@ -4,8 +4,12 @@
   "workers_dev": true,
   "main": "src/index.ts",
   "compatibility_date": "2026-11-02",
-  "compatibility_flags": ["global_fetch_strictly_public"],
-  "observability": { "enabled": true },
+  "compatibility_flags": [
+    "global_fetch_strictly_public"
+  ],
+  "observability": {
+    "enabled": true
+  },
   "queues": {
     "consumers": [
       {
@@ -21,6 +25,13 @@
         "max_batch_timeout": 5,
         "max_retries": 5,
         "dead_letter_queue": "jerico-uptime-probes-dlq"
+      },
+      {
+        "queue": "jerico-notifications",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "jerico-notifications-dlq"
       }
     ]
   }
