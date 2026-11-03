@@ -1098,6 +1098,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
   const accepted = await withDatabase(context.env, async (database) => {
     const [updated] = await database.update(notificationDeliveries).set({
       status: result.status === "attempting" ? "queued" : result.status,
+      enqueueLeaseExpiresAt: null,
       attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
       providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
       lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
@@ -1194,7 +1195,7 @@ export default {
     context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
       console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
     }));
-    context.waitUntil(retryFailedNotificationEnqueues(env, new Date()).catch((error) => {
+    context.waitUntil(withDatabase(env, (database) => retryFailedNotificationEnqueues(database, env, new Date())).catch((error) => {
       console.error("Jerico notification enqueue reconciliation failed", error instanceof Error ? error.message : String(error));
     }));
     if (controller.cron === "0 3 * * *") {
