@@ -122,7 +122,6 @@ export async function queueIncidentNotifications(
       activeConsumerAttempt: 0,
     }).onConflictDoNothing().returning({
       id: notificationDeliveries.id,
-      enqueueToken: notificationDeliveries.activeEnqueueToken,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
       attempts: notificationDeliveries.attempts,
       eventType: notificationDeliveries.eventType,
@@ -130,7 +129,7 @@ export async function queueIncidentNotifications(
     });
     if (!delivery) continue;
 
-    const message = buildNotificationMessage(delivery, channel, incident, env);
+    const message = buildNotificationMessage({ ...delivery, enqueueToken }, channel, incident, env);
     if (!message) {
       await database.update(notificationDeliveries).set({
         status: "failed",
@@ -269,7 +268,7 @@ export async function retryFailedNotificationEnqueues(
     });
     if (!claimed) continue;
 
-    const message = buildNotificationMessage(claimed, channel, incident, env);
+    const message = buildNotificationMessage({ ...claimed, enqueueToken }, channel, incident, env);
     if (!message) {
       await database.update(notificationDeliveries).set({
         status: "failed",
