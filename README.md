@@ -39,11 +39,11 @@ The longer-term vision is a complete Founder Operating System that combines prod
 
 ## Identity and tenancy
 
-Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are under implementation and are not production-verified yet. The initial web flow includes sign-up/sign-in and guided organization plus first-project setup.
+Phase 1 introduces Better Auth, PostgreSQL/Drizzle persistence, organizations, memberships, products, projects, and environments. See the [identity and tenancy architecture](docs/architecture/identity-and-tenancy.md) and [Phase 1 roadmap](docs/roadmap/phase-1-identity-tenancy.md). These capabilities are implemented in the Phase 1 merge but remain unverified against a live PostgreSQL deployment. The initial web flow includes sign-up/sign-in and guided organization plus first-project setup. Phase 2A adds project/environment-scoped public and secret ingestion credential management; see [Phase 2A](docs/roadmap/phase-2-credentials.md).
 
 ## Repository status
 
-The repository is in **Phase 0 — foundation**. The web, desktop, API, ingestion, and shared-package directories are being scaffolded. A scaffold is not a completed product feature: authentication, persistence, telemetry ingestion, alerting, and monitoring workflows remain unimplemented until their respective phases are completed and tested.
+The repository has merged the Phase 0 foundation and Phase 1 identity/tenancy implementation. Phase 2A credential management is under review; telemetry ingestion, SDKs, analytics, alerting, and monitoring workflows remain incomplete. Implemented code is not considered production-ready until dependency installation, automated checks, and database integration tests pass.
 
 ## Getting started
 
