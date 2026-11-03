@@ -12,6 +12,21 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8.14.39-alpine
+        env:
+          CLICKHOUSE_DB: jerico
+          CLICKHOUSE_USER: jerico
+          CLICKHOUSE_PASSWORD: jerico_test
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "clickhouse-client --user jerico --password jerico_test --query 'SELECT 1'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,4 +39,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @jerico/api test:integration
+        env:
+          CLICKHOUSE_TEST_URL: http://127.0.0.1:8123
+          CLICKHOUSE_TEST_DATABASE: jerico
+          CLICKHOUSE_TEST_USERNAME: jerico
+          CLICKHOUSE_TEST_PASSWORD: jerico_test
       - run: pnpm build

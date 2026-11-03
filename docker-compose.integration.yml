@@ -1,0 +1,17 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8.14.39-alpine
+    environment:
+      CLICKHOUSE_DB: jerico
+      CLICKHOUSE_USER: jerico
+      CLICKHOUSE_PASSWORD: jerico_test
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - clickhouse-client --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD" --query "SELECT 1"
+      interval: 5s
+      timeout: 5s
+      retries: 20
