@@ -31,9 +31,12 @@ describe("uptime monitor contracts", () => {
     });
   });
 
-  it("rejects non-HTTP protocols and embedded URL credentials", () => {
+  it("rejects non-HTTP protocols, credentials, private hosts, and unsupported ports", () => {
     expect(createUptimeMonitorSchema.safeParse({ name: "FTP monitor", url: "ftp://example.com/file" }).success).toBe(false);
     expect(createUptimeMonitorSchema.safeParse({ name: "Credential URL", url: "https://user:pass@example.com" }).success).toBe(false);
+    expect(createUptimeMonitorSchema.safeParse({ name: "Localhost", url: "http://localhost/health" }).success).toBe(false);
+    expect(createUptimeMonitorSchema.safeParse({ name: "Private IP", url: "http://10.0.0.1/health" }).success).toBe(false);
+    expect(createUptimeMonitorSchema.safeParse({ name: "SSH port", url: "https://status.example.com:22/health" }).success).toBe(false);
   });
 
   it("bounds probe settings and requires a non-empty update", () => {
