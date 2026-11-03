@@ -80,6 +80,31 @@ async function withOrganization(
 }
 
 
+
+async function readBoundedJson(request: Request, maxBytes: number): Promise<unknown> {
+  if (!request.body) throw new SyntaxError("Request body is required.");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      throw new RangeError("Request payload is too large.");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
 function constantTimeEqual(left: string, right: string): boolean {
   const a = new TextEncoder().encode(left);
   const b = new TextEncoder().encode(right);
@@ -665,9 +690,14 @@ app.post("/internal/uptime-results", async (context) => {
   const supplied = context.req.header("x-jerico-uptime-secret") ?? "";
   if (!secret || secret.length < 32) return context.json({ error: { code: "UPTIME_RESULTS_UNAVAILABLE", message: "Internal uptime result ingestion is not configured." } }, 503);
   if (!constantTimeEqual(secret, supplied)) return context.json({ error: { code: "UNAUTHORIZED", message: "Invalid internal credential." } }, 401);
-  const contentLength = Number(context.req.header("content-length") ?? "0");
-  if (contentLength > 4096) return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The probe result payload is too large." } }, 413);
-  const parsed = uptimeProbeResultSchema.safeParse(await context.req.json().catch(() => null));
+  let body: unknown;
+  try {
+    body = await readBoundedJson(context.req.raw, 4096);
+  } catch (error) {
+    const tooLarge = error instanceof RangeError;
+    return context.json({ error: { code: tooLarge ? "PAYLOAD_TOO_LARGE" : "INVALID_JSON", message: tooLarge ? "The probe result payload is too large." : "The probe result payload is invalid." } }, tooLarge ? 413 : 400);
+  }
+  const parsed = uptimeProbeResultSchema.safeParse(body);
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The uptime probe result is invalid." } }, 400);
   try {
     const result = parsed.data;
