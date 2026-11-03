@@ -11,3 +11,13 @@ export function normalizeRoutePath(pathname: string): string {
   const withLeadingSlash = normalized.startsWith("/") ? normalized : `/${normalized}`;
   return withLeadingSlash.slice(0, 512) || "/";
 }
+
+export function resolveRoutePath(pathname: string, resolver?: (pathname: string) => string): string {
+  try {
+    const resolved = resolver?.(pathname);
+    if (typeof resolved === "string" && resolved.trim()) return normalizeRoutePath(resolved);
+  } catch {
+    // An application resolver must not interrupt telemetry capture.
+  }
+  return normalizeRoutePath(pathname);
+}
