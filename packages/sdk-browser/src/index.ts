@@ -31,15 +31,15 @@ export class BrowserJericoClient extends JericoClient {
     }
   }
 
-  override log(): never {
+  override log(_name: string, _message: string, _attributes?: Record<string, TelemetryValue>): never {
     throw new Error("Browser credentials cannot submit logs; use a secret key from a trusted server.");
   }
 
-  override metric(): never {
+  override metric(_name: string, _value: number, _attributes?: Record<string, TelemetryValue>): never {
     throw new Error("Browser credentials cannot submit metrics; use a secret key from a trusted server.");
   }
 
-  override span(): never {
+  override span(_name: string, _valueMs: number, _attributes?: Record<string, TelemetryValue>): never {
     throw new Error("Browser credentials cannot submit spans; use a secret key from a trusted server.");
   }
 
