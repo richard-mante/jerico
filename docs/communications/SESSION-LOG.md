@@ -378,3 +378,14 @@
 - Applied normalized paths to page-view events and the initial Core Web Vitals document attribution.
 - Added unit tests and updated browser SDK README, Next.js example, Phase 4 roadmap, and handover.
 - No lint, typecheck, tests, build, or browser validation was run.
+
+
+## 2026-11-03 — Phase 5A uptime monitor management
+
+- Confirmed PR #28 merged into `main` (merge commit `aebb2119db4a97496b1f3b071c47d11371e08d17`).
+- Created `feat/phase-5-uptime-monitor-management` from current `main`.
+- Added Drizzle schema and migration `0005_uptime_monitors.sql` for project-scoped monitor definitions and check results, including composite tenant/project foreign keys and bounded configuration constraints. Registered the migration in the journal.
+- Added strict create/update contracts and API routes for list/create/update/delete plus latest check-history retrieval. Owner/admin role is required for writes; project and organization scope is verified.
+- Added a project uptime management page with create/edit/pause/delete and history disclosure; linked it from project cards.
+- This is configuration-only: scheduled probes, history writes, state transitions, and incidents are not implemented. SSRF protections and DNS/redirect validation are mandatory before outbound probes are introduced.
+- Added contract validation tests and a mocked cross-tenant API test. No migration execution, lint, typecheck, unit tests, build, database integration, or browser validation was run.

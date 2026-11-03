@@ -287,3 +287,14 @@ At the end of each substantial session, update this file and append a session-lo
 - Browser SDK accepts `resolveRoute(pathname)` for framework-specific route templates. Resolver exceptions fall back to built-in normalization.
 - Both page views and Core Web Vitals use normalized paths, reducing common dynamic-ID cardinality. Arbitrary dynamic slugs still require an app-provided resolver.
 - Added pure unit tests for default normalization, query/fragment removal, length bounds, custom templates, and resolver fallback. No lint, typecheck, tests, build, or browser validation was run.
+
+
+### Phase 5A — uptime monitor management (open PR)
+
+- Added `uptime_monitors` and `uptime_check_results` PostgreSQL tables with same-organization/project composite foreign keys, bounded interval/timeout/status constraints, due-check index, and monitor history indexes.
+- Added migration `0005_uptime_monitors.sql` and registered it in the Drizzle journal.
+- Added strict create/update contracts for HTTP(S) URLs, GET/HEAD, interval 60–86400 seconds, timeout 1–30 seconds, and expected status 100–599. URL credentials are rejected.
+- Added project-scoped monitor list/create/update/pause/delete and check-history read APIs. Owner/admin roles manage monitors; project/org membership is checked on every route.
+- Added a project uptime management page with create/edit/pause/delete and history disclosure, linked from project cards.
+- Important: this is configuration-only. No scheduler, outbound probes, history writes, uptime status, or incidents exist yet. The UI explicitly says checks are not running. SSRF/DNS/redirect protections must be implemented before enabling probes.
+- Tests are authored but not executed. No migration, lint, typecheck, tests, build, database integration, or browser validation was run.

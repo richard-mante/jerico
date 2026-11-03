@@ -7,8 +7,10 @@ import {
   createOrganizationSchema,
   createProductSchema,
   createProjectSchema,
+  createUptimeMonitorSchema,
+  updateUptimeMonitorSchema,
 } from "@jerico/contracts";
-import { environments, member, products, projectErrorGroupStates, projectIngestionKeys, projects } from "@jerico/database/schema";
+import { environments, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
@@ -561,6 +563,86 @@ app.post("/api/v1/projects/:projectId/environments", async (context) => withOrga
     if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "An environment with this slug already exists for the project." } }, 409);
     throw error;
   }
+}));
+
+
+app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const data = await database.select().from(uptimeMonitors)
+    .where(and(eq(uptimeMonitors.organizationId, organizationId), eq(uptimeMonitors.projectId, projectId)))
+    .orderBy(desc(uptimeMonitors.createdAt));
+  return context.json({ data, checksEnabled: false });
+}));
+
+app.post("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage uptime monitors." } }, 403);
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const parsed = createUptimeMonitorSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The uptime monitor details are invalid.", details: parsed.error.flatten() } }, 400);
+  const [created] = await database.insert(uptimeMonitors).values({
+    id: crypto.randomUUID(),
+    organizationId,
+    projectId,
+    name: parsed.data.name,
+    url: parsed.data.url,
+    method: parsed.data.method,
+    intervalSeconds: parsed.data.intervalSeconds,
+    timeoutMs: parsed.data.timeoutMs,
+    expectedStatusCode: parsed.data.expectedStatusCode,
+    enabled: parsed.data.enabled,
+    createdBy: userId,
+  }).returning();
+  return context.json({ data: created, checksEnabled: false }, 201);
+}));
+
+app.patch("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage uptime monitors." } }, 403);
+  const projectId = context.req.param("projectId");
+  const monitorId = context.req.param("monitorId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const parsed = updateUptimeMonitorSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide valid uptime monitor fields.", details: parsed.error.flatten() } }, 400);
+  const [updated] = await database.update(uptimeMonitors).set({ ...parsed.data, updatedAt: new Date() })
+    .where(and(eq(uptimeMonitors.id, monitorId), eq(uptimeMonitors.projectId, projectId), eq(uptimeMonitors.organizationId, organizationId)))
+    .returning();
+  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
+  return context.json({ data: updated, checksEnabled: false });
+}));
+
+app.delete("/api/v1/projects/:projectId/uptime-monitors/:monitorId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage uptime monitors." } }, 403);
+  const projectId = context.req.param("projectId");
+  const monitorId = context.req.param("monitorId");
+  const [deleted] = await database.delete(uptimeMonitors)
+    .where(and(eq(uptimeMonitors.id, monitorId), eq(uptimeMonitors.projectId, projectId), eq(uptimeMonitors.organizationId, organizationId)))
+    .returning({ id: uptimeMonitors.id });
+  if (!deleted) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
+  return context.json({ data: { deleted: true } });
+}));
+
+app.get("/api/v1/projects/:projectId/uptime-monitors/:monitorId/checks", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const monitorId = context.req.param("monitorId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const [monitor] = await database.select({ id: uptimeMonitors.id }).from(uptimeMonitors)
+    .where(and(eq(uptimeMonitors.id, monitorId), eq(uptimeMonitors.projectId, projectId), eq(uptimeMonitors.organizationId, organizationId))).limit(1);
+  if (!monitor) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
+  const limit = parseQueryLimit(context.req.query("limit"));
+  if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
+  const data = await database.select().from(uptimeCheckResults)
+    .where(and(eq(uptimeCheckResults.monitorId, monitorId), eq(uptimeCheckResults.projectId, projectId), eq(uptimeCheckResults.organizationId, organizationId)))
+    .orderBy(desc(uptimeCheckResults.checkedAt)).limit(limit);
+  return context.json({ data, checksEnabled: false });
 }));
 
 app.onError((error, context) => {
