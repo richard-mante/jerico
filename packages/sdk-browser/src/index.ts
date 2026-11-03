@@ -94,7 +94,7 @@ export class BrowserJericoClient extends JericoClient {
   capturePageView(attributes?: Record<string, TelemetryValue>): boolean {
     return this.track("page.view", {
       path: window.location.pathname,
-      title: document.title,
+      title: document.title.slice(0, 512),
       ...attributes,
     });
   }
