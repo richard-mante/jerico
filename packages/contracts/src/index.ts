@@ -52,8 +52,18 @@ export type TelemetryBatch = z.infer<typeof telemetryBatchSchema>;
 
 const uptimeMonitorUrlSchema = z.string().url().max(2048).refine((value) => {
   const url = new URL(value);
-  return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
-}, "Monitor URLs must use HTTP or HTTPS and must not include credentials.");
+  const hostname = url.hostname.toLowerCase().replace(/\\.$/, "");
+  const blockedSuffixes = [".localhost", ".local", ".internal", ".home.arpa", ".lan", ".corp", ".home", ".intranet", ".private", ".arpa", ".test", ".invalid", ".example", ".onion"];
+  const blockedHosts = ["localhost", "metadata", "metadata.google.internal", "metadata.azure.internal", "instance-data"];
+  const isIpLiteral = hostname.startsWith("[") || /^\\d{1,3}(?:\\.\\d{1,3}){3}$/.test(hostname);
+  const allowedPort = ["", "80", "443", "8080", "8443"].includes(url.port);
+  return (url.protocol === "http:" || url.protocol === "https:")
+    && !url.username && !url.password
+    && !isIpLiteral && hostname.includes(".")
+    && !blockedHosts.includes(hostname)
+    && !blockedSuffixes.some((suffix) => hostname.endsWith(suffix))
+    && allowedPort;
+}, "Monitor URLs must use public HTTP(S), a supported web port, and no credentials or private/local hostnames.");
 
 export const createUptimeMonitorSchema = z.object({
   name: z.string().trim().min(2).max(80),
