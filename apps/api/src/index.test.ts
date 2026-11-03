@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   select: vi.fn(),
   insert: vi.fn(),
+  update: vi.fn(),
 }));
 
 vi.mock("./auth", () => ({
@@ -14,6 +15,7 @@ vi.mock("./database", () => ({
   withDatabase: async (_env: unknown, callback: (database: unknown) => Promise<Response>) => callback({
     select: mocks.select,
     insert: mocks.insert,
+    update: mocks.update,
   }),
 }));
 
@@ -37,6 +39,7 @@ describe("project observability route authorization", () => {
       user: { id: "user-a" },
       session: { activeOrganizationId: "org-a" },
     });
+    mocks.update.mockReset();
     mocks.insert.mockReturnValue({
       values: () => ({ onConflictDoUpdate: async () => ({}) }),
     });
@@ -198,6 +201,41 @@ describe("notification channel authorization", () => {
     expect(response.status).toBe(400);
     expect(mocks.select).not.toHaveBeenCalled();
   });
+  it("atomically consumes the current email verification token", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [{ id: "channel-a" }],
+        }),
+      }),
+    });
+    const response = await app.request("/api/v1/notification-channels/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: "v".repeat(43) }),
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("rejects an email verification token replaced by a resend before consumption", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    const response = await app.request("/api/v1/notification-channels/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: "v".repeat(43) }),
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+  });
+
   it("accepts a repeated webhook verification callback after its challenge was consumed", async () => {
     const challenge = "v".repeat(43);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(challenge));
