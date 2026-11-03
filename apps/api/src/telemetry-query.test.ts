@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryOverview } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryOverview } from "./telemetry-query";
 
 describe("telemetry query validation", () => {
   it("defaults to one hour and rejects ranges over 31 days", () => {
@@ -88,4 +88,27 @@ describe("ClickHouse query adapter", () => {
     )).rejects.toThrow("Invalid ClickHouse identifier");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("groups errors within the same tenant, project, and environment scope", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
+      fingerprint: "12345", name: "TypeError", latestMessage: "Cannot read property", occurrences: "4",
+      firstSeen: "2026-11-03T10:00:00.000Z", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-4",
+    }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const groups = await queryTelemetryErrorGroups(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", environmentId: "env-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z", limit: 25 },
+    );
+    expect(groups[0]).toEqual({
+      fingerprint: "12345", name: "TypeError", latestMessage: "Cannot read property", occurrences: 4,
+      firstSeen: "2026-11-03T10:00:00.000Z", lastSeen: "2026-11-03T11:00:00.000Z", latestEventId: "event-4",
+    });
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_organizationId")).toBe("org-a");
+    expect(parsed.searchParams.get("param_projectId")).toBe("project-a");
+    expect(parsed.searchParams.get("param_environmentId")).toBe("env-a");
+    expect(parsed.searchParams.get("query")).toContain("GROUP BY fingerprint, name");
+    expect(parsed.searchParams.get("query")).toContain("event_type = 'error'");
+  });
+
 });
