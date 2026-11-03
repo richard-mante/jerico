@@ -32,10 +32,10 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };
+type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; enqueueAttempt?: number; to: string; subject: string; text: string };
 type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
 type WebhookNotificationMessage = {
-  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; url: string;
+  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; enqueueAttempt?: number; url: string;
   secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved";
   incidentId: string; projectId: string; title: string; triggerValue: number; occurredAt: string;
 };
@@ -210,10 +210,21 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
   return false;
 }
 
+type NotificationAttemptContext = {
+  attemptId: string;
+  enqueueAttempt: number;
+  queueAttempt: number;
+};
+
+class StaleNotificationAttemptError extends Error {
+  constructor() { super("Notification queue attempt is stale."); }
+}
+
 async function postNotificationResult(
   env: WorkerEnv,
   result: { deliveryId: string; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
-): Promise<void> {
+  attempt: NotificationAttemptContext,
+): Promise<boolean> {
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification result callback is not configured.");
   }
@@ -230,10 +241,14 @@ async function postNotificationResult(
         "content-type": "application/json",
         "x-jerico-notification-secret": env.NOTIFICATION_DELIVERY_SECRET,
       },
-      body: JSON.stringify(result),
+      body: JSON.stringify({ ...result, ...attempt }),
     });
-    await response.body?.cancel().catch(() => undefined);
-    if (!response.ok) throw new Error("Notification result callback rejected.");
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error("Notification result callback rejected.");
+    }
+    const payload = await response.json().catch(() => null) as { data?: { accepted?: unknown } } | null;
+    return payload?.data?.accepted !== false;
   } finally {
     clearTimeout(timeout);
   }
@@ -242,7 +257,7 @@ async function postNotificationResult(
 async function processNotification(message: EmailNotificationMessage, env: WorkerEnv): Promise<void> {
   await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" });
+    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" }, attempt)) throw new StaleNotificationAttemptError();
     throw new Error("Resend email delivery is not configured.");
   }
   const controller = new AbortController();
@@ -266,7 +281,7 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
-      await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_rejected" });
+      if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_rejected" }, attempt)) throw new StaleNotificationAttemptError();
       throw new Error("Email provider rejected the notification.");
     }
     const payload = await response.json().catch(() => ({})) as { id?: unknown };
@@ -374,7 +389,7 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
       triggerValue: message.triggerValue,
       occurredAt: message.occurredAt,
     });
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "sent" });
+    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "sent" }, attempt)) throw new StaleNotificationAttemptError();
   } catch (error) {
     const rejected = error instanceof Error && error.message === "Webhook endpoint rejected the event.";
     await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
@@ -388,12 +403,23 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
       message.ack();
       continue;
     }
+    const attempt: NotificationAttemptContext = {
+      attemptId: crypto.randomUUID(),
+      enqueueAttempt: "enqueueAttempt" in message.body && Number.isInteger(message.body.enqueueAttempt)
+        ? message.body.enqueueAttempt as number
+        : 1,
+      queueAttempt: Math.max(1, message.attempts ?? 1),
+    };
     try {
-      if (message.body.type === "notification.email") await processNotification(message.body, env);
+      if (message.body.type === "notification.email") await processNotification(message.body, env, attempt);
       else if (message.body.type === "notification.webhook.verify") await processWebhookVerification(message.body, env);
-      else await processWebhookNotification(message.body, env);
+      else await processWebhookNotification(message.body, env, attempt);
       message.ack();
     } catch (error) {
+      if (error instanceof StaleNotificationAttemptError) {
+        message.ack();
+        continue;
+      }
       console.error("Jerico notification delivery failed", {
         ...(message.body.type === "notification.webhook.verify" ? { channelId: message.body.channelId } : { deliveryId: message.body.deliveryId }),
         error: error instanceof Error ? error.message : String(error),
