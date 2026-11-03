@@ -20,3 +20,10 @@ describe("notification enqueue retry backoff", () => {
     expect(notificationEnqueueRetryDelay(20)).toBe(60 * 60_000);
   });
 });
+
+
+describe("notification enqueue lease recovery", () => {
+  it("uses a two-minute lease so abandoned queued rows can be reclaimed", () => {
+    expect(notificationEnqueueLeaseDuration()).toBe(120_000);
+  });
+});
