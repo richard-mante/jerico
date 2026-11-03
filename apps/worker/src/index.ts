@@ -1,4 +1,5 @@
 type TelemetryEvent = {
+  eventId?: string;
   type: "event" | "error" | "log" | "metric" | "span";
   name: string;
   timestamp?: string;
@@ -29,8 +30,11 @@ export function escapeIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) throw new Error("Invalid ClickHouse identifier.");
   return value;
 }
-export function toRow(message: TelemetryMessage, event: TelemetryEvent) {
+export function toRow(message: TelemetryMessage, event: TelemetryEvent, eventIndex = 0) {
   return {
+    // Legacy schemaVersion 1 messages already in the queue have no eventId.
+    // requestId + index is stable across redelivery of the same envelope.
+    event_id: event.eventId ?? `legacy:${message.requestId}:${eventIndex}`,
     timestamp: event.timestamp ?? message.acceptedAt,
     accepted_at: message.acceptedAt,
     organization_id: message.organizationId,
@@ -50,7 +54,7 @@ export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryM
   if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
   const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
   const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
-  const rows = messages.flatMap((message) => message.events.map((event) => toRow(message, event)));
+  const rows = messages.flatMap((message) => message.events.map((event, index) => toRow(message, event, index)));
   if (!rows.length) return;
   const query = encodeURIComponent(`INSERT INTO ${database}.${table} FORMAT JSONEachRow`);
   const headers = new Headers({ "content-type": "application/x-ndjson" });

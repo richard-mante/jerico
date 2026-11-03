@@ -106,3 +106,19 @@
 - Continue Phase 2C by establishing an executable validation environment, generating the pnpm lockfile, and running the full workspace checks.
 - Fix issues found by those checks; verify Drizzle migrations against disposable PostgreSQL.
 - Provision and test Hyperdrive, Cloudflare Queues, Rate Limiting, and ClickHouse before calling ingestion production-ready.
+
+
+## 2026-11-03 — Phase 2C event-level queue deduplication
+
+- Merged documentation handover PR #4 to `main` as `9c7ca2e161ccf3f98c81ed57f5525ab8fabfebb1`.
+- Reviewed the current ingestion-to-ClickHouse path and confirmed the at-least-once queue consumer could write duplicate rows after a successful ClickHouse insert followed by a crash before queue acknowledgement.
+- Started `feat/phase-2c-queue-deduplication` from `main`.
+- Added a server-generated `eventId` to every accepted event before queue publication. The ID is carried in the queued envelope, so queue retries/redeliveries retain the same ID.
+- Updated the ClickHouse writer to persist `event_id`; updated the initial ClickHouse table to use `ReplacingMergeTree` and include `event_id` in the sorting key.
+- Updated worker unit tests and Phase 2B documentation to describe eventual deduplication and its limits. Client retries after ambiguous HTTP responses remain separate accepted events; strict immediate uniqueness is not claimed.
+- No dependency install, typecheck, tests, build, ClickHouse SQL execution, or end-to-end queue test was possible through the GitHub-only workflow. CI runner allocation remains unresolved.
+
+### Next
+- Review the branch diff and open a focused PR for event-level deduplication.
+- Validate ClickHouse `ReplacingMergeTree` behavior and query semantics against a real ClickHouse instance; run the workspace checks when a local environment is available.
+- Continue with SDK design only after ingestion contracts and runtime validation are stable.
