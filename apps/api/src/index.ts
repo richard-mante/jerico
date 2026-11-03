@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
   createWebhookNotificationChannelSchema,
@@ -816,10 +816,33 @@ app.post("/api/v1/notification-channels/verify", async (context) => {
 
 app.delete("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
-  const [deleted] = await database.delete(notificationChannels).where(and(
-    eq(notificationChannels.id, context.req.param("channelId")),
-    eq(notificationChannels.organizationId, organizationId),
-  )).returning({ id: notificationChannels.id });
+  const channelId = context.req.param("channelId");
+  const deleted = await database.transaction(async (transaction) => {
+    // Invalidate queued/outbox work before deleting the channel. Sent history
+    // remains intact; token fencing makes already-queued messages stale.
+    await transaction.update(notificationDeliveries).set({
+      status: "failed",
+      lastErrorCode: "channel_unavailable",
+      nextEnqueueAt: null,
+      activeEnqueueToken: null,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(notificationDeliveries.channelId, channelId),
+      eq(notificationDeliveries.organizationId, organizationId),
+      or(
+        eq(notificationDeliveries.status, "failed"),
+        and(
+          eq(notificationDeliveries.status, "queued"),
+          eq(notificationDeliveries.activeConsumerAttempt, 0),
+        ),
+      ),
+    ));
+    const [row] = await transaction.delete(notificationChannels).where(and(
+      eq(notificationChannels.id, channelId),
+      eq(notificationChannels.organizationId, organizationId),
+    )).returning({ id: notificationChannels.id });
+    return row;
+  });
   if (!deleted) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
   return context.json({ data: { deleted: true } });
 }));
@@ -1148,10 +1171,38 @@ app.post("/internal/notification-delivery-results", async (context) => {
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
   const result = parsed.data;
   const accepted = await withDatabase(context.env, async (database) => {
+    if (result.status === "attempting") {
+      const [delivery] = await database.select({
+        channelId: notificationDeliveries.channelId,
+        organizationId: notificationDeliveries.organizationId,
+      }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+      if (!delivery) return { accepted: false, active: false };
+      const [channel] = await database.select({ id: notificationChannels.id }).from(notificationChannels).where(and(
+        eq(notificationChannels.id, delivery.channelId),
+        eq(notificationChannels.organizationId, delivery.organizationId),
+        eq(notificationChannels.enabled, true),
+        isNotNull(notificationChannels.verifiedAt),
+      )).limit(1);
+      if (!channel) {
+        const [invalidated] = await database.update(notificationDeliveries).set({
+          status: "failed",
+          lastErrorCode: "channel_unavailable",
+          nextEnqueueAt: null,
+          activeEnqueueToken: null,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(notificationDeliveries.id, result.deliveryId),
+          result.enqueueToken ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken) : isNull(notificationDeliveries.activeEnqueueToken),
+          ne(notificationDeliveries.status, "sent"),
+        )).returning({ id: notificationDeliveries.id });
+        if (invalidated) return { accepted: true, active: false };
+      }
+    }
     const common = [
       eq(notificationDeliveries.id, result.deliveryId),
       result.enqueueToken ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken) : isNull(notificationDeliveries.activeEnqueueToken),
       ne(notificationDeliveries.status, "sent"),
+      or(isNull(notificationDeliveries.lastErrorCode), ne(notificationDeliveries.lastErrorCode, "channel_unavailable")),
     ];
     const [updated] = result.status === "attempting"
       ? await database.update(notificationDeliveries).set({
@@ -1189,9 +1240,10 @@ app.post("/internal/notification-delivery-results", async (context) => {
       status: notificationDeliveries.status,
       activeEnqueueToken: notificationDeliveries.activeEnqueueToken,
       activeConsumerAttempt: notificationDeliveries.activeConsumerAttempt,
+      lastErrorCode: notificationDeliveries.lastErrorCode,
     }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
     if (!existing) return { accepted: false, active: false };
-    if (existing.status === "sent") return { accepted: true, active: false };
+    if (existing.status === "sent" || existing.lastErrorCode === "channel_unavailable") return { accepted: true, active: false };
     // During a rolling deployment, an older Worker may still send callbacks
     // without the enqueue token. Do not acknowledge those against a new
     // token-owned enqueue; returning 404 makes that queue attempt retry.
