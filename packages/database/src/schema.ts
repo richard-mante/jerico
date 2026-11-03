@@ -308,7 +308,7 @@ export const incidents = pgTable("incidents", {
 
 export const notificationChannels = pgTable("notification_channels", {
   id: text("id").primaryKey(),
-  organizationId: text("organization_id").notNull(),
+  organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
   type: text("type").notNull().default("email"),
   target: text("target").notNull(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
