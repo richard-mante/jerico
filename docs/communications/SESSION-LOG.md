@@ -168,3 +168,29 @@
 - Outstanding blockers: no committed `pnpm-lock.yaml`; GitHub Actions hosted runner allocation has repeatedly failed before steps execute; no disposable PostgreSQL/ClickHouse or provisioned Cloudflare resources are connected to this session.
 - Next: resolve a runnable validation path, generate the lockfile, execute all workspace checks, then add request-level ingestion idempotency and end-to-end SDK-to-ingestion tests before starting dashboard query APIs.
 
+
+
+## 2026-11-03 — Phase 4 observability query API (first slice in progress)
+
+- Created branch `feat/phase-4-observability-query-api` from current `main`. PR #8 (request-level ingestion idempotency) remains open and unmerged; this Phase 4 work is isolated from it.
+- Inspected the existing Hono API organization membership guard, PostgreSQL project/environment schema, ClickHouse telemetry table, and Worker writer shape.
+- Added `apps/api/src/telemetry-query.ts` with a ClickHouse HTTP query adapter, strict database/table identifier validation, parameterized tenant/project/environment/time/type filters, 31-day time-range validation, page-size bounds, opaque keyset cursor helpers, and safe server-side ClickHouse error handling.
+- Added authenticated API routes for project events, errors, and logs. Each route checks organization membership using the existing guard, verifies that the project belongs to that organization, validates any environment filter against the same project, and queries ClickHouse with organization + project scope.
+- Added unit tests for time range validation, page limits, cursor parsing, query parameter binding, and identifier injection rejection.
+- Added ClickHouse API Worker local environment examples and `docs/roadmap/phase-4-observability.md`.
+- Updated the implementation roadmap and current-state handover.
+- No package install, lint, typecheck, tests, build, PostgreSQL integration, ClickHouse query, or route authorization integration test was executed. GitHub Actions runner allocation remains an unresolved blocker.
+- Extended the first slice with metrics and spans list routes and a project overview aggregation endpoint covering counts for all five telemetry types and latest event time. Added overview query tests and documented the fact that ReplacingMergeTree counts may temporarily include duplicate queue deliveries before background merges.
+- Added the first live web explorer at `/dashboard/projects/:projectId/observability`, linked from project cards. It loads the user's organizations, project environments, overview counts, and selected telemetry stream; supports organization/environment/time filters, five telemetry tabs, cursor-based pagination, and loading/empty/error/unauthenticated states.
+- Updated the Phase 4 roadmap and current-state handover to reflect the API and UI slice.
+- Next: add route-level tenant isolation tests, verify ClickHouse SQL against a real instance, and improve the explorer with error grouping, metric charts, and trace detail. Do not call Phase 4 complete until browser and cross-tenant integration tests pass.
+
+
+## 2026-11-03 — Phase 4 grouped error query
+
+- Continued work on the existing `feat/phase-4-observability-query-api` branch and PR #9.
+- Added a ClickHouse query adapter that groups error telemetry by a query-time fingerprint derived from error name and message, returning occurrence count, first/last seen timestamps, latest message, and latest event ID.
+- Added authenticated `GET /api/v1/projects/:projectId/telemetry/errors/groups`. It reuses the organization membership guard, checks project ownership, validates optional environment ownership in PostgreSQL, bounds time range and limit, and binds tenant/project/environment values in ClickHouse query parameters.
+- Added unit coverage for grouping output and tenant/project/environment query binding.
+- Important limitation: the fingerprint is not stored, message changes split groups, and there are no issue resolve/ignore actions or stack-trace aggregation yet. The endpoint returns at most 100 groups.
+- No lint, typecheck, tests, build, ClickHouse SQL execution, PostgreSQL integration, or browser validation was run. GitHub Actions currently fails before runner steps are available.

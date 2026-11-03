@@ -1,0 +1,224 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { authClient } from "../lib/auth-client";
+
+type Organization = { id: string; name: string };
+type Environment = { id: string; name: string; slug: string; isProduction: boolean };
+type TelemetryItem = {
+  eventId: string;
+  timestamp: string;
+  environmentId: string;
+  eventType: string;
+  name: string;
+  message: string;
+  value: number | null;
+  attributes: string;
+};
+type Overview = {
+  total: number;
+  events: number;
+  errors: number;
+  logs: number;
+  metrics: number;
+  spans: number;
+  lastEventAt: string | null;
+};
+type Tab = "events" | "errors" | "logs" | "metrics" | "spans";
+
+const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+const tabs: { id: Tab; label: string }[] = [
+  { id: "events", label: "Events" },
+  { id: "errors", label: "Errors" },
+  { id: "logs", label: "Logs" },
+  { id: "metrics", label: "Metrics" },
+  { id: "spans", label: "Traces" },
+];
+const emptyOverview: Overview = { total: 0, events: 0, errors: 0, logs: 0, metrics: 0, spans: 0, lastEventAt: null };
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium", timeStyle: "medium",
+  }).format(date);
+}
+
+export function ProjectObservability({ initialOrganizationId }: { initialOrganizationId: string }) {
+  const params = useParams<{ projectId: string }>();
+  const projectId = params.projectId;
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { data: organizations, isPending: organizationsPending } = authClient.useListOrganizations();
+  const [organizationId, setOrganizationId] = useState(initialOrganizationId);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [environmentId, setEnvironmentId] = useState("");
+  const [tab, setTab] = useState<Tab>("events");
+  const [rangeHours, setRangeHours] = useState("24");
+  const [overview, setOverview] = useState<Overview>(emptyOverview);
+  const [rows, setRows] = useState<TelemetryItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+
+  const organizationList = useMemo(() => (organizations ?? []) as Organization[], [organizations]);
+
+  useEffect(() => {
+    if (organizationList.length && (!organizationId || !organizationList.some((item) => item.id === organizationId))) {
+      setOrganizationId(organizationList[0].id);
+    }
+  }, [organizationId, organizationList]);
+
+  useEffect(() => {
+    if (!organizationId || !session) return;
+    void authClient.organization.setActive({ organizationId });
+    const controller = new AbortController();
+    void fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/environments`, {
+      credentials: "include",
+      headers: { "X-Jerico-Organization-Id": organizationId },
+      signal: controller.signal,
+    }).then(async (response) => {
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "Could not load environments.");
+      const items = (payload.data ?? []) as Environment[];
+      setEnvironments(items);
+      if (environmentId && !items.some((item) => item.id === environmentId)) setEnvironmentId("");
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not load environments.");
+    });
+    return () => controller.abort();
+  }, [organizationId, projectId, session, environmentId]);
+
+  const queryWindow = useMemo(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - Number(rangeHours) * 60 * 60 * 1000);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, [rangeHours]);
+
+  useEffect(() => {
+    if (!organizationId || !session) return;
+    const controller = new AbortController();
+    const headers = { "X-Jerico-Organization-Id": organizationId };
+    const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to });
+    if (environmentId) query.set("environmentId", environmentId);
+    setLoading(true);
+    setError("");
+    setNextCursor(null);
+    void Promise.all([
+      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
+        credentials: "include", headers, signal: controller.signal,
+      }),
+      fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab}?${query}&limit=50`, {
+        credentials: "include", headers, signal: controller.signal,
+      }),
+    ]).then(async ([overviewResponse, listResponse]) => {
+      const overviewPayload = await overviewResponse.json();
+      const listPayload = await listResponse.json();
+      if (!overviewResponse.ok) throw new Error(overviewPayload.error?.message ?? "Could not load project overview.");
+      if (!listResponse.ok) throw new Error(listPayload.error?.message ?? "Could not load telemetry.");
+      setOverview(overviewPayload.data as Overview);
+      setRows((listPayload.data ?? []) as TelemetryItem[]);
+      setNextCursor(listPayload.pagination?.nextCursor ?? null);
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted) {
+        setRows([]);
+        setOverview(emptyOverview);
+        setError(cause instanceof Error ? cause.message : "Could not load telemetry.");
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [organizationId, session, projectId, tab, environmentId, queryWindow]);
+
+  async function loadMore() {
+    if (!organizationId || !nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const query = new URLSearchParams({ from: queryWindow.from, to: queryWindow.to, limit: "50", cursor: nextCursor });
+      if (environmentId) query.set("environmentId", environmentId);
+      const response = await fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/${tab}?${query}`, {
+        credentials: "include",
+        headers: { "X-Jerico-Organization-Id": organizationId },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "Could not load the next page.");
+      setRows((current) => [...current, ...((payload.data ?? []) as TelemetryItem[])]);
+      setNextCursor(payload.pagination?.nextCursor ?? null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load the next page.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  if (sessionPending || organizationsPending) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#090b10] text-sm text-[#929aaa]">Loading your workspace…</main>;
+  }
+  if (!session) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#090b10] px-6 text-[#f5f7fb]"><div className="text-center"><h1 className="text-2xl font-semibold">Sign in to continue</h1><Link href="/sign-in" className="mt-5 inline-flex rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b]">Sign in</Link></div></main>;
+  }
+  if (!organizationList.length) {
+    return <main className="min-h-screen bg-[#090b10] px-6 py-12 text-[#f5f7fb]"><p>No organization is available for this account.</p><Link className="mt-4 inline-block text-[#d9f36a]" href="/dashboard">Return to dashboard</Link></main>;
+  }
+
+  const stats = [
+    { label: "All signals", value: overview.total },
+    { label: "Events", value: overview.events },
+    { label: "Errors", value: overview.errors },
+    { label: "Logs", value: overview.logs },
+    { label: "Metrics", value: overview.metrics },
+    { label: "Spans", value: overview.spans },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#090b10] px-5 py-7 text-[#f5f7fb] sm:px-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+          <Link href="/dashboard" className="flex items-center gap-3 text-lg font-semibold"><span className="grid size-9 place-items-center rounded-xl bg-[#d9f36a] text-sm font-black text-[#15190b]">J</span>jerico</Link>
+          <div className="flex items-center gap-3 text-sm text-[#a8afbd]"><span>{session.user.name}</span><button onClick={() => authClient.signOut()} className="hover:text-white">Sign out</button></div>
+        </header>
+
+        <section className="flex flex-col gap-5 py-9 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <Link href="/dashboard" className="text-xs text-[#8d96a5] hover:text-white">Projects</Link>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-[#d9f36a]">Project observability</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Telemetry overview</h1>
+            <p className="mt-2 text-sm text-[#929aaa]">Project <span className="font-mono text-[#c8ced8]">{projectId.slice(0, 12)}</span></p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Workspace</span><select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} className="block min-w-44 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white">{organizationList.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></label>
+            <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Environment</span><select value={environmentId} onChange={(event) => setEnvironmentId(event.target.value)} className="block min-w-40 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white"><option value="">All environments</option>{environments.map((environment) => <option key={environment.id} value={environment.id}>{environment.name}</option>)}</select></label>
+            <label className="space-y-1.5 text-xs text-[#929aaa]"><span>Time range</span><select value={rangeHours} onChange={(event) => setRangeHours(event.target.value)} className="block min-w-32 rounded-xl border border-white/10 bg-[#111620] px-3 py-2.5 text-sm text-white"><option value="1">Last hour</option><option value="24">Last 24 hours</option><option value="168">Last 7 days</option><option value="720">Last 30 days</option></select></label>
+          </div>
+        </section>
+
+        {error && <p role="alert" className="mb-5 rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">{error}</p>}
+
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {stats.map((stat) => <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><p className="text-xs text-[#8f98a7]">{stat.label}</p><p className="mt-3 text-2xl font-semibold tabular-nums">{stat.value.toLocaleString()}</p></div>)}
+        </section>
+
+        <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+            <div><h2 className="font-semibold">Signal explorer</h2><p className="mt-1 text-xs text-[#7f8998]">Latest matching telemetry from ClickHouse</p></div>
+            <div className="flex flex-wrap gap-1 rounded-xl bg-black/20 p-1">{tabs.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${tab === item.id ? "bg-[#d9f36a] text-[#15190b]" : "text-[#9ba4b2] hover:text-white"}`}>{item.label}</button>)}</div>
+          </div>
+          {loading ? <div className="px-5 py-16 text-center text-sm text-[#8f98a7]">Loading telemetry…</div> : rows.length ? (
+            <div className="divide-y divide-white/[0.06]">
+              {rows.map((row, index) => <article key={`${row.eventId}-${index}`} className="grid gap-2 px-5 py-4 sm:grid-cols-[190px_110px_minmax(0,1fr)] sm:items-start">
+                <time className="text-xs text-[#8791a0]">{formatTimestamp(row.timestamp)}</time>
+                <span className="w-fit rounded-md border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-[#b4bdca]">{row.eventType}</span>
+                <div className="min-w-0"><p className="truncate text-sm font-medium">{row.name}</p>{row.message && <p className="mt-1 break-words text-xs leading-5 text-[#8f98a7]">{row.message}</p>}<p className="mt-1 font-mono text-[10px] text-[#606b7a]">{row.eventId}</p></div>
+              </article>)}
+            </div>
+          ) : <div className="px-5 py-16 text-center"><p className="text-sm font-medium text-[#c6cdd7]">No {tab} yet</p><p className="mt-2 text-xs text-[#7f8998]">When your application sends {tab}, they will appear here.</p></div>}
+          {nextCursor && <div className="border-t border-white/10 px-5 py-4 text-center"><button disabled={loadingMore} onClick={() => void loadMore()} className="rounded-lg border border-white/15 px-4 py-2 text-xs font-medium text-[#cbd2dc] hover:bg-white/5 disabled:opacity-50">{loadingMore ? "Loading…" : "Load more"}</button></div>}
+        </section>
+        <p className="mt-5 text-xs text-[#687382]">Latest signal: {overview.lastEventAt ? formatTimestamp(overview.lastEventAt) : "No telemetry received in this range."}</p>
+      </div>
+    </main>
+  );
+}
