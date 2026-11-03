@@ -191,4 +191,19 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("query")).toContain("cityHash64(name, message)");
     expect(parsed.searchParams.get("query")).toContain("{errorFingerprint:String}");
   });
+  it("filters span queries by a bound trace ID", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await queryTelemetry(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z", limit: 100, eventType: "span", traceId: "trace-abc" },
+    );
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_traceId")).toBe("trace-abc");
+    expect(parsed.searchParams.get("query")).toContain("JSONExtractString(attributes, 'traceId')");
+    expect(parsed.searchParams.get("query")).toContain("{traceId:String}");
+    expect(parsed.searchParams.get("param_eventType")).toBe("span");
+  });
+
 });
