@@ -16,7 +16,7 @@ export type ApiBindings = {
   UPTIME_RESULTS_SECRET?: string;
   UPTIME_PROBES?: { send(message: unknown): Promise<void> };
   NOTIFICATIONS?: { send(message: unknown): Promise<void> };
-  NOTIFICATION_DELIVERY_SECRET?: string;
+  NOTIFICATION_DELIVERY_SECRET?: string;\n  WEBHOOK_ENCRYPTION_KEY?: string;
 };
 export type JericoDatabase = NodePgDatabase<typeof schema>;
 
