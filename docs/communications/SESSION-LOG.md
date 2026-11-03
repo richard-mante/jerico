@@ -389,3 +389,23 @@
 - Added a project uptime management page with create/edit/pause/delete and history disclosure; linked it from project cards.
 - This is configuration-only: scheduled probes, history writes, state transitions, and incidents are not implemented. SSRF protections and DNS/redirect validation are mandatory before outbound probes are introduced.
 - Added contract validation tests and a mocked cross-tenant API test. No migration execution, lint, typecheck, unit tests, build, database integration, or browser validation was run.
+
+
+## 2026-11-03 — Phase 5B scheduled public uptime probes
+
+- Confirmed PR #29 merged into `main` (merge commit `a731cecc88faaa92492f50851ebd89d2718a61fe`).
+- Created `feat/uptime-probe-security` from current `main`.
+- Added `apps/worker/src/uptime-probe.ts`: HTTP(S) only, GET/HEAD only, common web ports only, reject IP literals and internal/reserved hostname suffixes, manual redirect handling with max three hops and per-hop revalidation, request timeout, response-body cancellation, and safe error codes only.
+- The probe runner uses global Worker `fetch` only; no `cloudflare:sockets` TCP sockets or VPC bindings. Deployment must remain workers.dev-only with public-only egress.
+- Added API Cron scheduling and a queue producer. Due monitors are conditionally claimed by advancing `next_check_at` and sent to `jerico-uptime-probes`.
+- Added Worker queue consumer, retry handling, and `jerico-uptime-probes-dlq` configuration.
+- Added a shared-secret internal result callback with constant-time comparison, strict schema validation, a bounded 4 KiB body, transactional check history insertion, and check-ID idempotency.
+- Added unit tests for target validation/redirects, contract tests for internal results, API callback authentication tests, and scheduler missing-binding test. No tests, lint, typecheck, build, migration, Cloudflare provisioning, or deployed probe run was executed.
+
+
+### Phase 5B follow-up — egress guard and retention
+
+- Enabled Workerd `global_fetch_strictly_public` on the probe Worker and required `PROBE_WORKER_HOST` so the Worker cannot probe itself. No VPC binding or custom route is configured.
+- Added a checked-at index and daily 30-day check-history retention.
+- Expanded internal result response-time bounds to tolerate scheduler delay.
+- Cloudflare queue/secret provisioning and deployed Workerd egress verification remain outstanding.

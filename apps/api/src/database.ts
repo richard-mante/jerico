@@ -13,6 +13,8 @@ export type ApiBindings = {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   HYPERDRIVE?: { connectionString: string };
+  UPTIME_RESULTS_SECRET?: string;
+  UPTIME_PROBES?: { send(message: unknown): Promise<void> };
 };
 export type JericoDatabase = NodePgDatabase<typeof schema>;
 
