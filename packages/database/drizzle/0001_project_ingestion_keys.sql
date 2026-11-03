@@ -17,7 +17,7 @@ CREATE TABLE "project_ingestion_keys" (
   CONSTRAINT "project_ingestion_keys_project_fk"
     FOREIGN KEY ("organization_id", "project_id") REFERENCES "projects" ("organization_id", "id") ON DELETE CASCADE,
   CONSTRAINT "project_ingestion_keys_environment_fk"
-    FOREIGN KEY ("project_id", "environment_id") REFERENCES "environments" ("project_id", "id") ON DELETE CASCADE,
+    FOREIGN KEY ("project_id", "environment_id") REFERENCES "environments" ("project_id", "id") ON DELETE CASCADE
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX "project_ingestion_keys_hash_unique" ON "project_ingestion_keys" ("key_hash");
