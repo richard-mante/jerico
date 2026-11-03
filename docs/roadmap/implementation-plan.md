@@ -90,8 +90,8 @@ See [Phase 4 query API plan](phase-4-observability.md).
 See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Project-scoped uptime monitor CRUD, check-history storage/API, scheduled queue dispatch, bounded public probes, and idempotent result persistence (Cloudflare provisioning/runtime validation pending).
 - [x] Initial SSRF controls: reject IP literals/internal hostnames/unsafe ports, use public-only Worker fetch egress, manually revalidate up to three redirects, bound timeout, and cancel response bodies. DNS/private egress assumptions require deployed Workerd verification; `global_fetch_strictly_public` and an exact self-host block are configured, and the probe Worker must remain workers.dev-only with no VPC binding.
-- [ ] Alert rules for error rate/count, uptime, and response time.
-- [ ] Incident deduplication, acknowledge, and resolve workflows.
+- [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration and scheduled evaluation (runtime validation pending).
+- [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notifications and audit history remain open).
 - [ ] Email and webhook notifications with verification, retries, and delivery history.
 
 **Acceptance:** An unavailable test endpoint creates one incident, sends a notification, and resolves after recovery according to configured thresholds.

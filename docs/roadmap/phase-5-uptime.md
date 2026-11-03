@@ -98,3 +98,34 @@ Set `API_URL` to the HTTPS `workers.dev` URL of the Jerico API and `PROBE_WORKER
 - Verify DNS/private address blocking and redirects in the deployed Workerd runtime.
 - Verify retries, duplicate callback idempotency, DLQ behavior, paused/deleted monitors, and queue outage recovery.
 - Add alert/incident state transitions only after this pipeline is verified.
+
+
+## Phase 5C: alert rules and incident lifecycle
+
+### Alert rule configuration
+
+Project-scoped alert rules support:
+- `error_count`: count error telemetry in a rolling 1–1,440 minute window.
+- `uptime_down`: count failed uptime check results in the rolling window. If no check results exist, the evaluator skips the rule instead of treating missing data as recovery.
+- `response_time`: calculate the nearest-rank p95 from up to the 10,000 most recent check response-time samples in the rolling window. This is based on uptime probes, not application request spans.
+
+Rules support `gt` and `gte` comparisons, thresholds, 1–10 consecutive minute evaluations, enable/pause, and owner/admin-only create/update/delete. Every evaluation is project- and organization-scoped. Error counts come from ClickHouse (and can temporarily include queue redeliveries until ReplacingMergeTree merges); uptime and response-time signals come from PostgreSQL check history.
+
+### Incident lifecycle
+
+- A breach that satisfies the consecutive-evaluation requirement opens an incident.
+- A partial unique index guarantees at most one open/acknowledged incident per alert rule.
+- Continued breaches update the active incident's latest value and timestamp.
+- Recovery automatically resolves an active incident.
+- Organization members can acknowledge or manually resolve incidents; rules remain owner/admin managed.
+- Deleting a rule cascades its incident history. There are no notifications, escalation policies, assignments, comments, or audit timeline yet.
+
+### API
+
+- `GET/POST /api/v1/projects/:projectId/alert-rules`
+- `PATCH/DELETE /api/v1/projects/:projectId/alert-rules/:ruleId`
+- `GET /api/v1/projects/:projectId/incidents`
+- `POST /api/v1/projects/:projectId/incidents/:incidentId/acknowledge`
+- `POST /api/v1/projects/:projectId/incidents/:incidentId/resolve`
+
+The API Cron Trigger evaluates enabled rules every minute. Error-count rules require ClickHouse configuration; uptime and response-time rules require persisted probe results. This implementation is authored but still needs runtime validation and alert delivery integrations.

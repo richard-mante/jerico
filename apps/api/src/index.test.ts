@@ -123,3 +123,32 @@ describe("project observability route authorization", () => {
   });
 
 });
+
+
+describe("alert rule route authorization", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getSession.mockResolvedValue({ user: { id: "user-a" }, session: { activeOrganizationId: "org-a" } });
+  });
+
+  it("does not allow members to create alert rules", async () => {
+    setSelectResults([{ role: "member" }]);
+    const response = await app.request("/api/v1/projects/project-a/alert-rules", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ name: "High errors", metric: "error_count", threshold: 10 }),
+    });
+    expect(response.status).toBe(403);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("does not reveal alert rules for a project outside the active organization", async () => {
+    setSelectResults([{ role: "member" }], []);
+    const response = await app.request("/api/v1/projects/project-from-org-b/alert-rules", {
+      method: "GET",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+    expect(response.status).toBe(404);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+});

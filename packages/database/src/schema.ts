@@ -246,4 +246,58 @@ export const uptimeCheckResults = pgTable("uptime_check_results", {
   index("uptime_check_results_checked_idx").on(t.checkedAt),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults };
+
+
+export const alertRules = pgTable("alert_rules", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  name: text("name").notNull(),
+  metric: text("metric").notNull(),
+  comparison: text("comparison").notNull().default("gte"),
+  threshold: integer("threshold").notNull(),
+  windowSeconds: integer("window_seconds").notNull().default(300),
+  consecutiveBreaches: integer("consecutive_breaches").notNull().default(1),
+  enabled: boolean("enabled").notNull().default(true),
+  consecutiveCount: integer("consecutive_count").notNull().default(0),
+  lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("alert_rules_metric_check", sql`${t.metric} IN ('error_count', 'uptime_down', 'response_time')`),
+  check("alert_rules_comparison_check", sql`${t.comparison} IN ('gt', 'gte')`),
+  check("alert_rules_threshold_check", sql`${t.threshold} >= 0`),
+  check("alert_rules_window_check", sql`${t.windowSeconds} BETWEEN 60 AND 86400`),
+  check("alert_rules_consecutive_breaches_check", sql`${t.consecutiveBreaches} BETWEEN 1 AND 10`),
+  check("alert_rules_consecutive_count_check", sql`${t.consecutiveCount} >= 0`),
+  uniqueIndex("alert_rules_id_org_project_unique").on(t.id, t.organizationId, t.projectId),
+  foreignKey({ name: "alert_rules_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
+  index("alert_rules_project_idx").on(t.organizationId, t.projectId, t.enabled),
+]);
+
+export const incidents = pgTable("incidents", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  alertRuleId: text("alert_rule_id").notNull(),
+  status: text("status").notNull().default("open"),
+  title: text("title").notNull(),
+  triggerValue: integer("trigger_value").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  lastTriggeredAt: timestamp("last_triggered_at", { withTimezone: true }).notNull().defaultNow(),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  acknowledgedBy: text("acknowledged_by").references(() => user.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("incidents_status_check", sql`${t.status} IN ('open', 'acknowledged', 'resolved')`),
+  uniqueIndex("incidents_id_org_project_unique").on(t.id, t.organizationId, t.projectId),
+  foreignKey({ name: "incidents_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
+  foreignKey({ name: "incidents_alert_rule_same_project_fk", columns: [t.alertRuleId, t.organizationId, t.projectId], foreignColumns: [alertRules.id, alertRules.organizationId, alertRules.projectId] }).onDelete("cascade"),
+  index("incidents_project_status_started_idx").on(t.organizationId, t.projectId, t.status, t.startedAt),
+  uniqueIndex("incidents_one_active_per_rule_unique").on(t.alertRuleId).where(sql`${t.status} IN ('open', 'acknowledged')`),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents };

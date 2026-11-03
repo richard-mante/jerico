@@ -409,3 +409,16 @@
 - Added a checked-at index and daily 30-day check-history retention.
 - Expanded internal result response-time bounds to tolerate scheduler delay.
 - Cloudflare queue/secret provisioning and deployed Workerd egress verification remain outstanding.
+
+
+## 2026-11-03 — Phase 5C alert rules and incident lifecycle
+
+- Started `feat/phase-5-alert-rules-incidents` from current `main`.
+- Added `alert_rules` and `incidents` Drizzle schema plus migration `0006_alert_rules_and_incidents.sql` and journal entry.
+- Added bounded Zod contracts for error-count, failed-uptime-check, and uptime-response-time alert rules.
+- Added project-scoped rule CRUD and incident list/acknowledge/resolve routes. Owner/admin role required for rule management; members can respond to incidents.
+- Added a scheduled evaluator invoked every minute. Error counts are queried from ClickHouse; uptime failures and response-time p95 use recent PostgreSQL check history. Missing uptime data does not resolve an active incident. Response-time calculation is bounded to 10,000 recent samples.
+- Added active-incident deduplication via a partial unique index; ongoing breaches update the active incident and recovery automatically resolves it.
+- Added an Alerts & Incidents project page, linked from dashboard project cards.
+- Added contract tests, query adapter tests, pure evaluator helper tests, and mocked API authorization tests. None have been executed; no migration, lint, typecheck, test, build, database integration, Cloudflare runtime, or browser validation has been run.
+- Remaining Phase 5 work: notification delivery, escalation, incident assignment/comments/audit history, and end-to-end runtime verification of cron + ClickHouse + PostgreSQL.

@@ -2,6 +2,8 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { and, asc, desc, eq, isNull, lte, or } from "drizzle-orm";
 import {
+  createAlertRuleSchema,
+  updateAlertRuleSchema,
   createEnvironmentSchema,
   createIngestionKeySchema,
   createOrganizationSchema,
@@ -11,12 +13,13 @@ import {
   updateUptimeMonitorSchema,
   uptimeProbeResultSchema,
 } from "@jerico/contracts";
-import { environments, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
+import { alertRules, environments, incidents, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
 import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
+import { evaluateAlertRules } from "./alert-evaluator";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
@@ -40,7 +43,7 @@ app.use("/api/*", cors({
 }));
 
 app.get("/", (context) => context.json({
-  name: "Jerico API", version: "v1", status: "phase-4-query-api",
+  name: "Jerico API", version: "v1", status: "phase-5-alert-rules",
   documentation: "https://github.com/richard-mante/jerico",
 }));
 app.get("/health", (context) => context.json({
@@ -605,6 +608,97 @@ app.post("/api/v1/projects/:projectId/environments", async (context) => withOrga
 }));
 
 
+
+app.get("/api/v1/projects/:projectId/alert-rules", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const data = await database.select().from(alertRules)
+    .where(and(eq(alertRules.organizationId, organizationId), eq(alertRules.projectId, projectId)))
+    .orderBy(desc(alertRules.createdAt));
+  return context.json({ data });
+}));
+
+app.post("/api/v1/projects/:projectId/alert-rules", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage alert rules." } }, 403);
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const parsed = createAlertRuleSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The alert rule details are invalid.", details: parsed.error.flatten() } }, 400);
+  const [created] = await database.insert(alertRules).values({
+    id: crypto.randomUUID(), organizationId, projectId, createdBy: userId, ...parsed.data,
+  }).returning();
+  return context.json({ data: created }, 201);
+}));
+
+app.patch("/api/v1/projects/:projectId/alert-rules/:ruleId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage alert rules." } }, 403);
+  const projectId = context.req.param("projectId");
+  const ruleId = context.req.param("ruleId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const parsed = updateAlertRuleSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide valid alert rule fields.", details: parsed.error.flatten() } }, 400);
+  const [updated] = await database.update(alertRules).set({ ...parsed.data, consecutiveCount: 0, updatedAt: new Date() })
+    .where(and(eq(alertRules.id, ruleId), eq(alertRules.projectId, projectId), eq(alertRules.organizationId, organizationId))).returning();
+  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Alert rule not found in this project." } }, 404);
+  return context.json({ data: updated });
+}));
+
+app.delete("/api/v1/projects/:projectId/alert-rules/:ruleId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage alert rules." } }, 403);
+  const projectId = context.req.param("projectId");
+  const [deleted] = await database.delete(alertRules)
+    .where(and(eq(alertRules.id, context.req.param("ruleId")), eq(alertRules.projectId, projectId), eq(alertRules.organizationId, organizationId)))
+    .returning({ id: alertRules.id });
+  if (!deleted) return context.json({ error: { code: "NOT_FOUND", message: "Alert rule not found in this project." } }, 404);
+  return context.json({ data: { deleted: true } });
+}));
+
+app.get("/api/v1/projects/:projectId/incidents", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const limit = parseQueryLimit(context.req.query("limit"));
+  if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
+  const status = context.req.query("status");
+  if (status && !["open", "acknowledged", "resolved"].includes(status)) return context.json({ error: { code: "INVALID_STATUS", message: "Status must be open, acknowledged, or resolved." } }, 400);
+  const filters = [eq(incidents.organizationId, organizationId), eq(incidents.projectId, projectId)];
+  if (status) filters.push(eq(incidents.status, status));
+  const data = await database.select().from(incidents).where(and(...filters)).orderBy(desc(incidents.startedAt)).limit(limit);
+  return context.json({ data });
+}));
+
+app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
+  const [updated] = await database.update(incidents).set({ status: "acknowledged", acknowledgedAt: new Date(), acknowledgedBy: userId, updatedAt: new Date() })
+    .where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "open"))).returning();
+  if (!updated) {
+    const [existing] = await database.select({ id: incidents.id, status: incidents.status }).from(incidents)
+      .where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
+    if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
+    return context.json({ data: existing });
+  }
+  return context.json({ data: updated });
+}));
+
+app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (context) => withOrganization(context, async (database, organizationId) => {
+  const now = new Date();
+  const [updated] = await database.update(incidents).set({ status: "resolved", resolvedAt: now, updatedAt: now })
+    .where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), or(eq(incidents.status, "open"), eq(incidents.status, "acknowledged")))).returning();
+  if (!updated) {
+    const [existing] = await database.select({ id: incidents.id, status: incidents.status }).from(incidents)
+      .where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
+    if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
+    return context.json({ data: existing });
+  }
+  return context.json({ data: updated });
+}));
+
 app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
@@ -759,6 +853,9 @@ export { app };
 export default {
   fetch: app.fetch.bind(app),
   scheduled(controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
+    context.waitUntil(evaluateAlertRules(env).catch((error) => {
+      console.error("Jerico alert evaluation failed", error instanceof Error ? error.message : String(error));
+    }));
     context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
       console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
     }));

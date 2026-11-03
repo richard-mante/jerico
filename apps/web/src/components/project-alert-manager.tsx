@@ -1,0 +1,174 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { authClient } from "../lib/auth-client";
+
+const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+type Metric = "error_count" | "uptime_down" | "response_time";
+type AlertRule = {
+  id: string; name: string; metric: Metric; comparison: "gt" | "gte"; threshold: number;
+  windowSeconds: number; consecutiveBreaches: number; enabled: boolean; consecutiveCount: number;
+};
+type Incident = {
+  id: string; alertRuleId: string; title: string; status: "open" | "acknowledged" | "resolved";
+  triggerValue: number; startedAt: string; lastTriggeredAt: string; resolvedAt: string | null;
+};
+const metricLabels: Record<Metric, string> = {
+  error_count: "Error count",
+  uptime_down: "Failed uptime checks",
+  response_time: "Response time (p95)",
+};
+function when(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+export function ProjectAlertManager() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { data: session, isPending } = authClient.useSession();
+  const organizationId = session?.session.activeOrganizationId ?? "";
+  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [name, setName] = useState("High error volume");
+  const [metric, setMetric] = useState<Metric>("error_count");
+  const [threshold, setThreshold] = useState("10");
+  const [comparison, setComparison] = useState<"gt" | "gte">("gte");
+  const [windowSeconds, setWindowSeconds] = useState("300");
+  const [consecutiveBreaches, setConsecutiveBreaches] = useState("1");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function request(path: string, init?: RequestInit) {
+    const response = await fetch(apiBase + path, {
+      ...init,
+      credentials: "include",
+      headers: {
+        ...(init?.headers ?? {}),
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        "X-Jerico-Organization-Id": organizationId,
+      },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error?.message ?? "The request could not be completed.");
+    return payload;
+  }
+  async function refresh() {
+    if (!organizationId || !projectId) return;
+    const [rulePayload, incidentPayload] = await Promise.all([
+      request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules`),
+      request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents?limit=50`),
+    ]);
+    setRules((rulePayload.data ?? []) as AlertRule[]);
+    setIncidents((incidentPayload.data ?? []) as Incident[]);
+  }
+  useEffect(() => {
+    if (!organizationId || !projectId) return;
+    void refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not load alerts."));
+  }, [organizationId, projectId]);
+
+  async function createRule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(), metric, comparison, threshold: Number(threshold),
+          windowSeconds: Number(windowSeconds), consecutiveBreaches: Number(consecutiveBreaches), enabled: true,
+        }),
+      });
+      setNotice("Alert rule created. It will be evaluated by the next scheduled cycle.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not create alert rule.");
+    } finally { setBusy(false); }
+  }
+  async function toggleRule(rule: AlertRule) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules/${encodeURIComponent(rule.id)}`, {
+        method: "PATCH", body: JSON.stringify({ enabled: !rule.enabled }),
+      });
+      setNotice(rule.enabled ? "Alert rule paused." : "Alert rule enabled.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update alert rule.");
+    } finally { setBusy(false); }
+  }
+  async function deleteRule(rule: AlertRule) {
+    if (!window.confirm(`Delete alert rule "${rule.name}" and its incident history?`)) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules/${encodeURIComponent(rule.id)}`, { method: "DELETE" });
+      setNotice("Alert rule deleted.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not delete alert rule.");
+    } finally { setBusy(false); }
+  }
+  async function updateIncident(incident: Incident, action: "acknowledge" | "resolve") {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incident.id)}/${action}`, { method: "POST" });
+      setNotice(action === "acknowledge" ? "Incident acknowledged." : "Incident resolved.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update incident.");
+    } finally { setBusy(false); }
+  }
+
+  if (isPending) return <main className="min-h-screen bg-[#090b10] p-8 text-sm text-[#929aaa]">Loading alert rules…</main>;
+  if (!session) return <main className="min-h-screen bg-[#090b10] p-8 text-[#f5f7fb]"><Link href="/sign-in">Sign in to continue</Link></main>;
+
+  return (
+    <main className="min-h-screen bg-[#090b10] px-5 py-8 text-[#f5f7fb] sm:px-8">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+          <div><Link href="/dashboard" className="text-sm text-[#a8afbd] hover:text-white">← Dashboard</Link><h1 className="mt-3 text-3xl font-semibold tracking-tight">Alerts & incidents</h1><p className="mt-2 text-sm text-[#929aaa]">Define project thresholds and track incidents when conditions persist.</p></div>
+          <Link href={`/dashboard/projects/${projectId}/uptime`} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-[#c2c8d3] hover:bg-white/5">Uptime monitors</Link>
+        </header>
+        {error && <p role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">{error}</p>}
+        {notice && <p role="status" className="mt-5 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/5 px-4 py-3 text-sm text-[#d9f36a]">{notice}</p>}
+        <section className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <form onSubmit={createRule} className="h-fit rounded-2xl border border-white/10 bg-white/[0.035] p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d9f36a]">New rule</p>
+            <h2 className="mt-2 text-xl font-semibold">Create an alert</h2>
+            <label className="mt-5 block space-y-2 text-sm"><span className="text-[#a8afbd]">Rule name</span><input required minLength={2} maxLength={80} value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3 outline-none focus:border-[#d9f36a]/60" /></label>
+            <label className="mt-4 block space-y-2 text-sm"><span className="text-[#a8afbd]">Signal</span><select value={metric} onChange={(event) => setMetric(event.target.value as Metric)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3">{Object.entries(metricLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-3">
+              <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">Condition</span><select value={comparison} onChange={(event) => setComparison(event.target.value as "gt" | "gte")} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-3 py-3"><option value="gte">At least</option><option value="gt">Greater than</option></select></label>
+              <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">{metric === "response_time" ? "Milliseconds" : "Count"}</span><input type="number" min="1" max="1000000" required value={threshold} onChange={(event) => setThreshold(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3" /></label>
+            </div>
+            <label className="mt-4 block space-y-2 text-sm"><span className="text-[#a8afbd]">Evaluation window</span><select value={windowSeconds} onChange={(event) => setWindowSeconds(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3"><option value="300">5 minutes</option><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select></label>
+            <label className="mt-4 block space-y-2 text-sm"><span className="text-[#a8afbd]">Consecutive breaches</span><select value={consecutiveBreaches} onChange={(event) => setConsecutiveBreaches(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3">{[1,2,3,4,5].map((value) => <option key={value} value={value}>{value} evaluation{value === 1 ? "" : "s"}</option>)}</select></label>
+            <p className="mt-3 text-xs leading-5 text-[#737b89]">{metric === "error_count" ? "Counts error events in the selected window." : metric === "uptime_down" ? "Counts failed uptime checks in the selected window. No probe data means no evaluation." : "Uses the 95th percentile of recorded uptime response times in the selected window."} Rules are evaluated every minute.</p>
+            <button disabled={busy} className="mt-5 w-full rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Saving…" : "Create alert rule"}</button>
+          </form>
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+              <div className="flex items-center justify-between"><div><h2 className="font-semibold">Alert rules</h2><p className="mt-1 text-xs text-[#737b89]">Rules configured for this project</p></div><span className="text-xs text-[#929aaa]">{rules.length} total</span></div>
+              <div className="mt-4 divide-y divide-white/10">
+                {rules.map((rule) => <div key={rule.id} className="py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{rule.name}</p><span className={`rounded-full px-2 py-1 text-[10px] ${rule.enabled ? "bg-[#d9f36a]/10 text-[#d9f36a]" : "bg-white/10 text-[#929aaa]"}`}>{rule.enabled ? "Enabled" : "Paused"}</span></div><p className="mt-2 text-xs text-[#929aaa]">{metricLabels[rule.metric]} · {rule.comparison === "gte" ? "≥" : ">"} {rule.threshold}{rule.metric === "response_time" ? " ms" : ""} · {Math.round(rule.windowSeconds / 60)}m window · {rule.consecutiveBreaches} consecutive</p></div><div className="flex gap-2"><button disabled={busy} onClick={() => void toggleRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">{rule.enabled ? "Pause" : "Enable"}</button><button disabled={busy} onClick={() => void deleteRule(rule)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 disabled:opacity-50">Delete</button></div></div>
+                </div>)}
+                {!rules.length && <p className="py-8 text-center text-sm text-[#737b89]">No alert rules yet. Create one to start monitoring a signal.</p>}
+              </div>
+            </section>
+            <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+              <div className="flex items-center justify-between"><div><h2 className="font-semibold">Incidents</h2><p className="mt-1 text-xs text-[#737b89]">Active and recent incident history</p></div><span className="text-xs text-[#929aaa]">{incidents.filter((item) => item.status !== "resolved").length} active</span></div>
+              <div className="mt-4 divide-y divide-white/10">
+                {incidents.map((incident) => <div key={incident.id} className="py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{incident.title}</p><span className={`rounded-full px-2 py-1 text-[10px] ${incident.status === "resolved" ? "bg-white/10 text-[#929aaa]" : incident.status === "acknowledged" ? "bg-blue-400/10 text-blue-300" : "bg-red-400/10 text-red-300"}`}>{incident.status}</span></div><p className="mt-2 text-xs text-[#929aaa]">Triggered value: {incident.triggerValue} · Started {when(incident.startedAt)}</p>{incident.resolvedAt && <p className="mt-1 text-xs text-[#737b89]">Resolved {when(incident.resolvedAt)}</p>}</div><div className="flex gap-2">{incident.status === "open" && <button disabled={busy} onClick={() => void updateIncident(incident, "acknowledge")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Acknowledge</button>}{incident.status !== "resolved" && <button disabled={busy} onClick={() => void updateIncident(incident, "resolve")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Resolve</button>}</div></div>
+                </div>)}
+                {!incidents.length && <p className="py-8 text-center text-sm text-[#737b89]">No incidents recorded. Incidents will appear when an alert rule breaches its threshold.</p>}
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
