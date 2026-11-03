@@ -88,6 +88,15 @@ function escapeIdentifier(value: string): string {
   return value;
 }
 
+const CLICKHOUSE_MAX_EXECUTION_SECONDS = 8;
+const CLICKHOUSE_REQUEST_TIMEOUT_MS = 10_000;
+
+async function fetchClickHouse(url: URL, headers: Headers): Promise<Response> {
+  // Bound server-side query work and client-side network/body wait independently.
+  url.searchParams.set("max_execution_time", String(CLICKHOUSE_MAX_EXECUTION_SECONDS));
+  return fetch(url, { headers, signal: AbortSignal.timeout(CLICKHOUSE_REQUEST_TIMEOUT_MS) });
+}
+
 export async function queryTelemetry<T>(
   env: TelemetryQueryBindings,
   input: TelemetryQuery,
@@ -136,7 +145,7 @@ export async function queryTelemetry<T>(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) {
     // Never forward ClickHouse's raw response body to the dashboard client.
     throw new Error(`ClickHouse query failed with status ${response.status}.`);
@@ -183,7 +192,7 @@ export async function queryTelemetryOverview(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse overview query failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<Record<string, unknown>> };
   const row = result.data?.[0];
@@ -241,7 +250,7 @@ export async function queryTelemetryErrorGroups(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse error-group query failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<Record<string, unknown>> };
   if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid error-group result.");
@@ -289,7 +298,7 @@ export async function queryTelemetryMetricSeries(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse metric-series query failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<Record<string, unknown>> };
   if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid metric-series result.");
@@ -344,7 +353,7 @@ export async function queryTelemetryEventCatalogue(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse event-catalogue query failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<Record<string, unknown>> };
   if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid event-catalogue result.");
@@ -389,7 +398,7 @@ export async function queryTelemetryEventSeries(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse event-series query failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<Record<string, unknown>> };
   if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid event-series result.");
@@ -443,7 +452,7 @@ export async function queryTelemetryRoutePerformance(
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) {
     headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
   }
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse route-performance query failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<Record<string, unknown>> };
   if (!Array.isArray(result.data)) throw new Error("ClickHouse returned an invalid route-performance result.");
@@ -483,7 +492,7 @@ export async function queryTelemetryErrorCount(
   const headers = new Headers();
   if (env.CLICKHOUSE_TOKEN) headers.set("authorization", `Bearer ${env.CLICKHOUSE_TOKEN}`);
   else if (env.CLICKHOUSE_USERNAME || env.CLICKHOUSE_PASSWORD) headers.set("authorization", "Basic " + btoa(`${env.CLICKHOUSE_USERNAME ?? "default"}:${env.CLICKHOUSE_PASSWORD ?? ""}`));
-  const response = await fetch(url, { headers });
+  const response = await fetchClickHouse(url, headers);
   if (!response.ok) throw new Error(`ClickHouse alert evaluation failed with status ${response.status}.`);
   const result = await response.json() as { data?: Array<{ total?: string | number }> };
   if (!Array.isArray(result.data) || !result.data[0]) throw new Error("ClickHouse returned an invalid alert evaluation result.");

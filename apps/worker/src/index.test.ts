@@ -57,6 +57,8 @@ describe("ClickHouse telemetry adapter", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     const [, init] = fetchMock.mock.calls[0]!;
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-token");
+    expect(init?.signal).toBeDefined();
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("max_execution_time")).toBe("8");
     expect(String(init?.body)).toContain('"organization_id":"org_123"');
     expect(String(init?.body)).toContain('"name":"signup"');
   });
