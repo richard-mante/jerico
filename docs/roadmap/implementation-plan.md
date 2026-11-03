@@ -88,8 +88,8 @@ See [Phase 4 query API plan](phase-4-observability.md).
 
 ## Phase 5 — Uptime, alerts, incidents
 See the [Phase 5 uptime plan](phase-5-uptime.md).
-- [x] Project-scoped uptime monitor CRUD and check-history storage/API (configuration only; scheduled probes and state transitions remain open).
-- [ ] SSRF protections: block private/loopback/link-local/metadata destinations, validate DNS and redirects, bound response size and redirect count.
+- [x] Project-scoped uptime monitor CRUD, check-history storage/API, scheduled queue dispatch, bounded public probes, and idempotent result persistence (Cloudflare provisioning/runtime validation pending).
+- [x] Initial SSRF controls: reject IP literals/internal hostnames/unsafe ports, use public-only Worker fetch egress, manually revalidate up to three redirects, bound timeout, and cancel response bodies. DNS/private egress assumptions require deployed Workerd verification; keep probe Worker workers.dev-only with no VPC binding.
 - [ ] Alert rules for error rate/count, uptime, and response time.
 - [ ] Incident deduplication, acknowledge, and resolve workflows.
 - [ ] Email and webhook notifications with verification, retries, and delivery history.
