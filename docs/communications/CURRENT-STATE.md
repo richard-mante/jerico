@@ -4,7 +4,7 @@
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Latest feature merge:** PR #33 — `9d45571e0639d418914b0d0fdbc34e6cf484e321`  
-**Latest main merge:** PR #36 — `ada0632e14441dde3140c273311f85332ebfbd24`  
+**Latest main merge:** PR #37 — `3680ed33f26b8f19cd7f4532d36880a1c9c46dcb`  
 **Current milestone:** Phase 5E — signed webhook notifications merged; Phase 0–5 implementation is present, but validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -61,7 +61,7 @@ Latest milestone: [PR #33 — verified signed webhook notifications](https://git
 
 **No successful end-to-end validation is confirmed for the repository's Phase 0–5 work.** Tests have been authored, but do not assume they pass.
 
-- CI jobs have repeatedly failed before runner allocation. Latest run #198 (push to main) failed before runner allocation. Its job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. The job has no execution steps or downloadable log; this is an Actions runner allocation/startup failure, not evidence that source checks passed or failed. This is an Actions runner allocation/startup failure, not evidence that source checks passed or failed.
+- CI jobs have repeatedly failed before runner allocation. Latest run #198 (push to main) failed before runner allocation. Its job is configured with the standard ubuntu-24.04 label but reports runner_id: 0, an empty runner name, and no steps. The job has no execution steps or downloadable log; this is an Actions runner allocation/startup failure, not evidence that source checks passed or failed.
 - No completed workspace dependency install, lint, typecheck, unit-test run, or full build has been verified.
 - No disposable PostgreSQL migration run or Better Auth/tenant integration test has been verified.
 - ClickHouse integration tests are gated and have not been observed passing against a real service.
@@ -96,6 +96,12 @@ Do not store any of these secrets in the repository. Use deployment secret store
 7. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
 
 Potential Phase 5 follow-ups include per-event notification preferences, quiet hours, escalation policies, manual retry controls, incident assignment/comments, and an audit timeline. Do not let these delay the essential validation and self-hosting release gates.
+
+
+
+### 2026-11-03 source-level review update
+
+Reviewed the current Worker probe/webhook delivery paths, API notification callbacks and channel lifecycle, database constraints, telemetry query construction, and auth setup. No confirmed exploitable issue was established from source inspection alone. In particular, the public-only Worker fetch compatibility flag remains configured, redirect handling is explicit, webhook secrets are AES-GCM encrypted at rest, and internal callbacks use bounded payload parsing plus shared-secret authentication. These are source observations, not deployed SSRF certification or runtime verification. Remaining review/validation items include deployed Workerd egress behavior, retry/DLQ semantics under callback outages, concurrent scheduler/evaluator behavior, tenant isolation against a live PostgreSQL instance, and ClickHouse query timeouts/resource limits.
 
 ## Continuity rules
 
