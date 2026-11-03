@@ -315,3 +315,12 @@ At the end of each substantial session, update this file and append a session-lo
 - Probe Worker now enables the `global_fetch_strictly_public` compatibility flag and requires `PROBE_WORKER_HOST` to block requests back to itself.
 - API retains check history for 30 days and schedules daily pruning with a timestamp index.
 - The probe Worker still requires provisioning of the queues, API URL, shared result secret, and exact worker hostname. No deployed Workerd test has verified the egress assumptions yet.
+
+
+### Phase 5C — uptime availability summaries (open PR)
+
+- Added `GET /api/v1/projects/:projectId/uptime-monitors/summary?window=24h|7d|30d`, grouped by monitor and bounded to the selected time window.
+- Returns total/up/down check counts, sample-based uptime percentage, average response time, p95 response time, and latest check timestamp.
+- Updated the uptime dashboard with a 24h/7d/30d selector and per-monitor observed uptime/latency summaries.
+- Added percentage helper tests, mocked API summary tests, tenant isolation, and invalid-window coverage. Tests have not been executed.
+- Important: this is sample-based availability, not time-weighted uptime; missed schedules do not count as downtime.
