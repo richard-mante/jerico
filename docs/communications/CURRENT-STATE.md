@@ -34,7 +34,7 @@ Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository conta
 
 ## Phase 1 implementation in review
 
-Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest branch commit: `82c46afc93925a636c77e55a2351b166320a755e`.
+Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest implementation commit: `70a7e4d7399008e287bb17722f1d49f62b3ca421`; subsequent commits update continuity documentation. Consult PR #2 for the exact current branch head.
 
 Implemented:
 - Better Auth identity, session, account, verification, organization, membership, and invitation schema.
