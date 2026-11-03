@@ -26,4 +26,27 @@ export const createEnvironmentSchema = z.object({
   isProduction: z.boolean().default(false),
 }).strict();
 export const createOrganizationSchema = z.object({ name: nameSchema, slug: slugSchema }).strict();
+
+export const createIngestionKeySchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  environmentId: z.string().min(1).max(128),
+  keyType: z.enum(["public", "secret"]),
+}).strict();
+
+export type IngestionKeyType = z.infer<typeof createIngestionKeySchema>["keyType"];
+
+const telemetryAttributeValueSchema = z.union([z.string().max(2048), z.number().finite(), z.boolean(), z.null()]);
+export const telemetryEventSchema = z.object({
+  type: z.enum(["event", "error", "log", "metric", "span"]),
+  name: z.string().trim().min(1).max(160),
+  timestamp: z.string().datetime({ offset: true }).optional(),
+  message: z.string().max(8192).optional(),
+  value: z.number().finite().optional(),
+  attributes: z.record(z.string().max(128), telemetryAttributeValueSchema).optional(),
+}).strict();
+export const telemetryBatchSchema = z.object({
+  events: z.array(telemetryEventSchema).min(1).max(100),
+}).strict();
+export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
+export type TelemetryBatch = z.infer<typeof telemetryBatchSchema>;
 export const API_VERSION = "v1" as const;

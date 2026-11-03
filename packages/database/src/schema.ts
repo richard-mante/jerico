@@ -1,4 +1,5 @@
-import { boolean, foreignKey, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
@@ -125,8 +126,43 @@ export const environments = pgTable("environments", {
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("environments_project_slug_unique").on(t.projectId, t.slug),
+  uniqueIndex("environments_project_id_id_unique").on(t.projectId, t.id),
   index("environments_organization_project_idx").on(t.organizationId, t.projectId),
   foreignKey({ name: "environments_project_same_organization_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments };
+export const projectIngestionKeys = pgTable("project_ingestion_keys", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  environmentId: text("environment_id").notNull(),
+  name: text("name").notNull(),
+  keyType: text("key_type").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull(),
+  createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "cascade" }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  check("project_ingestion_keys_key_type_check", sql`${t.keyType} IN ('public', 'secret')`),
+  uniqueIndex("project_ingestion_keys_hash_unique").on(t.keyHash),
+  foreignKey({ name: "project_ingestion_keys_project_fk", columns: [t.organizationId, t.projectId], foreignColumns: [projects.organizationId, projects.id] }).onDelete("cascade"),
+  foreignKey({ name: "project_ingestion_keys_environment_fk", columns: [t.projectId, t.environmentId], foreignColumns: [environments.projectId, environments.id] }).onDelete("cascade"),
+  index("project_ingestion_keys_project_idx").on(t.organizationId, t.projectId),
+  index("project_ingestion_keys_environment_idx").on(t.environmentId),
+  index("project_ingestion_keys_active_idx").on(t.projectId, t.revokedAt),
+]);
+
+export const projectIngestionUsage = pgTable("project_ingestion_usage", {
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  usageDate: date("usage_date", { mode: "string" }).notNull(),
+  eventCount: integer("event_count").notNull().default(0),
+  updatedAt: updatedAt(),
+}, (t) => [
+  primaryKey({ name: "project_ingestion_usage_pk", columns: [t.projectId, t.usageDate] }),
+  check("project_ingestion_usage_event_count_check", sql`${t.eventCount} >= 0`),
+  index("project_ingestion_usage_date_idx").on(t.usageDate),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage };

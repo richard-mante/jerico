@@ -1,0 +1,6 @@
+# Local-only ClickHouse connection. Copy to .dev.vars and replace placeholders.
+CLICKHOUSE_URL=http://localhost:8123
+CLICKHOUSE_DATABASE=jerico
+CLICKHOUSE_TABLE=telemetry_events
+CLICKHOUSE_USERNAME=default
+CLICKHOUSE_PASSWORD=

@@ -981,3 +981,10 @@ After Observability MVP:
 ## Identity and tenancy implementation
 
 See [Identity, Organizations, and Tenant Resources](identity-and-tenancy.md) for the Better Auth and Drizzle implementation boundary, session handling, organization membership checks, resource ownership constraints, and deployment secrets. The detailed Phase 1 implementation is being added incrementally; this architecture description is not proof of a live database or deployed authentication service.
+
+
+## Telemetry ingestion implementation
+
+The first authenticated ingestion path is documented in [Phase 2B — Telemetry Ingestion](../roadmap/phase-2-ingestion.md). The current Worker accepts bounded event batches, validates project credentials against PostgreSQL, derives tenant dimensions from the credential record, applies public/secret capability restrictions, redacts common sensitive values, and publishes to a Cloudflare Queue. A queue consumer writes to ClickHouse with retry and dead-letter configuration.
+
+This is the managed Cloudflare runtime implementation, not proof of a completed self-hosted queue/runtime adapter. The Cloudflare Rate Limiting binding and Hyperdrive ID must be provisioned per account before production deployment. The ClickHouse schema has initial 7-day log and 30-day other-telemetry retention rules. Daily/monthly plan quotas, idempotent event IDs, and a self-hosted durable queue adapter remain future work.

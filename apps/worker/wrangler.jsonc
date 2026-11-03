@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jerico-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-02",
+  "observability": { "enabled": true },
+  "queues": {
+    "consumers": [
+      {
+        "queue": "jerico-telemetry",
+        "max_batch_size": 100,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "jerico-telemetry-dlq"
+      }
+    ]
+  }
+}

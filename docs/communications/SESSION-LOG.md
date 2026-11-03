@@ -38,3 +38,54 @@
 - Generate and commit the pnpm lockfile; run lint/typecheck/tests/build.
 - Add PostgreSQL-backed Better Auth and tenancy integration tests and apply the migration to a disposable database.
 - Continue organization management/switching, project management, audit logging, and API-key lifecycle after Phase 1 validation.
+
+
+## 2026-11-03 — Phase 2A project ingestion credentials
+
+- Confirmed Phase 1 PR #2 is merged into `main` as `5952c67ead9868783a7d764d06ca78bf3d4fa37b`.
+- Created `feat/phase-2-ingestion-credentials` from the merged `main` branch.
+- Added `project_ingestion_keys` Drizzle schema and SQL migration `0001_project_ingestion_keys.sql`. Credentials are constrained to the same organization/project/environment through composite foreign keys; a composite unique index was added to environments for the environment ownership FK.
+- Added `createIngestionKeySchema` to shared contracts and validation tests.
+- Added Web Crypto credential generation in `apps/api/src/ingestion-keys.ts`: 256-bit random values with `jk_pub_` and `jk_sec_` prefixes; only SHA-256 hash and short prefix are stored.
+- Added project credential API routes: list, create, and soft revoke. Membership is checked through the existing organization guard; owner/admin roles can create/revoke, members can list metadata. Raw credentials are returned only in the create response.
+- Added a web project credential manager at `/dashboard/projects/[projectId]/keys`, with environment/type selection, one-time credential display/copy, metadata listing, and revocation. Added a dashboard link from each project row.
+- Added `docs/roadmap/phase-2-credentials.md`, linked it from the implementation roadmap, updated the root README and current-state handover.
+- Current feature branch: `feat/phase-2-ingestion-credentials`. Draft PR #3 opened at https://github.com/richard-mante/jerico/pull/3. Phase 2A implementation is not yet validated or merged.
+- GitHub Actions run for PR #3 failed before runner allocation. The check completed without executing steps; no source-level failure details are available.
+- No dependency install, lockfile generation, lint, typecheck, unit tests, build, PostgreSQL migration, or API integration test has been run. GitHub Actions runner allocation remains unresolved.
+- The ingestion service remains intentionally disabled. No telemetry write endpoint, queue, ClickHouse storage, rate limiting, quota enforcement, or redaction is implemented in this milestone.
+
+### Next
+- Review the full Phase 2A diff for schema/migration consistency, authorization, and UI behavior.
+- Establish a working validation environment; generate the pnpm lockfile and run lint/typecheck/tests/build.
+- Apply migration to disposable PostgreSQL and test tenant/project/environment isolation and credential revocation.
+- Only then open/merge Phase 2A PR and proceed to authenticated telemetry ingestion.
+
+
+## 2026-11-03 — Phase 2B authenticated telemetry ingestion
+
+- Continued on `feat/phase-2-ingestion-credentials` and extended draft PR #3: https://github.com/richard-mante/jerico/pull/3.
+- Added bounded telemetry event/batch contracts in `packages/contracts/src/index.ts` for event, error, log, metric, and span records.
+- Replaced the ingest placeholder with `POST /ingest/v1/events` in `apps/ingest/src/index.ts`. It parses bearer keys, hashes credentials, looks up active key hashes in PostgreSQL, derives organization/project/environment IDs from the stored credential, limits request bodies to 96 KiB and batches to 100 events, applies public-vs-secret event-type permissions, redacts common sensitive values, and queues a versioned envelope.
+- Added credential parsing/hash helpers and tests in `apps/ingest/src/credentials.ts` and `credentials.test.ts`.
+- Added redaction logic and tests in `apps/ingest/src/redaction.ts` and `redaction.test.ts`.
+- Added Cloudflare Queue producer binding configuration in `apps/ingest/wrangler.jsonc`; added pg/Drizzle/database/contracts dependencies to the ingest app.
+- Added `apps/worker` queue consumer. It batches queued records into ClickHouse HTTP `JSONEachRow` inserts, acknowledges successful writes, retries failed writes, and relies on Cloudflare Queue dead-letter routing after configured retries.
+- Added ClickHouse row/identifier/write tests in `apps/worker/src/index.test.ts`.
+- Added `infrastructure/clickhouse/init/001_telemetry_events.sql` with tenant dimensions, MergeTree ordering, 7-day log retention, and 30-day retention for other event types.
+- Added `docs/roadmap/phase-2-ingestion.md`, updated architecture/roadmap/README, and refreshed this handover.
+- Production requests fail closed if `APP_ENV=production` and the `INGEST_RATE_LIMITER` binding is missing. Actual Cloudflare rate-limit binding, queues, Hyperdrive, and ClickHouse resources still need account-level provisioning.
+- No package install, lockfile generation, lint, typecheck, unit tests, build, DB migration, Cloudflare deployment, queue delivery, or ClickHouse integration test was run. GitHub Actions runner allocation remains unresolved.
+- Known follow-up work: daily/monthly quotas, billing metering, idempotent event IDs, adaptive backpressure, self-hosted queue/runtime adapter, query APIs, and SDKs. Queue delivery is at-least-once and duplicate ClickHouse writes are possible in a crash-after-insert-before-ack scenario.
+
+### Next
+- Perform a full code/type review after a real pnpm install; fix compiler/runtime errors.
+- Run all workspace checks and PostgreSQL integration tests.
+- Provision and exercise the complete Cloudflare Queue → ClickHouse path, including retries and DLQ.
+- Add idempotency and quota enforcement; implement self-hosted queue adapter before declaring the ingestion pipeline deployment-neutral.
+
+
+- Follow-up hardening in the same Phase 2B branch: added `project_ingestion_usage` with migration `0002_project_ingestion_usage.sql`, an atomic per-project daily counter (default 100,000 events per UTC day), 429 responses with reset guidance, and quota refund when queue publication fails. Added unit tests for UTC date boundaries, reset countdown, and limit configuration.
+- Added explicit JSON content-type enforcement and inline secret-assignment redaction coverage.
+- Updated Phase 2B docs, roadmap, current-state handover, and PR #3 description to reflect daily quota behavior. Monthly plan tiers/billing metering remain out of scope.
+- Latest validation remains pending; no local package install or automated checks were executed.

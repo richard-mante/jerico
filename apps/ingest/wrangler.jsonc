@@ -3,5 +3,14 @@
   "name": "jerico-ingest",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-02",
-  "observability": { "enabled": true }
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "queues": {
+    "producers": [
+      {
+        "binding": "TELEMETRY_QUEUE",
+        "queue": "jerico-telemetry"
+      }
+    ]
+  }
 }
