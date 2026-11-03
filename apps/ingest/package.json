@@ -9,13 +9,21 @@
     "deploy": "wrangler deploy",
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "clean": "rm -rf dist .wrangler"
   },
-  "dependencies": { "hono": "^4.13.7" },
+  "dependencies": {
+    "@jerico/contracts": "workspace:*",
+    "@jerico/database": "workspace:*",
+    "drizzle-orm": "^0.44.7",
+    "hono": "^4.13.7",
+    "pg": "^8.16.3"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261101.1",
+    "@types/pg": "^8.15.5",
     "typescript": "^5.9.3",
+    "vitest": "^4.0.8",
     "wrangler": "^4.0.0"
   }
 }
