@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import {
   createEnvironmentSchema,
   createIngestionKeySchema,
@@ -17,6 +17,7 @@ import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
 import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
+import { calculateUptimePercentage } from "./uptime-summary";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
@@ -684,6 +685,39 @@ app.get("/api/v1/projects/:projectId/uptime-monitors/:monitorId/checks", async (
   return context.json({ data, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
 
+
+app.get("/api/v1/projects/:projectId/uptime-monitors/summary", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const windowValue = context.req.query("window") ?? "24h";
+  const windowHours: Record<string, number> = { "24h": 24, "7d": 168, "30d": 720 };
+  const hours = windowHours[windowValue];
+  if (!hours) return context.json({ error: { code: "INVALID_WINDOW", message: "Window must be 24h, 7d, or 30d." } }, 400);
+  const to = new Date();
+  const from = new Date(to.getTime() - hours * 60 * 60 * 1000);
+  const rows = await database.select({
+    monitorId: uptimeCheckResults.monitorId,
+    totalChecks: sql<number>`count(*)::int`,
+    upChecks: sql<number>`count(*) FILTER (WHERE ${uptimeCheckResults.status} = 'up')::int`,
+    downChecks: sql<number>`count(*) FILTER (WHERE ${uptimeCheckResults.status} = 'down')::int`,
+    averageResponseTimeMs: sql<number | null>`round(avg(${uptimeCheckResults.responseTimeMs}))::int`,
+    p95ResponseTimeMs: sql<number | null>`round(percentile_cont(0.95) WITHIN GROUP (ORDER BY ${uptimeCheckResults.responseTimeMs}))::int`,
+    lastCheckedAt: sql<Date | null>`max(${uptimeCheckResults.checkedAt})`,
+  }).from(uptimeCheckResults)
+    .where(and(
+      eq(uptimeCheckResults.organizationId, organizationId),
+      eq(uptimeCheckResults.projectId, projectId),
+      gte(uptimeCheckResults.checkedAt, from),
+    ))
+    .groupBy(uptimeCheckResults.monitorId);
+  const data = rows.map((row) => ({
+    ...row,
+    uptimePercentage: calculateUptimePercentage(row.upChecks, row.totalChecks),
+  }));
+  return context.json({ data, filters: { window: windowValue, from: from.toISOString(), to: to.toISOString() } });
+}));
 
 app.post("/internal/uptime-results", async (context) => {
   const secret = context.env.UPTIME_RESULTS_SECRET;
