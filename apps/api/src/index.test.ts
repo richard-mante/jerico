@@ -283,6 +283,76 @@ describe("notification channel authorization", () => {
     expect(response.status).toBe(202);
     await expect(response.json()).resolves.toMatchObject({ data: { accepted: true } });
   });
+  it("accepts the active notification attempt and ignores duplicate attempting callbacks", async () => {
+    const deliveryId = "550e8400-e29b-41d4-a716-446655440000";
+    const attemptId = "550e8400-e29b-41d4-a716-446655440001";
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{ id: deliveryId, status: "queued", activeAttemptId: attemptId }]);
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({ deliveryId, attemptId, enqueueAttempt: 1, queueAttempt: 1, status: "attempting" }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true, stale: false } });
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a failed callback from an older notification attempt", async () => {
+    const deliveryId = "550e8400-e29b-41d4-a716-446655440000";
+    const oldAttemptId = "550e8400-e29b-41d4-a716-446655440001";
+    const currentAttemptId = "550e8400-e29b-41d4-a716-446655440002";
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{ id: deliveryId, status: "queued", activeAttemptId: currentAttemptId }]);
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({
+        deliveryId, attemptId: oldAttemptId, enqueueAttempt: 1, queueAttempt: 1,
+        status: "failed", errorCode: "provider_unavailable",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: false, stale: true } });
+  });
+
+  it("accepts completion from the currently active notification attempt", async () => {
+    const deliveryId = "550e8400-e29b-41d4-a716-446655440000";
+    const attemptId = "550e8400-e29b-41d4-a716-446655440001";
+    const set = vi.fn().mockReturnValue({
+      where: () => ({
+        returning: async () => [{ id: deliveryId }],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({
+        deliveryId, attemptId, enqueueAttempt: 2, queueAttempt: 1,
+        status: "sent", providerMessageId: "provider-123",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true, stale: false } });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: "sent", providerMessageId: "provider-123" }));
+  });
+
   it("rejects delivery callbacks without the shared internal secret", async () => {
     const response = await app.request("/internal/notification-delivery-results", {
       method: "POST",
