@@ -37,7 +37,8 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
 
     for (const candidate of candidates) {
       const leaseToken = crypto.randomUUID();
-      const leaseExpiresAt = new Date(now.getTime() + ALERT_EVALUATION_LEASE_MS);
+      const leaseClaimedAt = new Date();
+      const leaseExpiresAt = new Date(leaseClaimedAt.getTime() + ALERT_EVALUATION_LEASE_MS);
       const [rule] = await database.update(alertRules).set({
         lastEvaluatedAt: now,
         evaluationLeaseToken: leaseToken,
@@ -47,7 +48,7 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
         eq(alertRules.id, candidate.id),
         eq(alertRules.enabled, true),
         or(isNull(alertRules.lastEvaluatedAt), lt(alertRules.lastEvaluatedAt, evaluationMinute)),
-        or(isNull(alertRules.evaluationLeaseExpiresAt), lte(alertRules.evaluationLeaseExpiresAt, now)),
+        or(isNull(alertRules.evaluationLeaseExpiresAt), lte(alertRules.evaluationLeaseExpiresAt, leaseClaimedAt)),
       )).returning();
       if (!rule) continue;
       evaluated += 1;
