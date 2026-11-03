@@ -1,0 +1,9 @@
+{
+  "name": "@jerico/sdk-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@jerico/sdk-core": "workspace:*" },
+  "scripts": { "lint": "biome lint .", "typecheck": "tsc --noEmit", "test": "vitest run" }
+}
