@@ -36,18 +36,18 @@
 
 ## Phase 2 — Credentials and telemetry ingestion
 
-**Current milestone:** [Phase 2A — Project Ingestion Credentials](phase-2-credentials.md) is implemented on a feature branch; validation and review are pending. The remaining Phase 2 work below is not yet complete.
+**Current milestones:** [Phase 2A — Project Ingestion Credentials](phase-2-credentials.md) and [Phase 2B — Authenticated Telemetry Ingestion](phase-2-ingestion.md) are implemented on the draft PR branch; validation, infrastructure provisioning, and review are pending.
 - [ ] Generate project/environment-scoped ingestion keys.
 - [ ] Store credential hashes only; show raw key once; support revocation.
 - [ ] Separate public ingestion credentials from server-only secrets.
-- [ ] Define versioned event, error, metric, and log contracts.
-- [ ] Configure ClickHouse schemas, indexes/order keys, and TTL.
+- [x] Define bounded versioned event, error, metric, log, and span contracts.
+- [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
 - [ ] Select a durable self-hosted queue and implement a queue adapter.
-- [ ] Implement ingestion authentication, validation, redaction, rate limits, quotas, and size limits.
-- [ ] Implement queue consumers, retries, dead-letter handling, and backpressure.
+- [ ] Implement ingestion authentication, validation, redaction, configured rate limits, quotas, and size limits. (Authentication, validation, redaction, request limits, and rate-limit hook implemented; plan quotas remain.)
+- [ ] Implement queue consumers, retries, dead-letter handling, and backpressure. (Cloudflare consumer/retry/DLQ config implemented; load/backpressure validation pending.)
 - [ ] Add ingestion/processing health metrics and integration tests.
 
-**Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected.
+**Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until the database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
 
 ## Phase 3 — TypeScript SDKs
 - [ ] Build shared SDK core: batching, transport, bounded retries, flush, sampling, and redaction.
