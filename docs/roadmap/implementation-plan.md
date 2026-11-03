@@ -85,7 +85,6 @@ See [Phase 4 query API plan](phase-4-observability.md).
 - [ ] Error grouping, stack traces, occurrence history, resolve/ignore actions.
 - [ ] Core Web Vitals, route performance, and percentiles.
 - [ ] Structured log explorer with severity and time filters.
-- [ ] Pagination and query limits on every high-volume view.
 
 **Acceptance:** Developers can investigate submitted telemetry without direct database access; all queries enforce tenant/project authorization.
 
