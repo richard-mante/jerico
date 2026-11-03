@@ -270,3 +270,12 @@ At the end of each substantial session, update this file and append a session-lo
 - Metrics cards show latest average with unit, latest rating, and p50/p75/p95 summaries.
 - Browser Web Vitals SDK metrics now attach `ms`/ `score` units and good/needs-improvement/poor ratings using the standard thresholds.
 - Added unit and gated ClickHouse integration assertions for percentiles and metadata. No tests, lint, typecheck, build, ClickHouse integration, or browser validation has been run.
+
+
+### Route-level Core Web Vitals — current open work
+
+- Branch `feat/route-performance-breakdown` adds `GET /api/v1/projects/:projectId/telemetry/metrics/routes`, grouping the five allowlisted browser Web Vitals by pathname.
+- Each route/metric result includes sample count, p75, p95, unit, and latest sample rating. The Metrics tab now displays route-level cards.
+- Web Vitals path attribution is captured at SDK initialization so a later SPA pathname change does not relabel the initial document's measurements.
+- Added query-adapter, mocked tenant-isolation, and gated ClickHouse integration coverage. No lint, typecheck, tests, build, ClickHouse integration, or browser validation has been run.
+- Limitation: raw pathname grouping is not route-template normalization and can create high cardinality if applications place IDs in path segments.

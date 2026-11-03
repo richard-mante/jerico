@@ -21,6 +21,7 @@ export class BrowserJericoClient extends JericoClient {
   private clsLastShiftTime = 0;
   private webVitalsSent = false;
   private captureWebVitalsEnabled = false;
+  private webVitalsPath = "";
 
   private createSessionId(): string {
     const id = crypto.randomUUID();
@@ -134,6 +135,7 @@ export class BrowserJericoClient extends JericoClient {
 
   private startWebVitalsCapture(): void {
     this.captureWebVitalsEnabled = true;
+    this.webVitalsPath = window.location.pathname;
     window.addEventListener("pagehide", this.onPageHide);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
 
@@ -181,7 +183,7 @@ export class BrowserJericoClient extends JericoClient {
     if (!isPublicWebVitalMetric(name)) return false;
     const unit = name === "web.vitals.cls" ? "score" : "ms";
     const rating = rateWebVital(name, value);
-    return super.metric(name, value, { ...attributes, unit, ...(rating ? { rating } : {}), source: "browser-web-vitals", path: window.location.pathname });
+    return super.metric(name, value, { ...attributes, unit, ...(rating ? { rating } : {}), source: "browser-web-vitals", path: this.webVitalsPath || window.location.pathname });
   }
 
   private flushWebVitals(): void {

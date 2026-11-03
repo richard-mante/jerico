@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance } from "./telemetry-query";
 
 describe("telemetry query validation", () => {
   it("defaults to one hour and rejects ranges over 31 days", () => {
@@ -207,6 +207,33 @@ describe("ClickHouse query adapter", () => {
     expect(parsed.searchParams.get("query")).toContain("JSONExtractString(attributes, 'traceId')");
     expect(parsed.searchParams.get("query")).toContain("{traceId:String}");
     expect(parsed.searchParams.get("param_eventType")).toBe("span");
+  });
+
+  it("groups allowlisted Web Vitals by tenant-scoped route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [
+      { path: "/checkout", name: "web.vitals.lcp", samples: "12", p75: "2400", p95: "3800", unit: "ms", rating: "needs-improvement" },
+      { path: "/checkout", name: "web.vitals.cls", samples: "12", p75: "0.08", p95: "0.18", unit: "score", rating: "good" },
+    ] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const routes = await queryTelemetryRoutePerformance(
+      { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" },
+      { organizationId: "org-a", projectId: "project-a", environmentId: "env-a", from: "2026-11-03T10:00:00.000Z", to: "2026-11-03T11:00:00.000Z" },
+    );
+    expect(routes).toEqual([{
+      path: "/checkout",
+      metrics: [
+        { name: "web.vitals.lcp", samples: 12, p75: 2400, p95: 3800, unit: "ms", rating: "needs-improvement" },
+        { name: "web.vitals.cls", samples: 12, p75: 0.08, p95: 0.18, unit: "score", rating: "good" },
+      ],
+    }]);
+    const [url] = fetchMock.mock.calls[0] as [URL];
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("param_organizationId")).toBe("org-a");
+    expect(parsed.searchParams.get("param_projectId")).toBe("project-a");
+    expect(parsed.searchParams.get("param_environmentId")).toBe("env-a");
+    expect(parsed.searchParams.get("query")).toContain("name IN ('web.vitals.lcp'");
+    expect(parsed.searchParams.get("query")).toContain("JSONExtractString(attributes, 'path')");
+    expect(parsed.searchParams.get("query")).toContain("quantileTDigest(0.95)(value)");
   });
 
 });

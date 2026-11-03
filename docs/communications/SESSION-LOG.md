@@ -356,3 +356,14 @@
 - Extended ClickHouse metric buckets with p50, p75, p95, unit, and rating metadata; updated API response mapping and dashboard metric cards.
 - Updated unit and gated ClickHouse integration test fixtures/assertions, SDK README, and Phase 3/4 documentation.
 - No lint, typecheck, unit tests, build, ClickHouse integration, or browser validation was run. Percentile SQL and actual browser metric distributions still require runtime verification.
+
+
+## 2026-11-03 — Route-level Core Web Vitals
+
+- Confirmed PR #26 merged into `main` (merge commit `d64b78c30cabc80c57aa4279d7bedfac63c951ae`).
+- Created `feat/route-performance-breakdown` from current `main`.
+- Added `queryTelemetryRoutePerformance` and authenticated `GET /api/v1/projects/:projectId/telemetry/metrics/routes`. The query is restricted to the five allowlisted Web Vitals names, binds organization/project/environment/time parameters, groups by pathname and metric, and returns sample count, p75, p95, unit, and latest rating, capped at 100 pairs.
+- Updated the Metrics tab with per-route Core Web Vitals cards.
+- Captured the browser SDK's initial pathname when Web Vitals collection starts so page-finalized metrics remain attributed to the document's initial route.
+- Added query-adapter tests, a mocked route-level cross-tenant test, and a gated ClickHouse integration case with route fixtures.
+- No lint, typecheck, unit tests, build, ClickHouse integration, or browser validation was run. Route path cardinality and privacy implications are documented.
