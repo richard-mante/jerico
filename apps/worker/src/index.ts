@@ -198,7 +198,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
   }
   if (message.type === "notification.webhook") {
     return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
-      && typeof message.enqueueToken === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.enqueueToken)
+      && (message.enqueueToken === undefined || (typeof message.enqueueToken === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.enqueueToken)))
       && typeof message.url === "string" && isSafeWebhookUrl(message.url, blockedHost)
       && typeof message.secretCiphertext === "string" && message.secretCiphertext.length >= 32 && message.secretCiphertext.length <= 512
       && typeof message.secretIv === "string" && message.secretIv.length >= 12 && message.secretIv.length <= 64
