@@ -710,6 +710,7 @@ app.get("/api/v1/projects/:projectId/uptime-monitors/summary", async (context) =
       eq(uptimeCheckResults.organizationId, organizationId),
       eq(uptimeCheckResults.projectId, projectId),
       gte(uptimeCheckResults.checkedAt, from),
+      lte(uptimeCheckResults.checkedAt, to),
     ))
     .groupBy(uptimeCheckResults.monitorId);
   const data = rows.map((row) => ({
