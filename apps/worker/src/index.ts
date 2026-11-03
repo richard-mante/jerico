@@ -184,6 +184,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
   if (typeof value !== "object" || value === null) return false;
   const message = value as Record<string, unknown>;
   if (message.schemaVersion !== 1) return false;
+  if (message.enqueueAttempt !== undefined && (!Number.isInteger(message.enqueueAttempt) || Number(message.enqueueAttempt) < 1 || Number(message.enqueueAttempt) > 5)) return false;
   if (message.type === "notification.email") {
     return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
       && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
@@ -254,12 +255,17 @@ async function postNotificationResult(
   }
 }
 
-async function processNotification(message: EmailNotificationMessage, env: WorkerEnv): Promise<void> {
-  await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
+async function processNotification(message: EmailNotificationMessage, env: WorkerEnv, attempt: NotificationAttemptContext): Promise<void> {
+  if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" }, attempt)) {
+    throw new StaleNotificationAttemptError();
+  }
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" }, attempt)) throw new StaleNotificationAttemptError();
+    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" }, attempt)) {
+      throw new StaleNotificationAttemptError();
+    }
     throw new Error("Resend email delivery is not configured.");
   }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
@@ -281,18 +287,25 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
-      if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_rejected" }, attempt)) throw new StaleNotificationAttemptError();
+      if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_rejected" }, attempt)) {
+        throw new StaleNotificationAttemptError();
+      }
       throw new Error("Email provider rejected the notification.");
     }
     const payload = await response.json().catch(() => ({})) as { id?: unknown };
-    await postNotificationResult(env, {
+    if (!await postNotificationResult(env, {
       deliveryId: message.deliveryId,
       status: "sent",
       ...(typeof payload.id === "string" ? { providerMessageId: payload.id.slice(0, 255) } : {}),
-    });
+    }, attempt)) {
+      throw new StaleNotificationAttemptError();
+    }
   } catch (error) {
+    if (error instanceof StaleNotificationAttemptError) throw error;
     if (error instanceof Error && error.message === "Email provider rejected the notification.") throw error;
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_unavailable" });
+    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_unavailable" }, attempt)) {
+      throw new StaleNotificationAttemptError();
+    }
     throw new Error("Email provider request failed.");
   } finally {
     clearTimeout(timeout);
@@ -372,8 +385,10 @@ async function processWebhookVerification(message: WebhookVerificationMessage, e
   } finally { clearTimeout(timeout); }
 }
 
-async function processWebhookNotification(message: WebhookNotificationMessage, env: WorkerEnv): Promise<void> {
-  await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
+async function processWebhookNotification(message: WebhookNotificationMessage, env: WorkerEnv, attempt: NotificationAttemptContext): Promise<void> {
+  if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" }, attempt)) {
+    throw new StaleNotificationAttemptError();
+  }
   try {
     await deliverWebhook({
       url: message.url,
@@ -389,10 +404,15 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
       triggerValue: message.triggerValue,
       occurredAt: message.occurredAt,
     });
-    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "sent" }, attempt)) throw new StaleNotificationAttemptError();
+    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "sent" }, attempt)) {
+      throw new StaleNotificationAttemptError();
+    }
   } catch (error) {
+    if (error instanceof StaleNotificationAttemptError) throw error;
     const rejected = error instanceof Error && error.message === "Webhook endpoint rejected the event.";
-    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
+    if (!await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" }, attempt)) {
+      throw new StaleNotificationAttemptError();
+    }
     throw new Error(rejected ? "Webhook endpoint rejected the event." : "Webhook delivery failed.");
   }
 }
