@@ -90,4 +90,12 @@ describe.skipIf(!testUrl)("ClickHouse telemetry query integration", () => {
     expect(logs).toHaveLength(1);
     expect(logs[0].name).toBe("api.request");
   });
+  it("retrieves all spans belonging to one trace independently of the dashboard page", async () => {
+    const spans = await queryTelemetry(bindings, {
+      organizationId, projectId, environmentId, from, to, limit: 100, eventType: "span", traceId: "trace-1",
+    });
+    expect(spans).toHaveLength(1);
+    expect(spans[0]).toMatchObject({ eventId: "span-1", eventType: "span", name: "http.request" });
+  });
+
 });
