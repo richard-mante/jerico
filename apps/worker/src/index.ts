@@ -543,7 +543,11 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
 
 export default {
   async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
-    if (batch.queue === "jerico-notifications-dlq") {\n      await processNotificationDeadLetterBatch(batch as MessageBatch<NotificationMessage>, env);\n      return;\n    }\n    if (batch.queue === "jerico-uptime-probes-dlq") {\n      await processUptimeDeadLetterBatch(batch as MessageBatch<UptimeProbeMessage>, env);\n      return;\n    }\n    if (batch.queue === "jerico-notifications") {
+    if (batch.queue === "jerico-notifications-dlq") {
+      await processNotificationDeadLetterBatch(batch as MessageBatch<NotificationMessage>, env);
+      return;\n    }\n    if (batch.queue === "jerico-uptime-probes-dlq") {
+      await processUptimeDeadLetterBatch(batch as MessageBatch<UptimeProbeMessage>, env);
+      return;\n    }\n    if (batch.queue === "jerico-notifications") {
       await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);
       return;
     }
