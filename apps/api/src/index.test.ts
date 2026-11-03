@@ -580,12 +580,6 @@ describe("notification delivery callback attempt fencing", () => {
         }),
       }),
     });
-    setSelectResults([{
-      id: "delivery-a",
-      status: "queued",
-      activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440001",
-      activeConsumerAttempt: 2,
-    }]);
     const response = await app.request("/internal/notification-delivery-results", {
       method: "POST",
       headers: { "content-type": "application/json", "x-jerico-notification-secret": "s".repeat(40) },
@@ -598,7 +592,7 @@ describe("notification delivery callback attempt fencing", () => {
     }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
     expect(response.status).toBe(202);
     expect((await response.json() as { data: { active: boolean } }).data.active).toBe(true);
-    expect(mocks.select).toHaveBeenCalledTimes(1);
+    expect(mocks.select).toHaveBeenCalledTimes(3);
   });
 
   it("increments cumulative attempts when a later enqueue generation starts at consumer attempt one", async () => {
