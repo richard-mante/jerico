@@ -22,7 +22,7 @@ Jerico is an extensible open-source Founder Operating System. The first independ
 - Transactional data: PostgreSQL through Drizzle ORM.
 - Cloudflare Hyperdrive: Worker-to-PostgreSQL connectivity/pooling layer; code can consume the `HYPERDRIVE` binding, but no production binding ID has been provisioned/configured yet.
 - Telemetry analytics: ClickHouse (not yet implemented).
-- Authentication: Better Auth with Drizzle/PostgreSQL adapter and organization plugin.
+- Authentication: Better Auth, self-hosted inside the Hono API Worker, using the Drizzle/PostgreSQL adapter and organization plugin. No separate Better Auth hosting subscription or managed auth service is required.
 - Shared contracts and UI: workspace packages.
 - Desktop is a separate client of the same APIs; monitoring must continue when desktop is closed.
 
@@ -34,7 +34,7 @@ Merged to main as 6b2e6a0be951db6ff2d0a2f3eb31b4cb6b6ec8e7. The repository conta
 
 ## Phase 1 implementation in review
 
-Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open.
+Branch: `feat/phase-1-identity-tenancy`. PR #2 remains open. Latest branch commit: `80ae14fa18959ac5db187149138396ace0bfdb8e`.
 
 Implemented:
 - Better Auth identity, session, account, verification, organization, membership, and invitation schema.
@@ -46,14 +46,16 @@ Implemented:
 - Web sign-in/sign-up pages and first-run organization/project onboarding, including Development and Production environment creation.
 - Shared Zod request contracts and validation tests.
 - Organization invitation acceptance page at `apps/web/src/app/accept-invitation/[id]/page.tsx`; signed-in users can accept via Better Auth, and signed-out users are instructed to sign in and reopen the invitation link.
+- Updated `withDatabase` lifecycle: a request-scoped `pg.Client` is created per Worker invocation; Hyperdrive clients are not explicitly ended because Workers clean up the edge connection, while local direct PostgreSQL clients are closed after use.
 
-The invitation page was added in commit `076c755da75c0aa20f00270863d8a4f832cadaa6`; continuity docs were updated in subsequent commits. These capabilities remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
+These capabilities remain unverified against an installed workspace or live PostgreSQL database. Do not call authentication or persistence production-ready until checks and integration tests pass.
 
 ## Required environment
 
-- Local: PostgreSQL, DATABASE_URL, BETTER_AUTH_SECRET, RESEND_API_KEY, EMAIL_FROM.
-- Cloudflare API Worker: provisioned Hyperdrive binding named HYPERDRIVE; Worker secrets for Better Auth and Resend; exact web origin in WEB_APP_URL.
+- Local: PostgreSQL, DATABASE_URL, BETTER_AUTH_SECRET, email provider configuration.
+- Cloudflare API Worker: provisioned Hyperdrive binding named HYPERDRIVE; Worker secrets for Better Auth and email delivery; exact web origin in WEB_APP_URL.
 - Google OAuth is optional and requires provider credentials.
+- The Hyperdrive binding ID must be added to `apps/api/wrangler.jsonc` after the actual Hyperdrive resource exists.
 - Never commit credentials or real connection strings.
 
 ## Not implemented yet
@@ -65,7 +67,7 @@ ClickHouse telemetry storage, queueing, SDKs, ingestion credential lifecycle, ob
 - No successful dependency install or committed pnpm lockfile.
 - No lint/typecheck/test/build run.
 - No PostgreSQL migration execution or Better Auth/tenancy integration test.
-- CI job fails before recording steps; latest inspected job has `steps: null` and no downloadable logs. Root cause remains unknown.
+- CI job fails before recording steps; latest inspected run (run #16, for commit `7dad40c`) has `steps: null` and no downloadable logs. Root cause remains unknown. Run #16 was created by the first code change in the latest session; a later docs-only commit is now the PR head.
 - No production Hyperdrive resource/binding ID or email/OAuth secrets configured.
 
 ## Next actions
