@@ -194,6 +194,8 @@ export class BrowserJericoClient extends JericoClient {
       const p98Index = Math.min(interactions.length - 1, Math.floor(interactions.length / 50));
       this.recordWebVital("web.vitals.inp", interactions[p98Index], { ...attributes, interactionCount: interactions.length });
     }
+    // Start a best-effort flush while the page is transitioning out of the foreground.
+    void this.flush().catch(() => undefined);
   }
 
   capturePageView(attributes?: Record<string, TelemetryValue>): boolean {
