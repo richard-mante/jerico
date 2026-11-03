@@ -32,10 +32,10 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; enqueueToken: string; to: string; subject: string; text: string };
+type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; enqueueToken?: string; to: string; subject: string; text: string };
 type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
 type WebhookNotificationMessage = {
-  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; enqueueToken: string; url: string;
+  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; enqueueToken?: string; url: string;
   secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved";
   incidentId: string; projectId: string; title: string; triggerValue: number; occurredAt: string;
 };
@@ -214,7 +214,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
 
 async function postNotificationResult(
   env: WorkerEnv,
-  result: { deliveryId: string; enqueueToken: string; attemptNumber: number; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
+  result: { deliveryId: string; enqueueToken?: string; attemptNumber: number; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
 ): Promise<void> {
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification result callback is not configured.");
