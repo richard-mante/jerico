@@ -122,4 +122,24 @@ describe("project observability route authorization", () => {
     expect(mocks.select).not.toHaveBeenCalled();
   });
 
+  it("does not expose uptime summaries for a project outside the active organization", async () => {
+    setSelectResults([{ role: "member" }], []);
+    const response = await app.request("/api/v1/projects/project-from-org-b/uptime-monitors/summary?window=24h", {
+      method: "GET",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+    expect(response.status).toBe(404);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects unsupported uptime summary windows", async () => {
+    setSelectResults([{ role: "member" }], [{ id: "project-a" }]);
+    const response = await app.request("/api/v1/projects/project-a/uptime-monitors/summary?window=90d", {
+      method: "GET",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
 });
