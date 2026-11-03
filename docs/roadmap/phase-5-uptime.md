@@ -71,7 +71,7 @@ The probe pipeline is implemented in code but requires Cloudflare queues/secrets
 - Each request has a 1–30 second timeout. Response bodies are cancelled immediately; no response body or headers are persisted.
 - Only HTTP status, response time, and a fixed safe error code are sent to the API. The API retains check results for 30 days and prunes older history daily.
 
-**Critical deployment constraint:** Keep `jerico-worker` on its `workers.dev` hostname with no custom-domain routes, VPC bindings, or private outbound network. The DNS-rebinding/private-address safety assumption relies on Cloudflare Workerd's default public-only global fetch egress, which filters resolved destinations to publicly routable addresses. Do not enable private-network access on this Worker. Cloudflare documents that private network access is provided through explicit VPC bindings; the probe code deliberately does not use them. If the deployment topology changes, re-review SSRF controls before continuing probes.
+**Critical deployment constraint:** Keep `jerico-worker` on its `workers.dev` hostname with no custom-domain routes, VPC bindings, or private outbound network. The Worker enables `global_fetch_strictly_public` and requires `PROBE_WORKER_HOST` to block requests back to its own hostname. The DNS-rebinding/private-address safety assumption relies on Cloudflare Workerd's default public-only global fetch egress, which filters resolved destinations to publicly routable addresses. Do not enable private-network access on this Worker. Cloudflare documents that private network access is provided through explicit VPC bindings; the probe code deliberately does not use them. If the deployment topology changes, re-review SSRF controls before continuing probes.
 
 ### Provisioning
 
