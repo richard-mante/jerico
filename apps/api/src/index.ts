@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
   createWebhookNotificationChannelSchema,
@@ -1095,25 +1095,77 @@ app.post("/internal/notification-delivery-results", async (context) => {
   const parsed = notificationDeliveryResultSchema.safeParse(body);
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
   const result = parsed.data;
-  const accepted = await withDatabase(context.env, async (database) => {
+  const outcome = await withDatabase(context.env, async (database) => {
+    const attemptMatch = and(
+      eq(notificationDeliveries.activeAttemptId, result.attemptId),
+      eq(notificationDeliveries.activeEnqueueAttempt, result.enqueueAttempt),
+      eq(notificationDeliveries.activeQueueAttempt, result.queueAttempt),
+    );
+
+    if (result.status === "attempting") {
+      // A newer queue/enqueue attempt wins by its monotonic (enqueue, queue)
+      // attempt pair. Repeated callbacks for the same attempt are idempotent.
+      const [updated] = await database.update(notificationDeliveries).set({
+        status: "queued",
+        activeAttemptId: result.attemptId,
+        activeEnqueueAttempt: result.enqueueAttempt,
+        activeQueueAttempt: result.queueAttempt,
+        attempts: sql`${notificationDeliveries.attempts} + 1`,
+        providerMessageId: null,
+        lastErrorCode: null,
+        lastAttemptAt: new Date(),
+        enqueuedAt: new Date(),
+        nextEnqueueAt: null,
+        sentAt: null,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(notificationDeliveries.id, result.deliveryId),
+        ne(notificationDeliveries.status, "sent"),
+        or(
+          lt(notificationDeliveries.activeEnqueueAttempt, result.enqueueAttempt),
+          and(
+            eq(notificationDeliveries.activeEnqueueAttempt, result.enqueueAttempt),
+            lt(notificationDeliveries.activeQueueAttempt, result.queueAttempt),
+          ),
+        ),
+      )).returning({ id: notificationDeliveries.id });
+      if (updated) return { found: true, accepted: true };
+      const [existing] = await database.select({
+        id: notificationDeliveries.id,
+        status: notificationDeliveries.status,
+        activeAttemptId: notificationDeliveries.activeAttemptId,
+      }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+      if (!existing) return { found: false, accepted: false };
+      return { found: true, accepted: existing.status === "sent" || existing.activeAttemptId === result.attemptId };
+    }
+
     const [updated] = await database.update(notificationDeliveries).set({
-      status: result.status === "attempting" ? "queued" : result.status,
-      attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
+      status: result.status,
       providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
       lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
       lastAttemptAt: new Date(),
-      enqueuedAt: new Date(),
-      nextEnqueueAt: null,
       sentAt: result.status === "sent" ? new Date() : null,
       updatedAt: new Date(),
-    }).where(and(eq(notificationDeliveries.id, result.deliveryId), ne(notificationDeliveries.status, "sent"))).returning({ id: notificationDeliveries.id });
-    if (updated) return true;
-    const [existing] = await database.select({ id: notificationDeliveries.id, status: notificationDeliveries.status })
-      .from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
-    return existing?.status === "sent";
+    }).where(and(
+      eq(notificationDeliveries.id, result.deliveryId),
+      ne(notificationDeliveries.status, "sent"),
+      attemptMatch,
+    )).returning({ id: notificationDeliveries.id });
+    if (updated) return { found: true, accepted: true };
+    const [existing] = await database.select({
+      id: notificationDeliveries.id,
+      status: notificationDeliveries.status,
+      activeAttemptId: notificationDeliveries.activeAttemptId,
+    }).from(notificationDeliveries).where(eq(notificationDeliveries.id, result.deliveryId)).limit(1);
+    if (!existing) return { found: false, accepted: false };
+    return {
+      found: true,
+      accepted: existing.status === "sent"
+        || (existing.activeAttemptId === result.attemptId && existing.status === result.status),
+    };
   });
-  if (!accepted) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
-  return context.json({ data: { accepted: true } }, 202);
+  if (!outcome.found) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
+  return context.json({ data: { accepted: outcome.accepted, stale: !outcome.accepted } }, 202);
 });
 
 app.post("/internal/uptime-results", async (context) => {
