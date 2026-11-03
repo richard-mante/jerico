@@ -152,3 +152,39 @@ describe("alert rule route authorization", () => {
     expect(mocks.select).toHaveBeenCalledTimes(2);
   });
 });
+
+
+describe("notification channel authorization", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getSession.mockResolvedValue({ user: { id: "user-a" }, session: { activeOrganizationId: "org-a" } });
+  });
+  it("does not allow members to create organization notification channels", async () => {
+    setSelectResults([{ role: "member" }]);
+    const response = await app.request("/api/v1/notification-channels", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-organization-id": "org-a" },
+      body: JSON.stringify({ email: "ops@example.com" }),
+    });
+    expect(response.status).toBe(403);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+  it("rejects invalid verification tokens before querying the database", async () => {
+    const response = await app.request("/api/v1/notification-channels/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: "short" }),
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+  it("rejects delivery callbacks without the shared internal secret", async () => {
+    const response = await app.request("/internal/notification-delivery-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": "wrong" },
+      body: JSON.stringify({}),
+    }, { NOTIFICATION_DELIVERY_SECRET: "s".repeat(40) });
+    expect(response.status).toBe(401);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+});
