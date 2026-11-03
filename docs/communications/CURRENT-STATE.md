@@ -4,7 +4,7 @@
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Current work branch:** `feat/phase-3-typescript-sdk-foundation`  
-**Current milestone:** Phase 2C — validation and infrastructure readiness
+**Current milestone:** Phase 3 — TypeScript SDK foundation (validation pending); Phase 2C infrastructure validation remains outstanding
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. Always inspect actual code before relying on this handover.
 
