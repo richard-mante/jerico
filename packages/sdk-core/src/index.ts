@@ -71,8 +71,8 @@ export class JericoClient {
     return this.enqueue({
       type: "error",
       name: error.name || "Error",
-      message: error.message,
-      attributes: { ...attributes, ...(error.stack ? { stack: error.stack } : {}) },
+      message: error.message.slice(0, 8192),
+      attributes: { ...attributes, ...(error.stack ? { stack: error.stack.slice(0, 2048) } : {}) },
     });
   }
 
@@ -92,12 +92,19 @@ export class JericoClient {
 
   private enqueue(event: Omit<TelemetryEvent, "timestamp">): boolean {
     if (this.closed) throw new Error("This Jerico client has been closed.");
-    if (!event.name.trim()) throw new Error("Telemetry event name cannot be empty.");
+    const name = event.name.trim();
+    if (!name || name.length > 160) throw new Error("Telemetry event name must contain 1–160 characters.");
+    for (const [key, value] of Object.entries(event.attributes ?? {})) {
+      if (!key || key.length > 128) throw new Error("Telemetry attribute keys must contain 1–128 characters.");
+      if (typeof value === "string" && value.length > 2048) throw new Error("Telemetry attribute values cannot exceed 2048 characters.");
+      if (typeof value === "number" && !Number.isFinite(value)) throw new Error("Telemetry attribute numbers must be finite.");
+    }
+    if (event.message && event.message.length > 8192) event = { ...event, message: event.message.slice(0, 8192) };
     if (this.queue.length + this.inFlightCount >= this.maxQueueSize) {
       this.reportError(new Error("Jerico telemetry queue is full; the new event was dropped."));
       return false;
     }
-    this.queue.push({ ...event, timestamp: new Date().toISOString() });
+    this.queue.push({ ...event, name, timestamp: new Date().toISOString() });
     if (!this.timerBlocked && this.queue.length >= this.maxBatchSize) {
       void this.flushBatch().catch(this.reportError);
     }
@@ -153,6 +160,6 @@ export class JericoClient {
 
   private readonly reportError = (error: unknown): void => {
     const normalized = error instanceof Error ? error : new Error(String(error));
-    this.options.onError?.(normalized);
+    try { this.options.onError?.(normalized); } catch { /* Never let SDK callbacks crash the host application. */ }
   };
 }
