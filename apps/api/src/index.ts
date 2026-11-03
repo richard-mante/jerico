@@ -1188,7 +1188,6 @@ app.post("/internal/notification-delivery-results", async (context) => {
           eq(notificationDeliveries.id, result.deliveryId),
           result.enqueueToken ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken) : isNull(notificationDeliveries.activeEnqueueToken),
           ne(notificationDeliveries.status, "sent"),
-      or(isNull(notificationDeliveries.lastErrorCode), ne(notificationDeliveries.lastErrorCode, "channel_unavailable")),
         )).returning({ id: notificationDeliveries.id });
         if (invalidated) return { accepted: true, active: false };
       }
@@ -1197,6 +1196,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
       eq(notificationDeliveries.id, result.deliveryId),
       result.enqueueToken ? eq(notificationDeliveries.activeEnqueueToken, result.enqueueToken) : isNull(notificationDeliveries.activeEnqueueToken),
       ne(notificationDeliveries.status, "sent"),
+      or(isNull(notificationDeliveries.lastErrorCode), ne(notificationDeliveries.lastErrorCode, "channel_unavailable")),
     ];
     const [updated] = result.status === "attempting"
       ? await database.update(notificationDeliveries).set({
