@@ -27,6 +27,12 @@ describe("JericoClient", () => {
     await client.close();
   });
 
+  it("validates event bounds before sending", () => {
+    const client = new JericoClient({ apiKey: "key", endpoint: "https://ingest.example.test", flushIntervalMs: 0 });
+    expect(() => client.track("x".repeat(161))).toThrow();
+    expect(() => client.track("valid", { detail: "x".repeat(2049) })).toThrow();
+  });
+
   it("validates batch size and metric values", () => {
     expect(() => new JericoClient({ apiKey: "key", endpoint: "https://ingest.example.test", maxBatchSize: 101 })).toThrow();
     const client = new JericoClient({ apiKey: "key", endpoint: "https://ingest.example.test", flushIntervalMs: 0 });
