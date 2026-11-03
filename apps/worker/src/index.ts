@@ -25,11 +25,11 @@ type ClickHouseEnv = {
   CLICKHOUSE_TOKEN?: string;
 };
 
-function escapeIdentifier(value: string): string {
+export function escapeIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) throw new Error("Invalid ClickHouse identifier.");
   return value;
 }
-function toRow(message: TelemetryMessage, event: TelemetryEvent) {
+export function toRow(message: TelemetryMessage, event: TelemetryEvent) {
   return {
     timestamp: event.timestamp ?? message.acceptedAt,
     accepted_at: message.acceptedAt,
@@ -46,7 +46,7 @@ function toRow(message: TelemetryMessage, event: TelemetryEvent) {
   };
 }
 
-async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryMessage[]) {
+export async function writeToClickHouse(env: ClickHouseEnv, messages: TelemetryMessage[]) {
   if (!env.CLICKHOUSE_URL) throw new Error("CLICKHOUSE_URL is not configured.");
   const database = escapeIdentifier(env.CLICKHOUSE_DATABASE ?? "jerico");
   const table = escapeIdentifier(env.CLICKHOUSE_TABLE ?? "telemetry_events");
