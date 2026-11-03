@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAlertRuleSchema, updateAlertRuleSchema, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
+import { createAlertRuleSchema, updateAlertRuleSchema, createNotificationChannelSchema, verifyNotificationChannelSchema, notificationDeliveryResultSchema, createEnvironmentSchema, createIngestionKeySchema, createProductSchema, createProjectSchema, createUptimeMonitorSchema, updateUptimeMonitorSchema, uptimeProbeResultSchema } from "./index";
 
 describe("resource request contracts", () => {
   it("accepts a standalone project without a product", () => {
@@ -91,5 +91,24 @@ describe("alert rule contracts", () => {
   it("requires a non-empty partial update", () => {
     expect(updateAlertRuleSchema.safeParse({}).success).toBe(false);
     expect(updateAlertRuleSchema.safeParse({ enabled: false }).success).toBe(true);
+  });
+});
+
+describe("email notification contracts", () => {
+  it("normalizes a valid notification email", () => {
+    expect(createNotificationChannelSchema.parse({ email: " Ops@Example.com " }).email).toBe("ops@example.com");
+  });
+  it("rejects malformed addresses and extra fields", () => {
+    expect(createNotificationChannelSchema.safeParse({ email: "not-an-email" }).success).toBe(false);
+    expect(createNotificationChannelSchema.safeParse({ email: "ops@example.com", url: "https://example.com" }).success).toBe(false);
+  });
+  it("requires a bounded verification token", () => {
+    expect(verifyNotificationChannelSchema.safeParse({ token: "v".repeat(43) }).success).toBe(true);
+    expect(verifyNotificationChannelSchema.safeParse({ token: "short" }).success).toBe(false);
+  });
+  it("accepts delivery results only with safe failure codes", () => {
+    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "sent", providerMessageId: "msg_123" }).success).toBe(true);
+    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed" }).success).toBe(false);
+    expect(notificationDeliveryResultSchema.safeParse({ deliveryId: "550e8400-e29b-41d4-a716-446655440000", status: "failed", errorCode: "private endpoint response" }).success).toBe(false);
   });
 });
