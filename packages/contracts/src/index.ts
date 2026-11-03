@@ -26,4 +26,12 @@ export const createEnvironmentSchema = z.object({
   isProduction: z.boolean().default(false),
 }).strict();
 export const createOrganizationSchema = z.object({ name: nameSchema, slug: slugSchema }).strict();
+
+export const createIngestionKeySchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  environmentId: z.string().min(1).max(128),
+  keyType: z.enum(["public", "secret"]),
+}).strict();
+
+export type IngestionKeyType = z.infer<typeof createIngestionKeySchema>["keyType"];
 export const API_VERSION = "v1" as const;
