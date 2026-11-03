@@ -64,6 +64,7 @@ See the detailed [Phase 3 SDK plan](phase-3-typescript-sdks.md).
 - [x] Initial browser SDK: public-key enforcement, page views, session identity, identify/reset, JS errors, and unhandled rejections.
 - [x] Initial Node SDK: secret-key enforcement, events/errors/logs/metrics/spans, explicit flush/close, and opt-in unhandled-rejection capture.
 - [ ] Validate workspace install, lint, typecheck, tests, and builds.
+- [ ] Validate request-level ingestion idempotency against PostgreSQL and Cloudflare Queues before enabling automatic retries.
 - [ ] Ensure SDK failures never crash the host application through integration tests.
 - [ ] Add route-change instrumentation and Core Web Vitals (requires a deliberate public-key metric permission decision).
 - [ ] Add richer Node instrumentation and framework adapters.
