@@ -100,7 +100,7 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 
 ### Known product gaps
 
-- The first live observability explorer and tenant-scoped query API are implemented in an open PR; charting, error grouping, metric visualization, span waterfalls, and route-level integration validation remain outstanding.
+- The first live observability explorer and tenant-scoped query API are merged; charting, error grouping, metric visualization, span waterfalls, and route-level integration validation remain outstanding.
 - SDK foundations are merged but not validated or production-ready.
 - Request-level idempotency is missing; client retries after ambiguous HTTP responses may create duplicate accepted batches.
 - Browser route-change instrumentation and Core Web Vitals are not implemented.
@@ -124,7 +124,7 @@ The API also exposes metrics and spans list routes plus a project overview aggre
 At the end of each substantial session, update this file and append a session-log entry with exact files, commits/PRs, checks run, results, blockers, and next action. Update the decision log only when a durable decision is made or changed. Never store secrets or production telemetry here.
 
 
-### Phase 4 follow-up — grouped errors (open PR #9)
+### Phase 4 follow-up — grouped errors API (merged PR #9)
 
 - Added a tenant-scoped error-group query adapter and `GET /api/v1/projects/:projectId/telemetry/errors/groups`.
 - Groups are derived at query time from error name + message and include occurrence count, first/last seen, latest message, and latest event ID. This is not a persisted issue fingerprint or error lifecycle system.
