@@ -16,7 +16,7 @@ import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
-import { scheduleDueUptimeMonitors } from "./uptime-scheduler";
+import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
@@ -758,9 +758,14 @@ export { app };
 
 export default {
   fetch: app.fetch.bind(app),
-  scheduled(_controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
+  scheduled(controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
     context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
       console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
     }));
+    if (controller.cron === "0 3 * * *") {
+      context.waitUntil(pruneUptimeCheckHistory(env).catch((error) => {
+        console.error("Jerico uptime history retention failed", error instanceof Error ? error.message : String(error));
+      }));
+    }
   },
 };
