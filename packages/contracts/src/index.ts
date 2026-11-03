@@ -71,4 +71,19 @@ export const updateUptimeMonitorSchema = createUptimeMonitorSchema.partial().str
 export type CreateUptimeMonitor = z.infer<typeof createUptimeMonitorSchema>;
 export type UpdateUptimeMonitor = z.infer<typeof updateUptimeMonitorSchema>;
 
+export const uptimeProbeResultSchema = z.object({
+  checkId: z.string().uuid(),
+  monitorId: z.string().min(1).max(128),
+  organizationId: z.string().min(1).max(128),
+  projectId: z.string().min(1).max(128),
+  status: z.enum(["up", "down"]),
+  statusCode: z.number().int().min(100).max(599).nullable(),
+  responseTimeMs: z.number().int().min(0).max(30000).nullable(),
+  errorCode: z.enum(["unsafe_target", "unsafe_redirect", "redirect_limit", "timeout", "network_error", "unexpected_status"]).nullable(),
+  checkedAt: z.string().datetime({ offset: true }),
+}).strict();
+
+export type UptimeProbeResult = z.infer<typeof uptimeProbeResultSchema>;
+
+
 export const API_VERSION = "v1" as const;
