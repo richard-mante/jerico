@@ -57,15 +57,15 @@ The web application now has a project observability route at `/dashboard/project
 - Newest-first signal rows and cursor-based Load more.
 - Loading, empty, unauthenticated, and API error states.
 
-The page now displays query-time grouped errors with occurrence counts, first/last seen timestamps, latest message, and latest event ID. It still does not show stack traces, persisted issue lifecycle actions, charts, metric visualizations, span waterfalls, or log severity-specific controls. It is a functional first explorer, not the finished observability UI.
+The explorer now includes event catalogue/details and volume charts; grouped errors with latest stack, occurrence drill-down, and persisted status; metric time-series charts; a best-effort span waterfall; and structured log severity filters. These are useful first slices, not a finished observability suite: Core Web Vitals, percentiles, automatic trace instrumentation, richer event/error search, assignments, notifications, and advanced drill-down remain open.
 
 ## Tests and validation
 
-The query adapter has unit coverage for time-range bounds, page limits, opaque cursor handling, parameter binding, and identifier injection rejection. These tests have been authored but not executed in this environment. Route-level tenant isolation and ClickHouse SQL behavior still require integration tests against PostgreSQL and ClickHouse. Counts can temporarily include duplicate queue deliveries until ClickHouse ReplacingMergeTree background merges complete; they are not strict real-time unique-event counts.
+The query adapter has unit coverage for time-range bounds, page limits, opaque cursor handling, parameter binding, and identifier injection rejection. Hono route tests cover unauthenticated rejection, member write denial, cross-organization project isolation, and owner status updates using mocked persistence. A gated ClickHouse integration suite and CI service are now merged, but neither local execution nor successful CI has been observed. PostgreSQL migration/transaction validation and browser validation remain outstanding. Counts can temporarily include duplicate queue deliveries until ClickHouse ReplacingMergeTree background merges complete; they are not strict real-time unique-event counts.
 
-## Next slice
+## Phase 4 exit criteria
 
-Add route-level authorization tests and verify ClickHouse SQL against a real instance. Then expand the explorer with event catalogue/time-series, error grouping and stack traces, metric charts, span waterfalls, and structured log detail before calling Phase 4 complete.
+- [x] Add route-level authorization tests (mocked session/database adapters).
 
 
 ## Error grouping API slice
