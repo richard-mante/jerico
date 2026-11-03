@@ -18,3 +18,6 @@ CLICKHOUSE_TOKEN=
 
 # Shared secret used only by the internal uptime result callback (generate at least 32 random bytes)
 UPTIME_RESULTS_SECRET=replace-with-a-long-random-secret
+
+# Shared secret for internal notification delivery callbacks (match the Worker value)
+NOTIFICATION_DELIVERY_SECRET=replace-with-a-long-random-secret

@@ -422,3 +422,14 @@
 - Added an Alerts & Incidents project page, linked from dashboard project cards.
 - Added contract tests, query adapter tests, pure evaluator helper tests, and mocked API authorization tests. None have been executed; no migration, lint, typecheck, test, build, database integration, Cloudflare runtime, or browser validation has been run.
 - Remaining Phase 5 work: notification delivery, escalation, incident assignment/comments/audit history, and end-to-end runtime verification of cron + ClickHouse + PostgreSQL.
+
+## 2026-11-03 — Phase 5D verified email notifications
+
+- Started feat/phase-5-email-notifications from current main.
+- Added migration 0007, email notification channel schema, and delivery history with recipient snapshots.
+- Added organization owner/admin email channel CRUD, resend verification, and a public verification endpoint. Tokens use 256-bit randomness, SHA-256 hashes at rest, and 24-hour expiry.
+- Added incident lifecycle email enqueueing for opened, acknowledged, and resolved events. Delivery records are deduplicated by incident/channel/event.
+- Added the Cloudflare notification queue producer/consumer, Resend send request with delivery-ID idempotency key, internal shared-secret result callback, retry handling, and dead-letter queue configuration.
+- Added project Alerts & Incidents UI for channel management and recent delivery history, plus a verification page.
+- Added notification contract tests, worker queue-message validation tests, and mocked API authorization/callback tests. None have been executed. No dependency install, lint, typecheck, unit tests, build, migration, Resend, Cloudflare queue, or browser validation was run.
+- Webhook channels and endpoint verification remain the next notification slice.

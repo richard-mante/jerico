@@ -50,6 +50,13 @@
       "when": 1793701500000,
       "tag": "0006_alert_rules_and_incidents",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793701800000,
+      "tag": "0007_email_notification_channels",
+      "breakpoints": true
     }
   ]
 }

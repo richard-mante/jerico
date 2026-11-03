@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { authClient } from "../lib/auth-client";
+import { NotificationChannelManager } from "./notification-channel-manager";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 type Metric = "error_count" | "uptime_down" | "response_time";
@@ -157,6 +158,7 @@ export function ProjectAlertManager() {
                 {!rules.length && <p className="py-8 text-center text-sm text-[#737b89]">No alert rules yet. Create one to start monitoring a signal.</p>}
               </div>
             </section>
+            <NotificationChannelManager projectId={projectId} organizationId={organizationId} />
             <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
               <div className="flex items-center justify-between"><div><h2 className="font-semibold">Incidents</h2><p className="mt-1 text-xs text-[#737b89]">Active and recent incident history</p></div><span className="text-xs text-[#929aaa]">{incidents.filter((item) => item.status !== "resolved").length} active</span></div>
               <div className="mt-4 divide-y divide-white/10">

@@ -1,7 +1,10 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { and, asc, desc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import {
+  createNotificationChannelSchema,
+  verifyNotificationChannelSchema,
+  notificationDeliveryResultSchema,
   createAlertRuleSchema,
   updateAlertRuleSchema,
   createEnvironmentSchema,
@@ -13,13 +16,15 @@ import {
   updateUptimeMonitorSchema,
   uptimeProbeResultSchema,
 } from "@jerico/contracts";
-import { alertRules, environments, incidents, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
+import { alertRules, environments, incidents, notificationChannels, notificationDeliveries, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
 import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
 import { evaluateAlertRules } from "./alert-evaluator";
+import { safelyQueueIncidentNotifications } from "./notification-delivery";
+import { sendEmail } from "./email";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
@@ -117,6 +122,17 @@ function constantTimeEqual(left: string, right: string): boolean {
     difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
   }
   return difference === 0;
+}
+
+
+async function hashVerificationToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function createVerificationToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 function makeSlug(value: string): string {
@@ -609,6 +625,128 @@ app.post("/api/v1/projects/:projectId/environments", async (context) => withOrga
 
 
 
+
+app.get("/api/v1/notification-channels", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
+  const data = await database.select({
+    id: notificationChannels.id,
+    type: notificationChannels.type,
+    target: notificationChannels.target,
+    verifiedAt: notificationChannels.verifiedAt,
+    enabled: notificationChannels.enabled,
+    createdAt: notificationChannels.createdAt,
+  }).from(notificationChannels).where(eq(notificationChannels.organizationId, organizationId)).orderBy(desc(notificationChannels.createdAt));
+  return context.json({ data });
+}));
+
+app.post("/api/v1/notification-channels", async (context) => withOrganization(context, async (database, organizationId, role, userId) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
+  const parsed = createNotificationChannelSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide a valid notification email address.", details: parsed.error.flatten() } }, 400);
+  const [existing] = await database.select().from(notificationChannels).where(and(
+    eq(notificationChannels.organizationId, organizationId),
+    eq(notificationChannels.type, "email"),
+    eq(notificationChannels.target, parsed.data.email),
+  )).limit(1);
+  if (existing?.verifiedAt) return context.json({ error: { code: "CHANNEL_ALREADY_VERIFIED", message: "This email address is already verified." } }, 409);
+  const token = createVerificationToken();
+  const tokenHash = await hashVerificationToken(token);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  let channelId = existing?.id;
+  if (existing) {
+    await database.update(notificationChannels).set({ verificationTokenHash: tokenHash, verificationExpiresAt: expiresAt, enabled: true, updatedAt: new Date() })
+      .where(and(eq(notificationChannels.id, existing.id), eq(notificationChannels.organizationId, organizationId)));
+  } else {
+    const [created] = await database.insert(notificationChannels).values({
+      id: crypto.randomUUID(), organizationId, type: "email", target: parsed.data.email,
+      verificationTokenHash: tokenHash, verificationExpiresAt: expiresAt, createdBy: userId,
+    }).returning({ id: notificationChannels.id });
+    channelId = created.id;
+  }
+  const verifyUrl = (context.env.WEB_APP_URL ?? "http://localhost:3000") + "/notifications/verify?token=" + encodeURIComponent(token);
+  try {
+    await sendEmail(context.env, {
+      to: parsed.data.email,
+      subject: "Verify your Jerico incident notification email",
+      text: "Confirm this email address to receive incident notifications from Jerico. This verification link expires in 24 hours.",
+      actionUrl: verifyUrl,
+      actionLabel: "Verify notification email",
+    });
+  } catch (error) {
+    console.error("Jerico notification email verification could not be sent", {
+      organizationId,
+      channelId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return context.json({ error: { code: "EMAIL_DELIVERY_UNAVAILABLE", message: "The verification email could not be sent. Check email configuration and try again." } }, 503);
+  }
+  return context.json({ data: { id: channelId, email: parsed.data.email, verifiedAt: null, verificationExpiresAt: expiresAt } }, existing ? 200 : 201);
+}));
+
+app.post("/api/v1/notification-channels/:channelId/resend-verification", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
+  const [channel] = await database.select().from(notificationChannels).where(and(
+    eq(notificationChannels.id, context.req.param("channelId")),
+    eq(notificationChannels.organizationId, organizationId),
+  )).limit(1);
+  if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
+  if (channel.verifiedAt) return context.json({ error: { code: "CHANNEL_ALREADY_VERIFIED", message: "This email address is already verified." } }, 409);
+  const token = createVerificationToken();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await database.update(notificationChannels).set({
+    verificationTokenHash: await hashVerificationToken(token),
+    verificationExpiresAt: expiresAt,
+    updatedAt: new Date(),
+  }).where(eq(notificationChannels.id, channel.id));
+  try {
+    await sendEmail(context.env, {
+      to: channel.target,
+      subject: "Verify your Jerico incident notification email",
+      text: "Confirm this email address to receive incident notifications from Jerico. This verification link expires in 24 hours.",
+      actionUrl: (context.env.WEB_APP_URL ?? "http://localhost:3000") + "/notifications/verify?token=" + encodeURIComponent(token),
+      actionLabel: "Verify notification email",
+    });
+  } catch {
+    return context.json({ error: { code: "EMAIL_DELIVERY_UNAVAILABLE", message: "The verification email could not be sent. Try again later." } }, 503);
+  }
+  return context.json({ data: { id: channel.id, verificationExpiresAt: expiresAt } });
+}));
+
+app.post("/api/v1/notification-channels/verify", async (context) => {
+  const parsed = verifyNotificationChannelSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "INVALID_VERIFICATION_TOKEN", message: "The verification token is invalid or expired." } }, 400);
+  const tokenHash = await hashVerificationToken(parsed.data.token);
+  const now = new Date();
+  const result = await withDatabase(context.env, async (database) => {
+    const [channel] = await database.select({ id: notificationChannels.id, organizationId: notificationChannels.organizationId })
+      .from(notificationChannels).where(and(
+        eq(notificationChannels.verificationTokenHash, tokenHash),
+        gte(notificationChannels.verificationExpiresAt, now),
+      )).limit(1);
+    if (!channel) return null;
+    const [verified] = await database.update(notificationChannels).set({
+      verifiedAt: now,
+      verificationTokenHash: null,
+      verificationExpiresAt: null,
+      enabled: true,
+      updatedAt: now,
+    }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, channel.organizationId))).returning({ id: notificationChannels.id });
+    return verified ?? null;
+  });
+  if (!result) return context.json({ error: { code: "INVALID_VERIFICATION_TOKEN", message: "The verification token is invalid or expired." } }, 400);
+  return context.json({ data: { verified: true } });
+});
+
+app.delete("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
+  const [deleted] = await database.delete(notificationChannels).where(and(
+    eq(notificationChannels.id, context.req.param("channelId")),
+    eq(notificationChannels.organizationId, organizationId),
+  )).returning({ id: notificationChannels.id });
+  if (!deleted) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
+  return context.json({ data: { deleted: true } });
+}));
+
 app.get("/api/v1/projects/:projectId/alert-rules", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
@@ -683,6 +821,9 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async 
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
+  await safelyQueueIncidentNotifications(database, context.env, {
+    id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
+  }, "incident.acknowledged");
   return context.json({ data: updated });
 }));
 
@@ -696,7 +837,37 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (con
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
+  await safelyQueueIncidentNotifications(database, context.env, {
+    id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
+  }, "incident.resolved");
   return context.json({ data: updated });
+}));
+
+
+app.get("/api/v1/projects/:projectId/notification-deliveries", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const limit = parseQueryLimit(context.req.query("limit"));
+  if (limit === null) return context.json({ error: { code: "INVALID_LIMIT", message: "Limit must be an integer between 1 and 100." } }, 400);
+  const data = await database.select({
+    id: notificationDeliveries.id,
+    incidentId: notificationDeliveries.incidentId,
+    channelId: notificationDeliveries.channelId,
+    target: notificationDeliveries.target,
+    eventType: notificationDeliveries.eventType,
+    status: notificationDeliveries.status,
+    attempts: notificationDeliveries.attempts,
+    lastErrorCode: notificationDeliveries.lastErrorCode,
+    lastAttemptAt: notificationDeliveries.lastAttemptAt,
+    sentAt: notificationDeliveries.sentAt,
+    createdAt: notificationDeliveries.createdAt,
+  }).from(notificationDeliveries).where(and(
+    eq(notificationDeliveries.organizationId, organizationId),
+    eq(notificationDeliveries.projectId, projectId),
+  )).orderBy(desc(notificationDeliveries.createdAt)).limit(limit);
+  return context.json({ data });
 }));
 
 app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId) => {
@@ -778,6 +949,34 @@ app.get("/api/v1/projects/:projectId/uptime-monitors/:monitorId/checks", async (
   return context.json({ data, checksEnabled: Boolean(context.env.UPTIME_PROBES) });
 }));
 
+
+
+app.post("/internal/notification-delivery-results", async (context) => {
+  const secret = context.env.NOTIFICATION_DELIVERY_SECRET;
+  const supplied = context.req.header("x-jerico-notification-secret") ?? "";
+  if (!secret || secret.length < 32) return context.json({ error: { code: "NOTIFICATION_CALLBACK_UNAVAILABLE", message: "Notification callback is not configured." } }, 503);
+  if (!constantTimeEqual(secret, supplied)) return context.json({ error: { code: "UNAUTHORIZED", message: "Invalid internal credential." } }, 401);
+  let body: unknown;
+  try { body = await readBoundedJson(context.req.raw, 4096); }
+  catch (error) {
+    const tooLarge = error instanceof RangeError;
+    return context.json({ error: { code: tooLarge ? "PAYLOAD_TOO_LARGE" : "INVALID_JSON", message: "The notification result payload is invalid." } }, tooLarge ? 413 : 400);
+  }
+  const parsed = notificationDeliveryResultSchema.safeParse(body);
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The notification result is invalid." } }, 400);
+  const result = parsed.data;
+  const [updated] = await withDatabase(context.env, async (database) => database.update(notificationDeliveries).set({
+    status: result.status === "attempting" ? "queued" : result.status,
+    attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
+    providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
+    lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
+    lastAttemptAt: new Date(),
+    sentAt: result.status === "sent" ? new Date() : null,
+    updatedAt: new Date(),
+  }).where(eq(notificationDeliveries.id, result.deliveryId)).returning({ id: notificationDeliveries.id }));
+  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery not found." } }, 404);
+  return context.json({ data: { accepted: true } }, 202);
+});
 
 app.post("/internal/uptime-results", async (context) => {
   const secret = context.env.UPTIME_RESULTS_SECRET;

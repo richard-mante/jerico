@@ -111,4 +111,18 @@ export const updateAlertRuleSchema = createAlertRuleSchema.partial().strict()
 export type CreateAlertRule = z.infer<typeof createAlertRuleSchema>;
 export type UpdateAlertRule = z.infer<typeof updateAlertRuleSchema>;
 
+
+export const createNotificationChannelSchema = z.object({
+  email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
+}).strict();
+export const verifyNotificationChannelSchema = z.object({
+  token: z.string().min(32).max(128),
+}).strict();
+export const notificationDeliveryResultSchema = z.object({
+  deliveryId: z.string().uuid(),
+  status: z.enum(["attempting", "sent", "failed"]),
+  providerMessageId: z.string().max(255).optional(),
+  errorCode: z.enum(["provider_rejected", "provider_unavailable", "configuration_missing", "invalid_message"]).optional(),
+}).strict().refine((value) => value.status !== "failed" || Boolean(value.errorCode), "Failed deliveries require a safe error code.");
+
 export const API_VERSION = "v1" as const;

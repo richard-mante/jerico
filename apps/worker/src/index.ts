@@ -31,6 +31,7 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
+type NotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };
 type ClickHouseEnv = {
   CLICKHOUSE_URL?: string;
   CLICKHOUSE_DATABASE?: string;
@@ -43,6 +44,9 @@ type WorkerEnv = ClickHouseEnv & {
   API_URL?: string;
   UPTIME_RESULTS_SECRET?: string;
   PROBE_WORKER_HOST?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  NOTIFICATION_DELIVERY_SECRET?: string;
 };
 
 export function escapeIdentifier(value: string): string {
@@ -163,8 +167,117 @@ async function processUptimeProbeBatch(batch: MessageBatch<UptimeProbeMessage>, 
   }
 }
 
+
+export function isValidNotificationMessage(value: unknown): value is NotificationMessage {
+  if (typeof value !== "object" || value === null) return false;
+  const message = value as Record<string, unknown>;
+  return message.schemaVersion === 1
+    && message.type === "notification.email"
+    && typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
+    && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
+    && typeof message.subject === "string" && message.subject.length >= 1 && message.subject.length <= 200
+    && typeof message.text === "string" && message.text.length >= 1 && message.text.length <= 10000;
+}
+
+async function postNotificationResult(
+  env: WorkerEnv,
+  result: { deliveryId: string; status: "attempting" | "sent" | "failed"; providerMessageId?: string; errorCode?: "provider_rejected" | "provider_unavailable" | "configuration_missing" | "invalid_message" },
+): Promise<void> {
+  if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
+    throw new Error("Notification result callback is not configured.");
+  }
+  const callbackUrl = new URL("/internal/notification-delivery-results", env.API_URL);
+  if (callbackUrl.protocol !== "https:") throw new Error("Notification callback must use HTTPS.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(callbackUrl, {
+      method: "POST",
+      redirect: "error",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        "x-jerico-notification-secret": env.NOTIFICATION_DELIVERY_SECRET,
+      },
+      body: JSON.stringify(result),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    if (!response.ok) throw new Error("Notification result callback rejected.");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function processNotification(message: NotificationMessage, env: WorkerEnv): Promise<void> {
+  await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
+  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
+    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "configuration_missing" });
+    throw new Error("Resend email delivery is not configured.");
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      redirect: "error",
+      signal: controller.signal,
+      headers: {
+        authorization: "Bearer " + env.RESEND_API_KEY,
+        "content-type": "application/json",
+        "Idempotency-Key": message.deliveryId,
+      },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM,
+        to: [message.to],
+        subject: message.subject,
+        text: message.text,
+      }),
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_rejected" });
+      throw new Error("Email provider rejected the notification.");
+    }
+    const payload = await response.json().catch(() => ({})) as { id?: unknown };
+    await postNotificationResult(env, {
+      deliveryId: message.deliveryId,
+      status: "sent",
+      ...(typeof payload.id === "string" ? { providerMessageId: payload.id.slice(0, 255) } : {}),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Email provider rejected the notification.") throw error;
+    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: "provider_unavailable" });
+    throw new Error("Email provider request failed.");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function processNotificationBatch(batch: MessageBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
+  for (const message of batch.messages) {
+    if (!isValidNotificationMessage(message.body)) {
+      message.ack();
+      continue;
+    }
+    try {
+      await processNotification(message.body, env);
+      message.ack();
+    } catch (error) {
+      console.error("Jerico notification delivery failed", {
+        deliveryId: message.body.deliveryId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      message.retry({ delaySeconds: 60 });
+    }
+  }
+}
+
 export default {
-  async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
+  async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
+    if (batch.queue === "jerico-notifications") {
+      await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);
+      return;
+    }
     if (batch.queue === "jerico-uptime-probes") {
       await processUptimeProbeBatch(batch as MessageBatch<UptimeProbeMessage>, env);
       return;
