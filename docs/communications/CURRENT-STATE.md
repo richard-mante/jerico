@@ -59,7 +59,7 @@ Implemented on the same draft branch:
 - Request body capped at 96 KiB; batches capped at 100 events.
 - Redacts sensitive attribute names, email addresses, bearer tokens, and JWT-like strings before enqueueing.
 - Optional per-credential Cloudflare Rate Limiting binding; production mode returns 503 when configured with `APP_ENV=production` but the binding is missing.
-- Atomic per-credential daily event quota in PostgreSQL (`project_ingestion_usage`, migration `0002_project_ingestion_usage.sql`), default 100,000 events per UTC day, configurable through `INGEST_DAILY_EVENT_LIMIT`; failed queue sends refund the reservation.
+- Atomic per-project daily event quota in PostgreSQL (`project_ingestion_usage`, migration `0002_project_ingestion_usage.sql`), default 100,000 events per UTC day, configurable through `INGEST_DAILY_EVENT_LIMIT`; failed queue sends refund the reservation.
 - Enqueues trusted, versioned envelopes to Cloudflare Queue `jerico-telemetry`.
 - Adds queue consumer in `apps/worker`, ClickHouse HTTP `JSONEachRow` writer, retry behavior, and dead-letter queue config.
 - Adds initial ClickHouse schema with 7-day log and 30-day other telemetry retention.
