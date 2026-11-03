@@ -140,3 +140,8 @@
 - Validate the SDK packages with a real pnpm install, lint, typecheck, tests, and builds.
 - Add integration coverage against the ingestion Worker and a local queue/ClickHouse stack.
 - Add request-level idempotency before introducing automatic retries.
+
+
+- Follow-up Phase 3 hardening: added client-side payload bounds matching the ingestion contract (event names, attribute keys/values, and messages); isolated user-supplied SDK error callbacks so they cannot crash the host application.
+- Added browser anonymous session IDs stored in `sessionStorage` with an in-memory fallback, plus explicit `identify()` and `reset()` APIs. User identity is never collected automatically.
+- Updated browser SDK and Phase 3 documentation. These additions are still unvalidated because package installation and automated checks have not run.
