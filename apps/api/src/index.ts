@@ -1098,6 +1098,7 @@ app.post("/internal/notification-delivery-results", async (context) => {
   const accepted = await withDatabase(context.env, async (database) => {
     const [updated] = await database.update(notificationDeliveries).set({
       status: result.status === "attempting" ? "queued" : result.status,
+      enqueueLeaseExpiresAt: null,
       attempts: result.status === "attempting" ? sql`${notificationDeliveries.attempts} + 1` : notificationDeliveries.attempts,
       providerMessageId: result.status === "sent" ? result.providerMessageId ?? null : null,
       lastErrorCode: result.status === "failed" ? result.errorCode ?? "provider_unavailable" : null,
