@@ -18,4 +18,6 @@ CREATE TABLE IF NOT EXISTS jerico.telemetry_events
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (organization_id, project_id, environment_id, timestamp, event_type)
-TTL timestamp + INTERVAL 90 DAY DELETE;
+TTL
+  timestamp + INTERVAL 7 DAY DELETE WHERE event_type = 'log',
+  timestamp + INTERVAL 30 DAY DELETE WHERE event_type != 'log';
