@@ -260,7 +260,6 @@ export async function retryFailedNotificationEnqueues(
       dueCondition,
     )).returning({
       id: notificationDeliveries.id,
-      enqueueToken: notificationDeliveries.activeEnqueueToken,
       enqueueAttempts: notificationDeliveries.enqueueAttempts,
       attempts: notificationDeliveries.attempts,
       eventType: notificationDeliveries.eventType,
