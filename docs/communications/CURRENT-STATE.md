@@ -279,3 +279,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Web Vitals path attribution is captured at SDK initialization so a later SPA pathname change does not relabel the initial document's measurements.
 - Added query-adapter, mocked tenant-isolation, and gated ClickHouse integration coverage. No lint, typecheck, tests, build, ClickHouse integration, or browser validation has been run.
 - Limitation: raw pathname grouping is not route-template normalization and can create high cardinality if applications place IDs in path segments.
+
+
+### Route-template normalization — current open work
+
+- Branch `feat/route-template-normalization` adds default normalization for UUID, long hexadecimal, and long numeric path segments; query strings/fragments are removed and route length is bounded.
+- Browser SDK accepts `resolveRoute(pathname)` for framework-specific route templates. Resolver exceptions fall back to built-in normalization.
+- Both page views and Core Web Vitals use normalized paths, reducing common dynamic-ID cardinality. Arbitrary dynamic slugs still require an app-provided resolver.
+- Added pure unit tests for default normalization, query/fragment removal, length bounds, custom templates, and resolver fallback. No lint, typecheck, tests, build, or browser validation was run.
