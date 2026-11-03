@@ -155,12 +155,12 @@ export const projectIngestionKeys = pgTable("project_ingestion_keys", {
 ]);
 
 export const projectIngestionUsage = pgTable("project_ingestion_usage", {
-  credentialId: text("credential_id").notNull().references(() => projectIngestionKeys.id, { onDelete: "cascade" }),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   usageDate: date("usage_date", { mode: "string" }).notNull(),
   eventCount: integer("event_count").notNull().default(0),
   updatedAt: updatedAt(),
 }, (t) => [
-  primaryKey({ name: "project_ingestion_usage_pk", columns: [t.credentialId, t.usageDate] }),
+  primaryKey({ name: "project_ingestion_usage_pk", columns: [t.projectId, t.usageDate] }),
   check("project_ingestion_usage_event_count_check", sql`${t.eventCount} >= 0`),
   index("project_ingestion_usage_date_idx").on(t.usageDate),
 ]);
