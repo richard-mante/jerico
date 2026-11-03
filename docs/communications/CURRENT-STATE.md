@@ -145,3 +145,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-metric-series` adds a tenant-scoped metric aggregation endpoint and responsive SVG charts in the dashboard Metrics tab.
 - Metric buckets include average/minimum/maximum/sample count; bucket size adapts to the time range and the query is bounded to the top eight metric names and 1,200 rows.
 - PR #11 is the metric visualization follow-up. No lint/typecheck/tests/build or live ClickHouse/browser validation has been run.
+
+
+### Phase 4 trace waterfall (PR #12)
+
+- PR #11 merged metric time-series aggregation and SVG charts into `main` (merge commit `a65c6a41d0bb40895e06cf23cc1e267ed0c78cfc`).
+- Branch `feat/phase-4-trace-waterfall` adds best-effort span grouping by `attributes.traceId`, standalone handling when trace IDs are absent, parent-span indication, duration bars, and duration labels.
+- The current SDK span method stores duration in milliseconds in `value`; trace/span IDs must be supplied manually in attributes. Automatic trace context propagation is not implemented.
+- PR #12 is the trace visualization follow-up. Validation remains outstanding.
