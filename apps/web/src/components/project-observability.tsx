@@ -102,7 +102,6 @@ export function ProjectObservability() {
     if (environmentId) query.set("environmentId", environmentId);
     setLoading(true);
     setError("");
-    setNotice("");
     setNextCursor(null);
     void Promise.all([
       fetch(`${apiBase}/api/v1/projects/${encodeURIComponent(projectId)}/telemetry/overview?${query}`, {
