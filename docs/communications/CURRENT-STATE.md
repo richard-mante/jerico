@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-03  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #49 — `42a242e5defbdb0e94f2f05996e3f538671135f8`  
-**Latest main merge:** PR #49 — `42a242e5defbdb0e94f2f05996e3f538671135f8`  
+**Latest feature merge:** PR #53 — `6aab508a960612367c0ff310e166484811151578`  
+**Latest main merge:** PR #53 — `6aab508a960612367c0ff310e166484811151578`  
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, current-row uptime scheduling | #39, #41, #43, #44 | Merged |
 
-Latest reliability milestone: [PR #49 — recover notification outbox handoffs after Worker termination](https://github.com/richard-mante/jerico/pull/49). Merge commit: `42a242e5defbdb0e94f2f05996e3f538671135f8`.
+Latest reliability milestone: [PR #53 — fence notification callbacks by enqueue attempt](https://github.com/richard-mante/jerico/pull/53). Merge commit: `6aab508a960612367c0ff310e166484811151578`.
 
 ### Phase 5 notification capabilities
 
@@ -74,7 +74,7 @@ Latest reliability milestone: [PR #49 — recover notification outbox handoffs a
 
 Before exercising the notification pipeline in a non-production environment:
 
-1. Apply migrations through `0012_notification_delivery_enqueued_at.sql` (includes notification enqueue retry migration 0009, alert evaluation lease migration 0010, and channel organization FK migration 0011).
+1. Apply migrations through `0013_notification_delivery_attempt_fencing.sql` (includes notification enqueue retry migration 0009, alert evaluation lease migration 0010, channel organization FK migration 0011, and outbox lease migration 0012).
 2. Provision `jerico-uptime-probes`, `jerico-uptime-probes-dlq`, `jerico-notifications`, and `jerico-notifications-dlq`.
 3. Configure matching `UPTIME_RESULTS_SECRET` on API and Worker.
 4. Configure matching `NOTIFICATION_DELIVERY_SECRET` on API and Worker.
@@ -111,6 +111,10 @@ Reviewed the current Worker probe/webhook delivery paths, API notification callb
 ### 2026-11-03 ClickHouse request-bound update
 
 Merged PR #39. All API telemetry query operations now apply ClickHouse `max_execution_time=8` and a 10-second client request timeout. Worker telemetry inserts use the same server-side execution bound and a 10-second client request timeout. Focused tests assert the configured limits. This is an implementation-level safeguard only: tests were authored but not executed, and ClickHouse integration/runtime behavior remains unverified.
+
+### 2026-11-03 notification callback attempt fencing
+
+Merged PR #53. Every notification queue handoff now carries a unique enqueue token; Worker callbacks also include Cloudflare's per-message attempt count. The API advances attempts only when the callback belongs to the active enqueue and advances the consumer attempt, and only the current attempt can complete/fail the delivery. Duplicate callbacks are idempotent; stale callbacks are ignored. Workers receive an explicit active/inactive result and skip provider work for superseded queue messages. Legacy tokenless queued messages and old callbacks are supported only while the row has no token-owned enqueue. Migration `0013_notification_delivery_attempt_fencing.sql` is required. Tests were added but not executed; manual concurrency and rolling-deploy validation remains outstanding.
 
 ### 2026-11-03 notification outbox crash recovery
 
