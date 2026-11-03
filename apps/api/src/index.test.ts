@@ -295,6 +295,90 @@ describe("notification channel authorization", () => {
 });
 
 
+describe("notification dead-letter callbacks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.update.mockReset();
+  });
+
+  it("marks the matching active enqueue as terminal failed", async () => {
+    const deliveryId = "550e8400-e29b-41d4-a716-446655440000";
+    const enqueueToken = "550e8400-e29b-41d4-a716-446655440001";
+    const set = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: async () => [{ id: deliveryId }],
+      }),
+    });
+    mocks.update.mockReturnValue({ set });
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/notification-dead-letter-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({ deliveryId, enqueueToken }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      status: "failed",
+      lastErrorCode: "queue_retry_exhausted",
+      nextEnqueueAt: null,
+    }));
+  });
+
+  it("does not let an old enqueue dead-letter overwrite a newer enqueue", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "queued",
+      activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440002",
+      lastErrorCode: null,
+    }]);
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/notification-dead-letter-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true, stale: true } });
+  });
+
+  it("never downgrades a delivery that has already been sent", async () => {
+    mocks.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+        }),
+      }),
+    });
+    setSelectResults([{
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "sent",
+      activeEnqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+      lastErrorCode: null,
+    }]);
+    const secret = "s".repeat(40);
+    const response = await app.request("/internal/notification-dead-letter-results", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": secret },
+      body: JSON.stringify({
+        deliveryId: "550e8400-e29b-41d4-a716-446655440000",
+        enqueueToken: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    }, { NOTIFICATION_DELIVERY_SECRET: secret });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ data: { accepted: true, stale: true } });
+  });
+});
+
 describe("notification delivery callback attempt fencing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
