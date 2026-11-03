@@ -12,7 +12,8 @@ describe("telemetry redaction", () => {
     expect(result.attributes?.password).toBe("[REDACTED]");
     expect(result.attributes?.detail).toBe("sent to [REDACTED_EMAIL]");
     expect(result.message).not.toContain("user@example.com");
-    expect(result.message).not.toContain("Bearer abc.def");\n    expect(result.message).not.toContain("token=topsecret");
+    expect(result.message).not.toContain("Bearer abc.def");
+    expect(result.message).not.toContain("token=topsecret");
     expect(result.attributes?.count).toBe(3);
   });
 });
