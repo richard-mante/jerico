@@ -12,11 +12,6 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      CLICKHOUSE_TEST_URL: http://127.0.0.1:8123
-      CLICKHOUSE_TEST_DATABASE: jerico
-      CLICKHOUSE_TEST_USERNAME: jerico
-      CLICKHOUSE_TEST_PASSWORD: jerico_test
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:24.8.14.39-alpine
@@ -45,4 +40,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @jerico/api test:integration
+        env:
+          CLICKHOUSE_TEST_URL: http://127.0.0.1:8123
+          CLICKHOUSE_TEST_DATABASE: jerico
+          CLICKHOUSE_TEST_USERNAME: jerico
+          CLICKHOUSE_TEST_PASSWORD: jerico_test
       - run: pnpm build
