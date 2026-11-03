@@ -1,3 +1,5 @@
+import { probeEndpoint } from "./uptime-probe";
+
 type TelemetryEvent = {
   eventId?: string;
   type: "event" | "error" | "log" | "metric" | "span";
@@ -17,8 +19,6 @@ type TelemetryMessage = {
   acceptedAt: string;
   events: TelemetryEvent[];
 };
-import { probeEndpoint } from "./uptime-probe";
-
 type UptimeProbeMessage = {
   schemaVersion: 1;
   type: "uptime.probe";
@@ -31,11 +31,6 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type WorkerEnv = ClickHouseEnv & {
-  API_URL?: string;
-  UPTIME_RESULTS_SECRET?: string;
-  PROBE_WORKER_HOST?: string;
-};
 type ClickHouseEnv = {
   CLICKHOUSE_URL?: string;
   CLICKHOUSE_DATABASE?: string;
@@ -43,6 +38,11 @@ type ClickHouseEnv = {
   CLICKHOUSE_USERNAME?: string;
   CLICKHOUSE_PASSWORD?: string;
   CLICKHOUSE_TOKEN?: string;
+};
+type WorkerEnv = ClickHouseEnv & {
+  API_URL?: string;
+  UPTIME_RESULTS_SECRET?: string;
+  PROBE_WORKER_HOST?: string;
 };
 
 export function escapeIdentifier(value: string): string {
