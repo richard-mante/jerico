@@ -240,6 +240,39 @@ describe("ClickHouse query adapter", () => {
 
 });
 
+describe("ClickHouse ReplacingMergeTree deduplication", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("forces FINAL on every table read, including nested series subqueries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{}] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const env = { CLICKHOUSE_URL: "https://clickhouse.example", CLICKHOUSE_TOKEN: "test-token" };
+    const range = {
+      organizationId: "org-a",
+      projectId: "project-a",
+      from: "2026-11-03T10:00:00.000Z",
+      to: "2026-11-03T11:00:00.000Z",
+    };
+
+    await queryTelemetry(env, { ...range, limit: 10 });
+    await queryTelemetryOverview(env, range);
+    await queryTelemetryErrorGroups(env, { ...range, limit: 10 });
+    await queryTelemetryMetricSeries(env, { ...range, bucketMinutes: 15 });
+    await queryTelemetryEventCatalogue(env, range);
+    await queryTelemetryEventSeries(env, { ...range, bucketMinutes: 15 });
+    await queryTelemetryRoutePerformance(env, range);
+    await queryTelemetryErrorCount(env, range);
+
+    for (const [url] of fetchMock.mock.calls as Array<[URL]>) {
+      const query = new URL(url).searchParams.get("query") ?? "";
+      const tableReads = query.match(/FROM jerico\.telemetry_events/g) ?? [];
+      const finalReads = query.match(/FROM jerico\.telemetry_events FINAL/g) ?? [];
+      expect(tableReads.length).toBeGreaterThan(0);
+      expect(finalReads).toHaveLength(tableReads.length);
+    }
+  });
+});
+
 describe("alert metric query", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("counts only errors in the requested organization and project", async () => {
