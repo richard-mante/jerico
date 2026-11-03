@@ -605,3 +605,18 @@
 ### Next
 - Continue reviewing cross-tenant constraints and internal callbacks; inspect queue retry/DLQ and Worker egress assumptions.
 - Apply migrations through `0011_notification_channel_organization_fk.sql` before deployment.
+
+
+## 2026-11-03 — Notification outbox crash recovery and scheduler wiring
+
+- Reviewed the API scheduled handler against the notification reconciler signature and found a concrete wiring defect: the scheduled handler passed `env` as the database argument, although `retryFailedNotificationEnqueues` expects `(database, env, now)`. This meant the scheduled reconciler did not receive a database and returned without retrying.
+- Corrected the Cron handler to open a request-scoped database connection with `withDatabase` and pass the actual database instance.
+- Found the process-termination gap in the outbox: rows were inserted as `queued` before the queue send, but a Worker termination before send could leave them queued forever. Added a two-minute enqueue lease and an `enqueued_at` marker to distinguish confirmed queue handoffs from uncompleted handoffs.
+- Reconciliation now scans due failed `queue_unavailable` rows and expired queued leases, atomically claims each row, increments the bounded enqueue attempt count, and retains the stable delivery ID. Successful sends and Worker callbacks clear the lease and mark the handoff as observed. Callback attempt counters fence stale failure cleanup.
+- Added migration `0012_notification_delivery_enqueued_at.sql`, Drizzle schema/journal updates, and an outbox lease index. Existing queued rows with no lease timestamp are backfilled as already handed to the queue to avoid blindly duplicating every pre-migration delivery; newly created rows use the lease protocol.
+- Added a focused helper test for lease duration. Tests, typecheck, lint, build, and PostgreSQL/Queue runtime checks were not executed. The user will handle manual testing. No lockfile was generated or modified.
+- Opened and merged [PR #49](https://github.com/richard-mante/jerico/pull/49); merge commit: `42a242e5defbdb0e94f2f05996e3f538671135f8`. Issue #48 closed.
+- Apply migrations through `0012_notification_delivery_enqueued_at.sql` before deployment.
+
+### Next
+- Continue the remaining queue callback idempotency and Worker egress review, then return to full tenant-isolation review. Keep runtime/manual validation as the release gate.
