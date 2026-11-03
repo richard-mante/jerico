@@ -25,6 +25,7 @@ function setSelectResults(...results: unknown[][]) {
     from: () => ({
       where: () => ({
         limit: async () => pending.shift() ?? [],
+        groupBy: async () => pending.shift() ?? [],
       }),
     }),
   }));
@@ -140,6 +141,29 @@ describe("project observability route authorization", () => {
     });
     expect(response.status).toBe(400);
     expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns sample-based uptime and latency summaries for a project", async () => {
+    setSelectResults(
+      [{ role: "member" }],
+      [{ id: "project-a" }],
+      [{
+        monitorId: "monitor-a",
+        totalChecks: 10,
+        upChecks: 9,
+        downChecks: 1,
+        averageResponseTimeMs: 120,
+        p95ResponseTimeMs: 240,
+        lastCheckedAt: new Date("2026-11-03T05:00:00.000Z"),
+      }],
+    );
+    const response = await app.request("/api/v1/projects/project-a/uptime-monitors/summary?window=24h", {
+      method: "GET",
+      headers: { "x-jerico-organization-id": "org-a" },
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { data: Array<{ monitorId: string; uptimePercentage: number; averageResponseTimeMs: number; p95ResponseTimeMs: number }> };
+    expect(payload.data[0]).toMatchObject({ monitorId: "monitor-a", uptimePercentage: 90, averageResponseTimeMs: 120, p95ResponseTimeMs: 240 });
   });
 
 });
