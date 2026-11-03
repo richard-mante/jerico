@@ -11,6 +11,7 @@ describe("JericoClient", () => {
     const [url, init] = fetcher.mock.calls[0]!;
     expect(url).toBe("https://ingest.example.test/ingest/v1/events");
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer jk_pub_test");
+    expect(new Headers(init?.headers).get("idempotency-key")).toMatch(/^[0-9a-f-]{36}$/i);
     expect(JSON.parse(String(init?.body)).events[0].name).toBe("signup");
     await client.close();
   });
@@ -24,6 +25,11 @@ describe("JericoClient", () => {
     await expect(client.flush()).rejects.toBeInstanceOf(JericoHttpError);
     await client.flush();
     expect(fetcher).toHaveBeenCalledTimes(2);
+    const firstRequest = fetcher.mock.calls[0]![1]!;
+    const secondRequest = fetcher.mock.calls[1]![1]!;
+    expect(new Headers(firstRequest.headers).get("idempotency-key"))
+      .toBe(new Headers(secondRequest.headers).get("idempotency-key"));
+    expect(firstRequest.body).toBe(secondRequest.body);
     await client.close();
   });
 
