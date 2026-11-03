@@ -48,6 +48,17 @@ Set these values in local `apps/api/.dev.vars` or the deployed API Worker enviro
 
 Use secrets for credentials in deployed environments. Do not commit actual tokens/passwords.
 
+## Web dashboard first slice
+
+The web application now has a project observability route at `/dashboard/projects/:projectId/observability`, linked from the project list. It reads the signed-in user's organizations, lets the user select an organization, loads that project's environments, and calls the authenticated overview and telemetry list APIs. It includes:
+- Overview counts for all five telemetry types.
+- Environment and time-range filters (1 hour, 24 hours, 7 days, 30 days).
+- Tabs for events, errors, logs, metrics, and spans.
+- Newest-first signal rows and cursor-based Load more.
+- Loading, empty, unauthenticated, and API error states.
+
+The page does not yet show charts, grouped error details/stack traces, metric visualizations, span waterfalls, or log severity-specific controls. It is a functional first explorer, not the finished observability UI.
+
 ## Tests and validation
 
 The query adapter has unit coverage for time-range bounds, page limits, opaque cursor handling, parameter binding, and identifier injection rejection. These tests have been authored but not executed in this environment. Route-level tenant isolation and ClickHouse SQL behavior still require integration tests against PostgreSQL and ClickHouse. Counts can temporarily include duplicate queue deliveries until ClickHouse ReplacingMergeTree background merges complete; they are not strict real-time unique-event counts.
