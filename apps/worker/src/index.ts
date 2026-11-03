@@ -1,4 +1,5 @@
 import { probeEndpoint } from "./uptime-probe";
+import { deliverWebhook, isSafeWebhookUrl } from "./webhook-delivery";
 
 type TelemetryEvent = {
   eventId?: string;
@@ -31,7 +32,14 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type NotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };
+type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; to: string; subject: string; text: string };
+type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
+type WebhookNotificationMessage = {
+  schemaVersion: 1; type: "notification.webhook"; deliveryId: string; url: string;
+  secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved";
+  incidentId: string; projectId: string; title: string; triggerValue: number; occurredAt: string;
+};
+type NotificationMessage = EmailNotificationMessage | WebhookVerificationMessage | WebhookNotificationMessage;
 type ClickHouseEnv = {
   CLICKHOUSE_URL?: string;
   CLICKHOUSE_DATABASE?: string;
@@ -47,6 +55,7 @@ type WorkerEnv = ClickHouseEnv & {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   NOTIFICATION_DELIVERY_SECRET?: string;
+  WEBHOOK_ENCRYPTION_KEY?: string;
 };
 
 export function escapeIdentifier(value: string): string {
@@ -168,15 +177,34 @@ async function processUptimeProbeBatch(batch: MessageBatch<UptimeProbeMessage>, 
 }
 
 
-export function isValidNotificationMessage(value: unknown): value is NotificationMessage {
+export function isValidNotificationMessage(value: unknown, blockedHost?: string): value is NotificationMessage {
   if (typeof value !== "object" || value === null) return false;
   const message = value as Record<string, unknown>;
-  return message.schemaVersion === 1
-    && message.type === "notification.email"
-    && typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
-    && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
-    && typeof message.subject === "string" && message.subject.length >= 1 && message.subject.length <= 200
-    && typeof message.text === "string" && message.text.length >= 1 && message.text.length <= 10000;
+  if (message.schemaVersion !== 1) return false;
+  if (message.type === "notification.email") {
+    return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
+      && typeof message.to === "string" && message.to.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)
+      && typeof message.subject === "string" && message.subject.length >= 1 && message.subject.length <= 200
+      && typeof message.text === "string" && message.text.length >= 1 && message.text.length <= 10000;
+  }
+  if (message.type === "notification.webhook.verify") {
+    return typeof message.channelId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.channelId)
+      && typeof message.url === "string" && isSafeWebhookUrl(message.url, blockedHost)
+      && typeof message.challenge === "string" && message.challenge.length >= 32 && message.challenge.length <= 128;
+  }
+  if (message.type === "notification.webhook") {
+    return typeof message.deliveryId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.deliveryId)
+      && typeof message.url === "string" && isSafeWebhookUrl(message.url, blockedHost)
+      && typeof message.secretCiphertext === "string" && message.secretCiphertext.length >= 32 && message.secretCiphertext.length <= 512
+      && typeof message.secretIv === "string" && message.secretIv.length >= 12 && message.secretIv.length <= 64
+      && ["incident.opened", "incident.acknowledged", "incident.resolved"].includes(String(message.eventType))
+      && typeof message.incidentId === "string" && message.incidentId.length <= 128
+      && typeof message.projectId === "string" && message.projectId.length <= 128
+      && typeof message.title === "string" && message.title.length >= 1 && message.title.length <= 200
+      && typeof message.triggerValue === "number" && Number.isFinite(message.triggerValue)
+      && typeof message.occurredAt === "string" && !Number.isNaN(Date.parse(message.occurredAt));
+  }
+  return false;
 }
 
 async function postNotificationResult(
@@ -253,14 +281,112 @@ async function processNotification(message: NotificationMessage, env: WorkerEnv)
   }
 }
 
+async function postWebhookVerificationResult(
+  env: WorkerEnv,
+  result: { channelId: string; challenge: string; status: "verified" | "failed"; errorCode?: "endpoint_rejected" | "endpoint_unavailable" | "invalid_response" },
+): Promise<void> {
+  if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
+    throw new Error("Webhook verification callback is not configured.");
+  }
+  const callbackUrl = new URL("/internal/webhook-verification-results", env.API_URL);
+  if (callbackUrl.protocol !== "https:") throw new Error("Webhook verification callback must use HTTPS.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(callbackUrl, {
+      method: "POST", redirect: "error", signal: controller.signal,
+      headers: { "content-type": "application/json", "x-jerico-notification-secret": env.NOTIFICATION_DELIVERY_SECRET },
+      body: JSON.stringify(result),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    if (!response.ok) throw new Error("Webhook verification callback rejected.");
+  } finally { clearTimeout(timeout); }
+}
+
+async function readBoundedResponse(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("Webhook verification response exceeded the size limit.");
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(bytes);
+}
+
+async function processWebhookVerification(message: WebhookVerificationMessage, env: WorkerEnv): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(message.url, {
+      method: "POST", redirect: "error", signal: controller.signal,
+      headers: { "content-type": "application/json", "x-jerico-event": "webhook.verify" },
+      body: JSON.stringify({ type: "jerico.webhook.verify", challenge: message.challenge }),
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      await postWebhookVerificationResult(env, { channelId: message.channelId, challenge: message.challenge, status: "failed", errorCode: "endpoint_rejected" });
+      return;
+    }
+    const raw = await readBoundedResponse(response, 4096);
+    let payload: unknown;
+    try { payload = JSON.parse(raw); } catch { payload = null; }
+    if (typeof payload !== "object" || payload === null || !("challenge" in payload) || payload.challenge !== message.challenge) {
+      await postWebhookVerificationResult(env, { channelId: message.channelId, challenge: message.challenge, status: "failed", errorCode: "invalid_response" });
+      return;
+    }
+    await postWebhookVerificationResult(env, { channelId: message.channelId, challenge: message.challenge, status: "verified" });
+  } catch (error) {
+    await postWebhookVerificationResult(env, { channelId: message.channelId, challenge: message.challenge, status: "failed", errorCode: "endpoint_unavailable" });
+    throw new Error("Webhook verification endpoint is unavailable.");
+  } finally { clearTimeout(timeout); }
+}
+
+async function processWebhookNotification(message: WebhookNotificationMessage, env: WorkerEnv): Promise<void> {
+  await postNotificationResult(env, { deliveryId: message.deliveryId, status: "attempting" });
+  try {
+    await deliverWebhook({
+      url: message.url,
+      secretCiphertext: message.secretCiphertext,
+      secretIv: message.secretIv,
+      encryptionKey: env.WEBHOOK_ENCRYPTION_KEY,
+      blockedHost: env.PROBE_WORKER_HOST,
+      eventType: message.eventType,
+      deliveryId: message.deliveryId,
+      incidentId: message.incidentId,
+      projectId: message.projectId,
+      title: message.title,
+      triggerValue: message.triggerValue,
+      occurredAt: message.occurredAt,
+    });
+    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "sent" });
+  } catch (error) {
+    const rejected = error instanceof Error && error.message === "Webhook endpoint rejected the event.";
+    await postNotificationResult(env, { deliveryId: message.deliveryId, status: "failed", errorCode: rejected ? "provider_rejected" : "provider_unavailable" });
+    throw new Error(rejected ? "Webhook endpoint rejected the event." : "Webhook delivery failed.");
+  }
+}
+
 async function processNotificationBatch(batch: MessageBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
-    if (!isValidNotificationMessage(message.body)) {
+    if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
       message.ack();
       continue;
     }
     try {
-      await processNotification(message.body, env);
+      if (message.body.type === "notification.email") await processNotification(message.body, env);\n      else if (message.body.type === "notification.webhook.verify") await processWebhookVerification(message.body, env);\n      else await processWebhookNotification(message.body, env);
       message.ack();
     } catch (error) {
       console.error("Jerico notification delivery failed", {
