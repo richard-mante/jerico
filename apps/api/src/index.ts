@@ -13,7 +13,7 @@ import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { createIngestionCredential } from "./ingestion-keys";
-import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryOverview, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
+import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryMetricSeries, queryTelemetryOverview, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
 
 type Variables = { requestId: string };
 type AppEnvironment = { Bindings: ApiBindings & TelemetryQueryBindings; Variables: Variables };
@@ -249,6 +249,30 @@ app.get("/api/v1/projects/:projectId/telemetry/errors/groups", async (context) =
   }
 }));
 
+app.get("/api/v1/projects/:projectId/telemetry/metrics/series", async (context) => withOrganization(context, async (database, organizationId) => {
+  const projectId = context.req.param("projectId");
+  const [project] = await database.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const environmentId = context.req.query("environmentId");
+  if (environmentId) {
+    const [environment] = await database.select({ id: environments.id }).from(environments)
+      .where(and(eq(environments.id, environmentId), eq(environments.projectId, projectId), eq(environments.organizationId, organizationId))).limit(1);
+    if (!environment) return context.json({ error: { code: "INVALID_ENVIRONMENT", message: "The environment does not belong to this project." } }, 400);
+  }
+  if (!context.env.CLICKHOUSE_URL) return context.json({ error: { code: "TELEMETRY_UNAVAILABLE", message: "Telemetry query storage is not configured." } }, 503);
+  const range = parseTimeRange(context.req.query("from"), context.req.query("to"));
+  if (!range) return context.json({ error: { code: "INVALID_TIME_RANGE", message: "Provide a valid time range no longer than 31 days and not in the future." } }, 400);
+  const durationHours = (new Date(range.to).getTime() - new Date(range.from).getTime()) / 3_600_000;
+  const bucketMinutes: 1 | 15 | 60 | 360 = durationHours <= 2 ? 1 : durationHours <= 48 ? 15 : durationHours <= 240 ? 60 : 360;
+  try {
+    const data = await queryTelemetryMetricSeries(context.env, { organizationId, projectId, environmentId, ...range, bucketMinutes });
+    return context.json({ data, filters: { ...range, environmentId: environmentId ?? null, bucketMinutes } });
+  } catch (error) {
+    console.error("Jerico telemetry metric-series query failed", { requestId: context.get("requestId"), projectId, error: error instanceof Error ? error.message : String(error) });
+    return context.json({ error: { code: "TELEMETRY_QUERY_FAILED", message: "Metric series could not be loaded right now.", requestId: context.get("requestId") } }, 502);
+  }
+}));
 app.get("/api/v1/projects/:projectId/telemetry/overview", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
