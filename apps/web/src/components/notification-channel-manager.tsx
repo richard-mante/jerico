@@ -12,7 +12,8 @@ function formatDate(value: string | null) {
 }
 
 export function NotificationChannelManager({ projectId, organizationId }: { projectId: string; organizationId: string }) {
-  const [channels, setChannels] = useState<Channel[]>([]);\n  const [canManageChannels, setCanManageChannels] = useState(false);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [canManageChannels, setCanManageChannels] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,7 +38,8 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       request("/api/v1/notification-channels"),
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries?limit=25`),
     ]);
-    if (results[0].status === "fulfilled") { setChannels((results[0].value.data ?? []) as Channel[]); setCanManageChannels(true); }\n    else setCanManageChannels(false);
+    if (results[0].status === "fulfilled") { setChannels((results[0].value.data ?? []) as Channel[]); setCanManageChannels(true); }
+    else setCanManageChannels(false);
     if (results[1].status === "fulfilled") setDeliveries((results[1].value.data ?? []) as Delivery[]);
     if (results[0].status === "rejected" && results[1].status === "rejected") throw results[0].reason;
     if (results[0].status === "rejected") setError(results[0].reason instanceof Error ? results[0].reason.message : "You may not have permission to manage notification channels.");
