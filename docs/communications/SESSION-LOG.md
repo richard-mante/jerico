@@ -523,3 +523,15 @@
 - No confirmed exploitable vulnerability was established by source inspection. The Worker still has `global_fetch_strictly_public`; probes revalidate each redirect, webhook delivery rejects redirects, webhook secrets are AES-GCM encrypted at rest, and internal callback bodies are bounded and authenticated.
 - Identified remaining validation/review topics rather than changing security-sensitive behavior without executable tests: Workerd egress verification, queue retry/DLQ behavior during callback outages, scheduler/evaluator concurrency, live PostgreSQL tenant isolation, and ClickHouse query timeout/resource limits.
 - Corrected the handover's stale latest-merge SHA and removed a duplicated CI-runner sentence. No application code, dependencies, or lockfile changed. No tests/builds/runtime checks were run.
+
+
+## 2026-11-03 — ClickHouse query and ingestion timeouts
+
+- Reviewed the Worker queue consumers, notification retry handling, uptime scheduler claim path, alert evaluator claim path, and ClickHouse API query adapters.
+- Identified that ClickHouse API reads and Worker telemetry writes had no explicit query execution or request timeout.
+- Implemented an 8-second ClickHouse `max_execution_time` and a 10-second client request timeout across all eight API query operations and the Worker telemetry insert.
+- Added focused assertions in `apps/api/src/telemetry-query.test.ts` and `apps/worker/src/index.test.ts`.
+- Opened and merged [PR #39](https://github.com/richard-mante/jerico/pull/39); merge commit: `4d23197e52f95edbf71741b1f8735b7f3b709c13`.
+- Confirmed ClickHouse's HTTP interface supports per-request query settings via URL parameters in the official documentation. This does not replace live ClickHouse integration testing.
+- Tests were authored but not executed. No lint, typecheck, build, ClickHouse service, or queue runtime validation was run. No lockfile was generated or modified.
+- Next review: make notification queue-enqueue failures recoverable (currently recorded as failed without an automatic outbox retry), then verify evaluator overlap behavior and proceed to the blocked runtime validation sequence.
