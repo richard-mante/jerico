@@ -161,3 +161,11 @@ At the end of each substantial session, update this file and append a session-lo
 - Branch `feat/phase-4-error-stack-details` adds the latest captured error stack to grouped-error results and a collapsed, scrollable stack disclosure in the Errors tab.
 - Stack content is rendered as text; groups without stack data do not show the disclosure. Only the latest stack is included.
 - PR #13 is the stack-detail follow-up. Validation remains outstanding.
+
+
+### Phase 4 structured log levels (PR #14)
+
+- PR #13 merged latest stack trace details into `main` (merge commit `9ce277e06fc5267da7ab4f9bf345feb1c16079af`).
+- Branch `feat/phase-4-structured-logs` adds `logWithLevel()` to the trusted Node/core SDK, defaults existing `log()` calls to `info`, and keeps browser log submission blocked.
+- API logs query accepts `level=debug|info|warn|error|fatal`; legacy logs without a level are treated as `info`. The dashboard Logs tab includes a severity selector.
+- PR #14 is the structured logging follow-up. Validation remains outstanding.
