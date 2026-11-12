@@ -196,3 +196,13 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 
 ### Execution direction
 - Continue functional implementation; tests, end-to-end work, and GitHub builds remain deferred until requested.
+### Notification and alert operations
+- [x] Per-channel preferences for opened, acknowledged, and resolved incident notifications, enforced during initial delivery and retries (PR #92).
+- [x] Temporary alert-rule snoozing with 1h, 4h, 24h, and 7d durations (PRs #93–#94).
+- [x] Project identity editing and archive/restore, with ingestion blocked for archived projects (PR #95).
+- [x] Organization member invitations, role changes, removal, and pending invitation cancellation (PR #96).
+- [ ] Complete incident lifecycle controls, including reopen semantics and repeat notification delivery identity.
+- [ ] Provider-neutral queue adapter and self-hosted runtime/deployment workflow.
+
+### Execution direction
+- Continue functional implementation; tests, end-to-end work, and GitHub builds remain deferred until requested.

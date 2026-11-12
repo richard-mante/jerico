@@ -861,3 +861,16 @@
 ### Next
 - Continue notification preferences and incident lifecycle controls, then finish project lifecycle and provider-neutral queue/self-hosted runtime work.
 - Keep `pnpm-lock.yaml` untouched; defer tests and builds.
+### 2026-11-12 — notification preferences, alert snoozing, project lifecycle, and organization teams (PRs #92–#96)
+
+- PR #92 adds per-channel event preferences for incident opened, acknowledged, and resolved notifications. Delivery creation, queue recovery, and manual retry all honor the current preference state; existing channels default to all events enabled.
+- PRs #93–#94 add persisted alert-rule snoozing and expose 1h, 4h, 24h, and 7d controls with a visible Snoozed state and Resume action.
+- PR #95 adds project details editing and archive/restore. Archived projects retain their history and dashboards but new telemetry ingestion is rejected with `PROJECT_ARCHIVED`.
+- PR #96 adds organization team management through Better Auth: invite, list members/invitations, change member roles, remove members, and cancel invitations. Controls are restricted to organization owners/admins and reuse the existing invitation acceptance route.
+- Merges: #92 `2a54b5ec1bf057ee276c5094e03b41235b9c9933`; #93 `61464d07b44c9263a7a16618875bc196d6797259`; #94 `6f739bcb85f444ef634f94e9db614057a2e96e33`; #95 `6c5d17e8e0373746c1da46f95ded008eb39be07f`; #96 `759066c8c25eabb36a7bb87a4ea23ffc37a1fc86`.
+- No tests or builds were run. No GitHub Actions/builds were requested.
+
+### Next
+- Continue incident lifecycle controls and organization/project administration gaps.
+- Begin the provider-neutral durable queue and self-hosted runtime path after remaining managed-cloud workflows are closed.
+- Keep `pnpm-lock.yaml` untouched; defer tests and builds.
