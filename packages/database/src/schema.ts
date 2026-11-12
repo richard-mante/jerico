@@ -394,4 +394,30 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   index("notification_deliveries_enqueue_retry_idx").on(t.status, t.lastErrorCode, t.nextEnqueueAt),
   index("notification_deliveries_outbox_lease_idx").on(t.status, t.enqueuedAt, t.nextEnqueueAt),
 ]);
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, incidentActivity, notificationChannels, notificationDeliveries };
+export const queueMessages = pgTable("queue_messages", {
+  id: text("id").primaryKey(),
+  queueName: text("queue_name").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  deduplicationKey: text("deduplication_key"),
+  status: text("status").notNull().default("available"),
+  availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+  leaseToken: text("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(5),
+  lastErrorCode: text("last_error_code"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => [
+  check("queue_messages_status_check", sql`${t.status} IN ('available', 'leased', 'completed', 'dead_lettered')`),
+  check("queue_messages_attempts_check", sql`${t.attempts} >= 0 AND ${t.maxAttempts} BETWEEN 1 AND 100 AND ${t.attempts} <= ${t.maxAttempts}`),
+  check("queue_messages_lease_pair_check", sql`(${t.leaseToken} IS NULL AND ${t.leaseExpiresAt} IS NULL) OR (${t.leaseToken} IS NOT NULL AND ${t.leaseExpiresAt} IS NOT NULL)`),
+  check("queue_messages_payload_size_check", sql`pg_column_size(${t.payload}) <= 262144`),
+  uniqueIndex("queue_messages_active_dedup_unique").on(t.queueName, t.deduplicationKey).where(sql`${t.deduplicationKey} IS NOT NULL AND ${t.status} IN ('available', 'leased')`),
+  index("queue_messages_claim_idx").on(t.queueName, t.status, t.availableAt, t.createdAt),
+  index("queue_messages_expired_lease_idx").on(t.queueName, t.leaseExpiresAt).where(sql`${t.status} = 'leased'`),
+  index("queue_messages_dead_letter_idx").on(t.queueName, t.completedAt).where(sql`${t.status} = 'dead_lettered'`),
+]);
+
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, incidentActivity, notificationChannels, notificationDeliveries, queueMessages };
