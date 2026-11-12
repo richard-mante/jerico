@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14` (PR #70 is open for OAuth-style telemetry redaction)  
+**Latest feature merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14`  
 **Latest main merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14`  
-**Current milestone:** Phase 5E reliability hardening — OAuth-style telemetry secret redaction is in PR #70; implementation through Phase 5E is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
+**Current milestone:** Phase 5E reliability hardening — implementation through Phase 5E is present; ingestion idempotency publication serialization is in branch `fix/ingest-idempotency-claim-race`; manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds, event-name redaction | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66, #68 | Merged |
 
-Latest merged reliability milestone: [PR #68 — redact sensitive telemetry event names](https://github.com/richard-mante/jerico/pull/68). Follow-up: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), open and not merged. Tests have been authored but not executed.
+Latest merged reliability milestone: [PR #68 — redact sensitive telemetry event names](https://github.com/richard-mante/jerico/pull/68). Merge commit: `fbdda443b48ba6563238c810c3454e4644649f14`. Open security follow-up: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70). Current implementation branch: `fix/ingest-idempotency-claim-race` (commit `69db56ee5d9e501e327e9b9e145a603fc2b67e1c`); not yet opened as a PR.
 
 ### Phase 5 notification capabilities
 
@@ -88,7 +88,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 
 ## Outstanding work and next sequence
 
-1. **Ingestion reliability review:** continue source-level review of request idempotency, daily quota reservation/release, duplicate queue publication, and telemetry DLQ replay/retention. Preserve the user-owned lockfile boundary; do not fabricate or modify `pnpm-lock.yaml`.
+1. **Ingestion idempotency race:** review branch `fix/ingest-idempotency-claim-race`; add a PostgreSQL-backed simultaneous-retry regression test and validate queue failure/commit ambiguity before merge.
 2. **Validation foundation:** restore GitHub-hosted runner allocation or establish a reachable local validation environment. The user will generate and commit the missing `pnpm-lock.yaml`; do not fabricate or modify it. Once it is present and a runner is available, install dependencies, run lint/typecheck/tests/build, and fix all findings. Latest run #213 failed before workflow steps were recorded; this is not a source-check result.
 3. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
 4. **Telemetry validation:** run ClickHouse integration tests and verify ingestion/query behavior, deduplication, and retention.
