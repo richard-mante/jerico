@@ -874,3 +874,16 @@
 - Continue incident lifecycle controls and organization/project administration gaps.
 - Begin the provider-neutral durable queue and self-hosted runtime path after remaining managed-cloud workflows are closed.
 - Keep `pnpm-lock.yaml` untouched; defer tests and builds.
+### 2026-11-12 — product management, organization profile, and incident reopen (PRs #98–#101)
+
+- PR #98 adds product detail/update APIs, a Products page for create/edit/archive/restore, and project-to-product linking in Project Settings. Product deletion is not exposed so linked project references are not broken.
+- PR #99 restricts product creation, editing, and archive controls to organization owners/admins while preserving member read access.
+- PR #100 adds organization name and slug editing to Team and Access, using Better Auth's organization update endpoint and synchronizing the workspace selector.
+- PR #101 adds incident reopening, active-incident conflict protection, reopened activity entries, `incident.reopened` notifications, per-channel reopened preferences, and repeatable notification event identities. Existing delivery rows are backfilled with event keys so repeat lifecycle events do not weaken deduplication.
+- Merges: #98 `3499503ad50c0330f7bb2bad8a3e6c890607c227`; #99 `69979c48f1ec004e44bc173e62849875a0bf3c5a`; #100 `662daa08e87f6b18e91bdbb6bf9ba939a2183216`; #101 `e9b8b89a2a1ca63edfabfdb0680a0b3a2bb8f815`.
+- No tests or builds were run. No GitHub Actions/builds were requested.
+
+### Next
+- Close remaining notification controls (quiet hours and escalation) and review the SDK integration/release experience.
+- Move into provider-neutral queue and self-hosted runtime/deployment implementation.
+- Keep `pnpm-lock.yaml` untouched; defer tests and builds.
