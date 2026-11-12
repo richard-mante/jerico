@@ -1,0 +1,83 @@
+name: jerico-self-hosted
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jerico
+      POSTGRES_USER: jerico
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - jerico-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jerico -d jerico"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: jerico
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - jerico-clickhouse:/var/lib/clickhouse
+      - ./infrastructure/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/queue-worker/Dockerfile
+    restart: "no"
+    command: ["pnpm", "db:migrate"]
+    environment:
+      DATABASE_URL: postgresql://jerico:${POSTGRES_PASSWORD}@postgres:5432/jerico
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  queue-worker:
+    build:
+      context: .
+      dockerfile: apps/queue-worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8789
+      DATABASE_URL: postgresql://jerico:${POSTGRES_PASSWORD}@postgres:5432/jerico
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: jerico
+      CLICKHOUSE_TABLE: telemetry_events
+      CLICKHOUSE_USERNAME: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      TELEMETRY_QUEUE_NAME: jerico-telemetry
+      QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-5}
+      QUEUE_BATCH_SIZE: ${QUEUE_BATCH_SIZE:-20}
+      QUEUE_VISIBILITY_TIMEOUT_SECONDS: ${QUEUE_VISIBILITY_TIMEOUT_SECONDS:-60}
+      QUEUE_POLL_INTERVAL_MS: ${QUEUE_POLL_INTERVAL_MS:-1000}
+    ports:
+      - "${QUEUE_WORKER_PORT:-8789}:8789"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8789/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  jerico-postgres:
+  jerico-clickhouse:
