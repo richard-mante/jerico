@@ -82,25 +82,18 @@ async function maintainOutbox(): Promise<void> {
 
 const maintenanceTimer = setInterval(() => void maintainOutbox(), 15 * 60 * 1000);
 
-const server = serve({
-  fetch: (request) => ingestApp.fetch(request, bindings),
-  hostname,
-  port,
-}, (info) => {
-  console.info("Jerico self-hosted ingestion API is ready", {
-    hostname: info.address,
-    port: info.port,
-  });
-});
+let server: ReturnType<typeof serve> | null = null;
 
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(maintenanceTimer);
   console.info("Stopping Jerico self-hosted ingestion API", { signal });
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve());
-  });
+  if (server) {
+    await new Promise<void>((resolve, reject) => {
+      server!.close((error) => error ? reject(error) : resolve());
+    });
+  }
   await pool.end();
 }
 
@@ -117,6 +110,16 @@ async function main(): Promise<void> {
   await pool.query("SELECT 1");
   await queue.health();
   await maintainOutbox();
+  server = serve({
+    fetch: (request) => ingestApp.fetch(request, bindings),
+    hostname,
+    port,
+  }, (info) => {
+    console.info("Jerico self-hosted ingestion API is ready", {
+      hostname: info.address,
+      port: info.port,
+    });
+  });
 }
 
 main().catch(async (error) => {
@@ -124,7 +127,7 @@ main().catch(async (error) => {
     errorName: error instanceof Error ? error.name : "UnknownError",
   });
   clearInterval(maintenanceTimer);
-  server.close();
+  if (server) server.close();
   await pool.end().catch(() => undefined);
   process.exitCode = 1;
 });
