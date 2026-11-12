@@ -1,6 +1,6 @@
 # Phase 3 — TypeScript SDKs
 
-**Status:** Initial SDK foundation and compiled ESM package structure merged to `main` (PR #6 and PR #136). Build/runtime validation, ingestion integration, licensing, and publication remain pending.
+**Status:** Initial SDK foundation, compiled ESM package structure, and official Core Web Vitals capture are merged to `main` (PR #6, PR #136, and PR #140). Build/runtime validation, ingestion integration, licensing, and publication remain pending.
 
 ## Packages
 
@@ -18,7 +18,7 @@ The SDK requires both a project ingestion key and an explicit endpoint. No hoste
 
 - Browser applications must use a `jk_pub_` key. Public keys can submit events, errors, and only the allowlisted `web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, and `web.vitals.ttfb` metrics. Other browser metrics, logs, and spans remain blocked. Core Web Vitals are measured with the official `web-vitals` library rather than a hand-built PerformanceObserver approximation.
 - Node.js applications must use a `jk_sec_` key. Secret keys must never be exposed to browser code.
-- The browser SDK captures pathname and document title for page views; it does not collect query strings or URL fragments.
+- The browser SDK captures pathname and document title for page views; it does not collect query strings or URL fragments. Core Web Vitals capture uses Google's `web-vitals` APIs, forwarding metric value, rating, ID, navigation type, and delta while retaining Jerico's public metric allowlist.
 - Automatic browser error capture is enabled by default and can be disabled.
 - Node unhandled-rejection capture is opt-in. The SDK does not install process exit handlers.
 
