@@ -1007,3 +1007,12 @@
 - Merged PR #151 (`3e707e2f4fe71c48173f008bee51859195b05482`): expanded `SECURITY.md` with private vulnerability reporting instructions, scope, and handling expectations. GitHub private reporting still needs repository-level configuration.
 - Merged PR #152 (`380771dddc3f8c371127d0380b15e5dd24199bad`): queue worker prunes completed/dead-lettered rows at startup and daily using `QUEUE_RETENTION_DAYS` (default 7, range 1–365). The setting is wired through Compose and preflight.
 - No Linux systemd, queue retention, manifest restore, backup/restore, Compose, Docker, tests, typecheck, lint, or runtime validation was executed. No production-readiness claim is made.
+
+
+### 2026-11-12 — Invalid telemetry envelope quarantine (PR #154)
+
+- Added provider-neutral `QueueDelivery.deadLetter(errorCode)` to the queue contract.
+- PostgreSQL immediately dead-letters the active lease with a bounded error code. Cloudflare requests immediate retry so configured `max_retries` and `dead_letter_queue` route the message to its DLQ.
+- Managed and self-hosted telemetry consumers now quarantine invalid envelopes rather than acknowledge/discard them. The queue ADR documents the provider-specific behavior.
+- PR #154 merged as `21b78a8fe262b48dc339fea5209f46c7f5253964`; issue #107 updated with the remaining live routing/replay validation.
+- No tests, typecheck, builds, Cloudflare DLQ, PostgreSQL queue, or runtime validation were run.
