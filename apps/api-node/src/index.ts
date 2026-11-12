@@ -141,13 +141,13 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   if (maintenanceTimer) clearInterval(maintenanceTimer);
-  if (activeMaintenance) await activeMaintenance;
   console.info("Stopping Jerico self-hosted API", { signal });
   if (server) {
     await new Promise<void>((resolve, reject) => {
       server!.close((error) => error ? reject(error) : resolve());
     });
   }
+  if (activeMaintenance) await activeMaintenance;
   await pool.end();
 }
 
