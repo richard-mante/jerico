@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #128 — optional age-encrypted backups (`44b5bc2cb134559d42d3fbb24542beca3a9e30d1`)  
-**Latest main merge:** PR #128 — `44b5bc2cb134559d42d3fbb24542beca3a9e30d1`  
-**Current milestone:** The self-hosted Compose stack now includes the Next.js dashboard, Node management and ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy automatic HTTPS. Backup/restore scripts now cover PostgreSQL and ClickHouse with checksums, an explicit destructive-restore gate, and optional age encryption. The Compose web dependency syntax was corrected in PR #127. Restore drills, fresh-install validation, production hardening, and runtime verification remain outstanding.
+**Latest feature merge:** PR #130 — deployment preflight (`edfda14d2974256fa56997a985fb095e73342c32`)  
+**Latest main merge:** PR #130 — `edfda14d2974256fa56997a985fb095e73342c32`  
+**Current milestone:** The self-hosted Compose stack now includes the Next.js dashboard, Node management and ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy automatic HTTPS. Backup/restore scripts now cover PostgreSQL and ClickHouse with checksums, an explicit destructive-restore gate, and optional age encryption. The Compose web dependency syntax was corrected in PR #127. The Linux deployment preflight and baseline sizing guidance are now present. Restore drills, fresh-install validation, off-site backup/retention policy, production hardening, and runtime verification remain outstanding.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -231,6 +231,6 @@ Merged PR #68. Ingestion now applies the existing deterministic text-redaction p
 - Merged PR #124: added ClickHouse local backup disk configuration, PostgreSQL custom-format backup, ClickHouse native backup archive, SHA-256 manifests, and a destructive restore script guarded by `CONFIRM_DESTRUCTIVE_RESTORE=YES`. Backup/restore pauses writers and drains API/ingest maintenance before closing pools.
 - Merged PR #127: corrected malformed `web.depends_on` syntax in Compose so the dashboard waits for the healthy API service; retained the 40-second graceful stop period.
 - Merged PR #128: added optional age encryption for both archives. When `AGE_RECIPIENT` is set, plaintext archives are removed before checksums are written. Restore verifies encrypted artifacts, requires `AGE_IDENTITY`, decrypts into a private temporary directory, and cleans it on exit. Existing plaintext backup format remains supported.
-- The Caddy `jerico-caddy-data` volume should also be preserved separately. A restore drill and fresh-install validation have not been run.
+- The Caddy `jerico-caddy-data` volume should also be preserved separately. The preflight checks Docker/Compose, secret formats, Compose interpolation, DNS, public ports, and basic CPU/RAM/disk thresholds. It does not certify capacity. A restore drill and fresh-install validation have not been run.
 - PR #124 merged as `e7228b16ec28bfd1bed1c4938b12b8e6746fe7ee`; PR #127 as `206a86ec2c82f7ef9f4136032580725a0cd99879`; PR #128 as `44b5bc2cb134559d42d3fbb24542beca3a9e30d1`.
 - No tests, typecheck, lint, build, Docker build, Compose validation, migrations, restore drill, or live PostgreSQL/ClickHouse runtime checks were run. No validation is claimed. `pnpm-lock.yaml` remains untouched.
