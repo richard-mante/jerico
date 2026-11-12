@@ -34,6 +34,7 @@ const clickhouseEnv: WorkerEnv = {
   CLICKHOUSE_TOKEN: process.env.CLICKHOUSE_TOKEN,
 };
 const port = integerEnv("PORT", 8789, 1, 65_535);
+const host = process.env.HOST?.trim() || "127.0.0.1";
 const pool = new Pool({
   connectionString: databaseUrl,
   max: integerEnv("DATABASE_POOL_MAX", 8, 1, 50),
@@ -94,7 +95,11 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   console.info("Stopping Jerico self-hosted telemetry worker", { signal });
-  server.close();
+  if (server.listening) {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
   await consumer.stop({ timeoutMs: 25_000 });
   await pool.end();
 }
@@ -103,8 +108,8 @@ async function main(): Promise<void> {
   await pool.query("SELECT 1");
   await telemetryQueue.health();
   await consumer.start();
-  server.listen(port, "0.0.0.0", () => {
-    console.info("Jerico self-hosted telemetry worker is ready", { port });
+  server.listen(port, host, () => {
+    console.info("Jerico self-hosted telemetry worker is ready", { host, port });
   });
 }
 
