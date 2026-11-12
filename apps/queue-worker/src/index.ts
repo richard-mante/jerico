@@ -6,8 +6,8 @@ import {
   isValidTelemetryMessage,
   writeToClickHouse,
   type TelemetryMessage,
-  type WorkerEnv,
-} from "@jerico/worker";
+  type ClickHouseEnv,
+} from "@jerico/worker/telemetry";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -25,7 +25,7 @@ function integerEnv(name: string, fallback: number, minimum: number, maximum: nu
 }
 
 const databaseUrl = required("DATABASE_URL");
-const clickhouseEnv: WorkerEnv = {
+const clickhouseEnv: ClickHouseEnv = {
   CLICKHOUSE_URL: required("CLICKHOUSE_URL"),
   CLICKHOUSE_DATABASE: process.env.CLICKHOUSE_DATABASE ?? "jerico",
   CLICKHOUSE_TABLE: process.env.CLICKHOUSE_TABLE ?? "telemetry_events",
