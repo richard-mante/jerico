@@ -26,7 +26,7 @@ The SDK requires both a project ingestion key and an explicit endpoint. No hoste
 
 - Events are buffered in memory, with a configurable maximum queue size and batch size (1–100).
 - The default batch size is 50 and the default periodic flush interval is 10 seconds.
-- Call `flush()` to explicitly send pending events and `close()` during graceful shutdown.
+- Call `flush()` to explicitly send pending events and `close()` during graceful shutdown. Ingestion requests are bounded by a configurable 10-second default timeout (`requestTimeoutMs`, 100–120,000 ms); an aborted/ambiguous batch retains the same idempotency key and body for an explicit retry.
 - A failed batch is retained in memory and reported through `onError`. Automatic retries are deliberately disabled after a failed request until server-side request idempotency exists; an ambiguous response may mean the server accepted the batch.
 - The queue is not persisted. A process/browser crash can lose buffered events.
 - Browser logs, custom metrics, and spans are blocked. With `captureWebVitals: true`, the browser SDK internally records only the five allowlisted Core Web Vitals metrics. It observes TTFB/FCP when available, accumulates CLS session windows, tracks LCP, and estimates INP from interaction-duration entries. Final page metrics are flushed best-effort when the document becomes hidden or closes.

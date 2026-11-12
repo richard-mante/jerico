@@ -25,7 +25,7 @@ await jerico.close();
 
 The Node SDK requires a `jk_sec_` project key. Keep it in server-only environment variables and never expose it to browser bundles or source control.
 
-Unhandled rejection capture is opt-in with `captureUnhandledRejections: true`. The SDK does not install process exit handlers. Always close the client during graceful shutdown; the queue is in-memory and cannot survive forced termination.
+Ingestion requests time out after 10 seconds by default; configure `requestTimeoutMs` (100–120,000 ms) for slower endpoints. Unhandled rejection capture is opt-in with `captureUnhandledRejections: true`. The SDK does not install process exit handlers. Always close the client during graceful shutdown; the queue is in-memory and cannot survive forced termination.
 
 ## Build
 

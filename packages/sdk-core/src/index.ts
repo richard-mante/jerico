@@ -16,6 +16,7 @@ export type JericoClientOptions = {
   apiKey: string;
   endpoint: string;
   flushIntervalMs?: number;
+  requestTimeoutMs?: number;
   maxBatchSize?: number;
   maxQueueSize?: number;
   fetch?: typeof fetch;
@@ -44,6 +45,7 @@ export class JericoClient {
   private readonly endpoint: string;
   private readonly maxBatchSize: number;
   private readonly maxQueueSize: number;
+  private readonly requestTimeoutMs: number;
 
   constructor(private readonly options: JericoClientOptions) {
     if (!options.apiKey.trim()) throw new Error("A Jerico ingestion API key is required.");
@@ -53,6 +55,10 @@ export class JericoClient {
     this.endpoint = options.endpoint.replace(/\/$/, "");
     this.maxBatchSize = options.maxBatchSize ?? DEFAULT_BATCH_SIZE;
     this.maxQueueSize = options.maxQueueSize ?? DEFAULT_QUEUE_SIZE;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
+    if (!Number.isInteger(this.requestTimeoutMs) || this.requestTimeoutMs < 100 || this.requestTimeoutMs > 120_000) {
+      throw new Error("requestTimeoutMs must be an integer between 100 and 120000.");
+    }
     if (!Number.isInteger(this.maxBatchSize) || this.maxBatchSize < 1 || this.maxBatchSize > 100) {
       throw new Error("maxBatchSize must be an integer between 1 and 100.");
     }
@@ -172,6 +178,8 @@ export class JericoClient {
     };
     this.retryBatch = batch;
     this.inFlight = (async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
       try {
         const response = await this.fetcher(`${this.endpoint}/ingest/v1/events`, {
           method: "POST",
@@ -181,6 +189,7 @@ export class JericoClient {
             "idempotency-key": batch.idempotencyKey,
           },
           body: JSON.stringify({ events: batch.events }),
+          signal: controller.signal,
         });
         if (!response.ok) {
           const retryAfter = Number(response.headers.get("retry-after"));
@@ -197,6 +206,7 @@ export class JericoClient {
         this.timerBlocked = true;
         throw error;
       } finally {
+        clearTimeout(timeout);
         this.inFlight = undefined;
       }
     })();
