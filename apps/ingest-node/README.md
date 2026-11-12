@@ -34,4 +34,4 @@ pnpm --filter @jerico/database db:migrate
 pnpm --filter @jerico/ingest-node start
 ```
 
-The `GET /health` endpoint reports whether the PostgreSQL queue publisher is configured. Keep the service behind a trusted reverse proxy and apply HTTPS at the edge.
+`GET /health` checks PostgreSQL and queue health; `GET /ready` also returns queue depth/age/dead-letter counters. Keep the service behind a trusted reverse proxy and apply HTTPS at the edge.
