@@ -68,26 +68,96 @@ const consumer = new PollingQueueConsumer(
 );
 
 let shuttingDown = false;
+const queueAdminToken = process.env.QUEUE_ADMIN_TOKEN;
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const a = new TextEncoder().encode(left);
+  const b = new TextEncoder().encode(right);
+  let difference = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
+  }
+  return difference === 0;
+}
+
+function respond(response: import("node:http").ServerResponse, status: number, payload: unknown): void {
+  response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  response.end(JSON.stringify(payload));
+}
+
 const server = createServer(async (request, response) => {
-  if (request.method !== "GET" || (request.url !== "/health" && request.url !== "/ready")) {
-    response.writeHead(404, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: "not_found" }));
+  const url = new URL(request.url ?? "/", "http://localhost");
+  if (request.method === "GET" && (url.pathname === "/health" || url.pathname === "/ready")) {
+    try {
+      await pool.query("SELECT 1");
+      const queue = await telemetryQueue.health();
+      respond(response, queue.status === "unavailable" ? 503 : 200, {
+        status: queue.status,
+        service: "jerico-queue-worker",
+        ready: true,
+        ...(url.pathname === "/ready" ? { queue } : {}),
+      });
+    } catch {
+      respond(response, 503, { status: "unavailable", service: "jerico-queue-worker", ready: false });
+    }
     return;
   }
+
+  const deadLetterPath = url.pathname === "/dead-letters"
+    || /^\/dead-letters\/[^/]+(?:\/replay)?$/.test(url.pathname);
+  if (!deadLetterPath) {
+    respond(response, 404, { error: "not_found" });
+    return;
+  }
+  if (!queueAdminToken || queueAdminToken.length < 32) {
+    respond(response, 404, { error: "not_found" });
+    return;
+  }
+  const authorization = request.headers.authorization ?? "";
+  const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!constantTimeEqual(suppliedToken, queueAdminToken)) {
+    respond(response, 401, { error: "unauthorized" });
+    return;
+  }
+
   try {
-    await pool.query("SELECT 1");
-    const queue = await telemetryQueue.health();
-    const ready = request.url === "/ready";
-    response.writeHead(queue.status === "unavailable" ? 503 : 200, { "content-type": "application/json" });
-    response.end(JSON.stringify({
-      status: queue.status,
-      service: "jerico-queue-worker",
-      ready: true,
-      ...(ready ? { queue } : {}),
-    }));
-  } catch {
-    response.writeHead(503, { "content-type": "application/json" });
-    response.end(JSON.stringify({ status: "unavailable", service: "jerico-queue-worker", ready: false }));
+    if (request.method === "GET" && url.pathname === "/dead-letters") {
+      const rawLimit = url.searchParams.get("limit");
+      const limit = rawLimit === null ? 50 : Number(rawLimit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        respond(response, 400, { error: "invalid_limit", message: "Limit must be between 1 and 100." });
+        return;
+      }
+      respond(response, 200, { data: await telemetryQueue.listDeadLetters(limit) });
+      return;
+    }
+
+    const replayMatch = url.pathname.match(/^\/dead-letters\/([^/]+)\/replay$/);
+    if (request.method === "POST" && replayMatch) {
+      const replayed = await telemetryQueue.replayDeadLetter(decodeURIComponent(replayMatch[1]!));
+      respond(response, replayed ? 202 : 409, replayed
+        ? { data: { replayed: true } }
+        : { error: "not_replayable", message: "The dead-letter message is missing, already replayed, or conflicts with an active deduplication key." });
+      return;
+    }
+
+    const detailMatch = url.pathname.match(/^\/dead-letters\/([^/]+)$/);
+    if (request.method === "GET" && detailMatch) {
+      const message = await telemetryQueue.getDeadLetter(decodeURIComponent(detailMatch[1]!));
+      if (!message) {
+        respond(response, 404, { error: "not_found" });
+        return;
+      }
+      respond(response, 200, { data: message });
+      return;
+    }
+    respond(response, 404, { error: "not_found" });
+  } catch (error) {
+    console.error("Dead-letter administration request failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    respond(response, 500, { error: "internal_error" });
   }
 });
 
