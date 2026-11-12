@@ -12,6 +12,8 @@ This Compose file runs the initial self-hosted web dashboard, management API, in
 - Node.js ingestion API: reuses the managed Hono ingestion routes, but publishes telemetry directly to the PostgreSQL queue. Its per-credential rate limiter is backed by atomic PostgreSQL fixed-window counters.
 - Node.js queue worker: consumes telemetry, uptime, and notification queues. Public outbound targets are DNS-resolved, checked for non-public IPs, and pinned to the validated address for the connection. Webhook redirects are rejected and uptime redirects are revalidated one hop at a time.
 
+The queue worker prunes completed and dead-lettered messages once at startup and then daily. `QUEUE_RETENTION_DAYS` defaults to 7 days and accepts 1–365; older dead letters are removed as well, so choose a retention window that meets operational investigation and audit needs.
+
 The web dashboard, API, ingestion service, and queue worker bind to container networking internally and publish only to host loopback by default. Caddy is the only public-facing service and terminates HTTPS for the three configured domains. The queue worker includes health/readiness endpoints and token-protected dead-letter inspection/replay across all three queues. Internal worker callbacks use a shared secret and an explicitly enabled HTTP exception restricted to the private Compose service name `api` and port 8787; this exception must not be enabled outside this private network.
 
 ## Host preflight and sizing
