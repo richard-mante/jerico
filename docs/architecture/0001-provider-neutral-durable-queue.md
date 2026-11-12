@@ -89,3 +89,10 @@ The self-hosted runtime must document database sizing, connection-pool limits, p
 ## Invalid-message quarantine
 
 Queue consumers must validate message schema/version before processing. The provider-neutral `QueueDelivery.deadLetter(errorCode)` action is used for permanently invalid or unprocessable envelopes instead of acknowledging and silently discarding them. The PostgreSQL adapter immediately marks the active lease dead-lettered with a bounded error code. The Cloudflare adapter requests immediate retry so the configured `max_retries` policy routes the message to its configured dead-letter queue. Provider-specific timing differs, but the message is not acknowledged as successful. Telemetry DLQ inspection/replay remains operator-managed in the managed Cloudflare deployment; the self-hosted API exposes authenticated DLQ inspection/replay.
+
+
+## Provider-neutral message size
+
+Cloudflare Queues currently limits an individual message to 128 KB (including approximately 100 bytes of platform metadata). Jerico therefore defines a 120,000-byte serialized payload ceiling for the shared queue contract and PostgreSQL adapter, leaving room for provider metadata. The managed ingestion endpoint separately caps the raw JSON request at 96 KiB, keeping the telemetry envelope below the queue limit. Do not raise the shared ceiling without revisiting the managed provider's current limits and all producers.
+
+Reference: [Cloudflare Queues platform limits](https://developers.cloudflare.com/queues/platform/limits/).
