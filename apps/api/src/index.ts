@@ -18,6 +18,7 @@ import {
   createOrganizationSchema,
   createProductSchema,
   createProjectSchema,
+  updateProjectSchema,
   createUptimeMonitorSchema,
   updateUptimeMonitorSchema,
   uptimeProbeResultSchema,
@@ -194,6 +195,27 @@ app.post("/api/v1/products", async (context) => withOrganization(context, async 
 app.get("/api/v1/projects", async (context) => withOrganization(context, async (database, organizationId) => {
   const rows = await database.select().from(projects).where(eq(projects.organizationId, organizationId)).orderBy(asc(projects.name));
   return context.json({ data: rows });
+}));
+app.get("/api/v1/projects/:projectId", async (context) => withOrganization(context, async (database, organizationId) => {
+  const [project] = await database.select().from(projects).where(and(eq(projects.id, context.req.param("projectId")), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  return context.json({ data: project });
+}));
+
+app.patch("/api/v1/projects/:projectId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot update projects." } }, 403);
+  const parsed = updateProjectSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The project details are invalid.", details: parsed.error.flatten() } }, 400);
+  const [existing] = await database.select({ id: projects.id }).from(projects).where(and(eq(projects.id, context.req.param("projectId")), eq(projects.organizationId, organizationId))).limit(1);
+  if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  try {
+    const [updated] = await database.update(projects).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(projects.id, existing.id), eq(projects.organizationId, organizationId))).returning();
+    return context.json({ data: updated });
+  } catch (error) {
+    if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "A project with this slug already exists in the organization." } }, 409);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "23503") return context.json({ error: { code: "INVALID_PRODUCT", message: "The selected product does not belong to this organization." } }, 400);
+    throw error;
+  }
 }));
 app.post("/api/v1/projects", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create projects." } }, 403);
