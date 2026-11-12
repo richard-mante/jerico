@@ -26,7 +26,7 @@ import { withDatabase, type ApiBindings, type JericoDatabase } from "./database"
 import { createIngestionCredential } from "./ingestion-keys";
 import { pruneUptimeCheckHistory, scheduleDueUptimeMonitors } from "./uptime-scheduler";
 import { evaluateAlertRules } from "./alert-evaluator";
-import { retryFailedNotificationEnqueues, safelyQueueIncidentNotifications } from "./notification-delivery";
+import { retryFailedNotificationEnqueues, retryNotificationDelivery, safelyQueueIncidentNotifications } from "./notification-delivery";
 import { sendEmail } from "./email";
 import { encryptWebhookSecret } from "./webhook-crypto";
 import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTimeRange, queryTelemetry, queryTelemetryErrorGroups, queryTelemetryEventCatalogue, queryTelemetryEventSeries, queryTelemetryMetricSeries, queryTelemetryOverview, queryTelemetryRoutePerformance, type TelemetryQueryBindings, type TelemetryRow } from "./telemetry-query";
@@ -970,6 +970,18 @@ app.get("/api/v1/projects/:projectId/notification-deliveries", async (context) =
   return context.json({ data });
 }));
 
+
+app.post("/api/v1/projects/:projectId/notification-deliveries/:deliveryId/retry", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot retry notification deliveries." } }, 403);
+  const result = await retryNotificationDelivery(database, context.env, {
+    organizationId, projectId: context.req.param("projectId"), deliveryId: context.req.param("deliveryId"),
+  });
+  if (result === "not_found") return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery was not found in this project." } }, 404);
+  if (result === "not_retryable") return context.json({ error: { code: "NOT_RETRYABLE", message: "Only failed notification deliveries can be retried." } }, 409);
+  if (result === "channel_unavailable") return context.json({ error: { code: "CHANNEL_UNAVAILABLE", message: "The notification channel is missing, disabled, unverified, or misconfigured." } }, 409);
+  if (result === "queue_unavailable") return context.json({ error: { code: "QUEUE_UNAVAILABLE", message: "The notification could not be queued. Automatic recovery will retry when possible." } }, 503);
+  return context.json({ data: { deliveryId: context.req.param("deliveryId"), status: "queued" } }, 202);
+}));
 app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
