@@ -4,7 +4,7 @@ import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { telemetryBatchSchema, type TelemetryEvent } from "@jerico/contracts";
-import { projectIngestionKeys, projectIngestionRequests, projectIngestionUsage, schema } from "@jerico/database/schema";
+import { projectIngestionKeys, projectIngestionRequests, projectIngestionUsage, projects, schema } from "@jerico/database/schema";
 import { hashPresentedCredential, readBearerCredential } from "./credentials";
 import { redactTelemetryEvent } from "./redaction";
 import { DailyQuotaExceeded, dailyEventLimit, secondsUntilUtcMidnight, utcUsageDate } from "./quota";
@@ -199,7 +199,9 @@ app.post("/ingest/v1/events", async (context) => {
         projectId: projectIngestionKeys.projectId,
         environmentId: projectIngestionKeys.environmentId,
         keyType: projectIngestionKeys.keyType,
+        projectStatus: projects.status,
       }).from(projectIngestionKeys)
+        .innerJoin(projects, and(eq(projects.id, projectIngestionKeys.projectId), eq(projects.organizationId, projectIngestionKeys.organizationId)))
         .where(and(eq(projectIngestionKeys.keyHash, keyHash), isNull(projectIngestionKeys.revokedAt)))
         .limit(1);
       return found ?? null;
@@ -209,6 +211,7 @@ app.post("/ingest/v1/events", async (context) => {
         (credential.keyType === "secret" && !rawKey.startsWith("jk_sec_"))) {
       return context.json({ error: { code: "INVALID_CREDENTIAL", message: "The credential is invalid or revoked.", requestId } }, 401);
     }
+    if (credential.projectStatus !== "active") return context.json({ error: { code: "PROJECT_ARCHIVED", message: "This project is archived and no longer accepts telemetry.", requestId } }, 409);
 
     if (context.env.INGEST_RATE_LIMITER) {
       const rate = await context.env.INGEST_RATE_LIMITER.limit({ key: credential.id });
