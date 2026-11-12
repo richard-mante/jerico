@@ -966,6 +966,30 @@ app.get("/api/v1/projects/:projectId/incidents", async (context) => withOrganiza
   return context.json({ data });
 }));
 
+app.get("/api/v1/projects/:projectId/members", async (context) => withOrganization(context, async (database, organizationId) => {
+  const [project] = await database.select({ id: projects.id }).from(projects).where(and(eq(projects.id, context.req.param("projectId")), eq(projects.organizationId, organizationId))).limit(1);
+  if (!project) return context.json({ error: { code: "NOT_FOUND", message: "Project not found in this organization." } }, 404);
+  const data = await database.select({ userId: member.userId, name: users.name, email: users.email, role: member.role }).from(member)
+    .innerJoin(users, eq(member.userId, users.id)).where(eq(member.organizationId, organizationId)).orderBy(asc(users.name));
+  return context.json({ data });
+}));
+
+app.patch("/api/v1/projects/:projectId/incidents/:incidentId/assignee", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
+  const body = await context.req.json().catch(() => null) as { assignedTo?: unknown } | null;
+  if (!body || !(body.assignedTo === null || (typeof body.assignedTo === "string" && body.assignedTo.length > 0 && body.assignedTo.length <= 128))) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide a valid member ID or null to unassign." } }, 400);
+  const [incident] = await database.select({ id: incidents.id }).from(incidents).where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
+  if (!incident) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
+  let assignee: { userId: string; name: string; email: string } | null = null;
+  if (body.assignedTo !== null) {
+    const [found] = await database.select({ userId: member.userId, name: users.name, email: users.email }).from(member).innerJoin(users, eq(member.userId, users.id))
+      .where(and(eq(member.organizationId, organizationId), eq(member.userId, body.assignedTo))).limit(1);
+    if (!found) return context.json({ error: { code: "INVALID_ASSIGNEE", message: "The assignee must be a member of this organization." } }, 400);
+    assignee = found;
+  }
+  const [updated] = await database.update(incidents).set({ assignedTo: body.assignedTo, updatedAt: new Date() }).where(and(eq(incidents.id, incident.id), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).returning();
+  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: context.req.param("projectId"), incidentId: incident.id, actorId: userId, activityType: "assigned", body: assignee ? `Assigned to ${assignee.name} (${assignee.email}).` : "Incident unassigned." });
+  return context.json({ data: updated });
+}));
 app.get("/api/v1/projects/:projectId/incidents/:incidentId/activity", async (context) => withOrganization(context, async (database, organizationId) => {
   const [incident] = await database.select({ id: incidents.id }).from(incidents).where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
   if (!incident) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);

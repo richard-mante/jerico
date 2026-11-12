@@ -293,6 +293,7 @@ export const incidents = pgTable("incidents", {
   lastTriggeredAt: timestamp("last_triggered_at", { withTimezone: true }).notNull().defaultNow(),
   acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   acknowledgedBy: text("acknowledged_by").references(() => user.id, { onDelete: "set null" }),
+  assignedTo: text("assigned_to").references(() => user.id, { onDelete: "set null" }),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -317,7 +318,7 @@ export const incidentActivity = pgTable("incident_activity", {
   body: text("body"),
   createdAt: createdAt(),
 }, (t) => [
-  check("incident_activity_type_check", sql`${t.activityType} IN ('opened', 'acknowledged', 'resolved', 'note')`),
+  check("incident_activity_type_check", sql`${t.activityType} IN ('opened', 'acknowledged', 'resolved', 'assigned', 'note')`),
   foreignKey({ name: "incident_activity_incident_same_project_fk", columns: [t.incidentId, t.organizationId, t.projectId], foreignColumns: [incidents.id, incidents.organizationId, incidents.projectId] }).onDelete("cascade"),
   index("incident_activity_incident_created_idx").on(t.incidentId, t.createdAt),
 ]);
