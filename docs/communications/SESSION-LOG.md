@@ -905,3 +905,14 @@
 - The Node worker currently consumes telemetry only. Uptime probes and notifications remain on Cloudflare because their current outbound networking relies on Cloudflare public-egress/SSRF protections. Do not move them to Node until equivalent DNS/IP pinning, redirect blocking, and private-address protections are implemented and reviewed.
 - Dead-letter inspection/replay, uptime/notification Node handlers, Docker Compose, and self-hosted backup/restore remain outstanding. The Cloudflare managed runtime remains active.
 - Migration 0022, PostgreSQL queue concurrency/recovery, ClickHouse writes, typecheck, lint, tests, and builds were not executed. No validation is claimed. pnpm-lock.yaml was not modified.
+
+
+## 2026-11-12 — Self-hosted telemetry Compose slice
+
+- Merged PR #116: added `compose.self-hosted.yaml` for PostgreSQL 17, ClickHouse 25.8, Drizzle migration execution, and the existing standalone telemetry queue worker. Added worker Dockerfile, root Docker ignore rules, secret template, and setup guide.
+- The Compose stack binds the worker port to host loopback and requires a bearer token for dead-letter administration. Persistent Postgres and ClickHouse volumes are retained on ordinary shutdown.
+- Added strict lease expiry fencing to queue acknowledgement, retry, dead-letter, and extension operations. A stale worker cannot settle a lease after its expiry even if another worker has not yet reclaimed it.
+- Confirmed the current Node worker already has authenticated dead-letter list/detail/replay routes; the Compose deployment wires the required token.
+- Explicit limitation: API/ingest remain on Cloudflare and publish to Cloudflare Queues. The Compose slice does not yet receive live self-hosted telemetry from those producers and does not include the full web/API/auth, uptime, or notification runtime.
+- PR #116 merged as `572b5c4b21e165a0337c4ae9bbb6af961bcdc192`. PR #115 was closed as superseded because its worker code was already present on main; PR #116 was rebuilt from current main to avoid merging stale duplicate worker changes.
+- No tests, typecheck, lint, Docker build, Compose validation, migrations, or database runtime checks were run. No validation is claimed. `pnpm-lock.yaml` was not modified.
