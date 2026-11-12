@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #75 — durable telemetry idempotency outbox (`4e78253ff95db91274cb55c363bcc54029ed67fc`)  
-**Latest main merge:** PR #72 — `b0ca6d15a6616d4f10836a75212253573407b7d3`  
-**Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency publication race is serialized, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
+**Latest feature merge:** PR #76 — idempotent credential usage tracking (`a10d44d81ed75eabc1e77d1a3ddfafd5fac8f4f7`)  
+**Latest main merge:** PR #76 — `a10d44d81ed75eabc1e77d1a3ddfafd5fac8f4f7`  
+**Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency outbox is durable, credential usage timestamps include idempotent requests, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds, event-name redaction | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66, #68 | Merged |
 
-Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), and [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72). Latest main commit: `b0ca6d15a6616d4f10836a75212253573407b7d3`.
+Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72), [PR #75 — durable telemetry idempotency outbox](https://github.com/richard-mante/jerico/pull/75), and [PR #76 — update credential usage for idempotent requests](https://github.com/richard-mante/jerico/pull/76). Latest main commit: `a10d44d81ed75eabc1e77d1a3ddfafd5fac8f4f7`.
 
 ### Phase 5 notification capabilities
 
