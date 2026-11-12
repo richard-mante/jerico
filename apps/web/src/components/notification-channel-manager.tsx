@@ -84,6 +84,18 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       setError(cause instanceof Error ? cause.message : "Could not resend verification email.");
     } finally { setBusy(false); }
   }
+  async function toggleChannel(channel: Channel) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, {
+        method: "PATCH", body: JSON.stringify({ enabled: !channel.enabled }),
+      });
+      setNotice(channel.enabled ? "Notification channel paused. No new incident notifications will be sent to it." : "Notification channel enabled.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update notification channel.");
+    } finally { setBusy(false); }
+  }
   async function remove(channel: Channel) {
     if (!window.confirm(`Remove ${channel.target} from incident notifications?`)) return;
     setBusy(true); setError(""); setNotice("");
@@ -118,8 +130,8 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
         </div>}
         <div className="mt-4 divide-y divide-white/10">
           {channels.map((channel) => <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div><p className="text-sm">{channel.type === "webhook" ? "Webhook" : "Email"} · {channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}{channel.lastVerificationErrorCode ? " · " + channel.lastVerificationErrorCode : ""}</p></div>
-            <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
+            <div><p className="text-sm">{channel.type === "webhook" ? "Webhook" : "Email"} · {channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}{channel.verifiedAt ? channel.enabled ? " · Active" : " · Paused" : ""}{channel.lastVerificationErrorCode ? " · " + channel.lastVerificationErrorCode : ""}</p></div>
+            <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}{channel.verifiedAt && <button disabled={busy} onClick={() => void toggleChannel(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{channel.enabled ? "Pause" : "Enable"}</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
           </div>)}
           {!channels.length && <p className="py-5 text-sm text-[#737b89]">No notification channels configured.</p>}
         </div>
