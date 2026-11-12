@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #144 — encrypted off-site backup/restore (`b47b9c6bf5b1add4a15d8b0336281a36c48366bf`)  
-**Latest main merge:** PR #144 — `b47b9c6bf5b1add4a15d8b0336281a36c48366bf`  
+**Latest feature merge:** PR #146 — backup credential file guards (`f747d93765ba9125069fb3cb4ddeb9058f62295b`)  
+**Latest main merge:** PR #146 — `f747d93765ba9125069fb3cb4ddeb9058f62295b`  
 **Current milestone:** The self-hosted Compose stack now includes the Next.js dashboard, Node management and ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy automatic HTTPS. Backup/restore scripts now cover PostgreSQL and ClickHouse with checksums, an explicit destructive-restore gate, and optional age encryption. The Compose web dependency syntax was corrected in PR #127. The Linux deployment preflight, baseline sizing guidance, opt-in local backup retention, non-root Node/web images, and reduced-capability app containers are now present. Restore drills, fresh-install validation, off-site backup storage/retention, measured resource sizing, and runtime verification remain outstanding.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
