@@ -984,6 +984,36 @@ app.post("/api/v1/projects/:projectId/notification-deliveries/:deliveryId/retry"
   if (result === "queue_unavailable") return context.json({ error: { code: "QUEUE_UNAVAILABLE", message: "The notification could not be queued. Automatic recovery will retry when possible." } }, 503);
   return context.json({ data: { deliveryId: context.req.param("deliveryId"), status: "queued" } }, 202);
 }));
+app.post("/api/v1/projects/:projectId/uptime-monitors/:monitorId/check", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot trigger uptime checks." } }, 403);
+  if (!context.env.UPTIME_PROBES) return context.json({ error: { code: "UPTIME_NOT_CONFIGURED", message: "The uptime probe queue is not configured." } }, 503);
+  const now = new Date();
+  const checkId = crypto.randomUUID();
+  const [monitor] = await database.update(uptimeMonitors).set({ activeCheckId: checkId, updatedAt: now }).where(and(
+    eq(uptimeMonitors.id, context.req.param("monitorId")),
+    eq(uptimeMonitors.projectId, context.req.param("projectId")),
+    eq(uptimeMonitors.organizationId, organizationId),
+  )).returning({
+    id: uptimeMonitors.id, organizationId: uptimeMonitors.organizationId, projectId: uptimeMonitors.projectId,
+    url: uptimeMonitors.url, method: uptimeMonitors.method, timeoutMs: uptimeMonitors.timeoutMs,
+    expectedStatusCode: uptimeMonitors.expectedStatusCode,
+  });
+  if (!monitor) return context.json({ error: { code: "NOT_FOUND", message: "Uptime monitor not found in this project." } }, 404);
+  try {
+    await context.env.UPTIME_PROBES.send({
+      schemaVersion: 1, type: "uptime.probe", checkId, monitorId: monitor.id,
+      organizationId: monitor.organizationId, projectId: monitor.projectId, url: monitor.url,
+      method: monitor.method, timeoutMs: monitor.timeoutMs, expectedStatusCode: monitor.expectedStatusCode,
+    });
+  } catch (error) {
+    await database.update(uptimeMonitors).set({ activeCheckId: null, updatedAt: new Date() }).where(and(
+      eq(uptimeMonitors.id, monitor.id), eq(uptimeMonitors.activeCheckId, checkId),
+    ));
+    console.error("Jerico manual uptime check could not be queued", { monitorId: monitor.id, checkId, error });
+    return context.json({ error: { code: "UPTIME_QUEUE_UNAVAILABLE", message: "The uptime check could not be queued. Try again shortly." } }, 503);
+  }
+  return context.json({ data: { checkId, monitorId: monitor.id, status: "queued" } }, 202);
+}));
 app.get("/api/v1/projects/:projectId/uptime-monitors", async (context) => withOrganization(context, async (database, organizationId) => {
   const projectId = context.req.param("projectId");
   const [project] = await database.select({ id: projects.id }).from(projects)
