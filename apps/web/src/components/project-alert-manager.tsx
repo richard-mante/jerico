@@ -194,8 +194,8 @@ export function ProjectAlertManager() {
   async function retryDelivery(delivery: NotificationDelivery) {
     setBusy(true); setError(""); setNotice("");
     try {
-      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries/${encodeURIComponent(delivery.id)}/retry`, { method: "POST" });
-      setNotice("Notification retry queued. Delivery history will update when the worker processes it.");
+      const result = await request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries/${encodeURIComponent(delivery.id)}/retry`, { method: "POST" });
+      setNotice(result?.status === "scheduled" ? "Notification retry scheduled for after quiet hours." : "Notification retry queued. Delivery history will update when the worker processes it.");
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not retry notification delivery.");
