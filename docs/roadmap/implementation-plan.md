@@ -77,7 +77,7 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
 - [x] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits (integration validation pending).
 - [x] Implement Cloudflare queue consumers, retries, and dead-letter routing (load/backpressure validation pending).
-- [ ] Select and implement a durable self-hosted queue adapter.
+- [ ] Implement the provider-neutral queue port and PostgreSQL-backed self-hosted adapter. The accepted design is documented in [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md); Cloudflare Queues remains the managed adapter until parity and recovery guarantees are demonstrated.
 - [ ] Add ingestion/processing health metrics and execute integration tests.
 
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
