@@ -19,6 +19,13 @@ validate_days() {
 validate_days CLICKHOUSE_LOG_RETENTION_DAYS "$log_days"
 validate_days CLICKHOUSE_EVENT_RETENTION_DAYS "$event_days"
 
+attempt=0
+until [ "$(clickhouse-client --host "$host" --user "$user" --password "$password" --query "EXISTS TABLE jerico.telemetry_events" 2>/dev/null || true)" = "1" ]; do
+  attempt=$((attempt + 1))
+  [ "$attempt" -lt 60 ] || { echo "Timed out waiting for jerico.telemetry_events to be initialized." >&2; exit 1; }
+  sleep 2
+done
+
 if [ "$log_days" -eq 0 ] && [ "$event_days" -eq 0 ]; then
   query="ALTER TABLE jerico.telemetry_events REMOVE TTL"
 elif [ "$log_days" -gt 0 ] && [ "$event_days" -gt 0 ]; then
