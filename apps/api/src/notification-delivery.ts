@@ -2,7 +2,7 @@ import { and, asc, eq, gte, isNotNull, isNull, lte, lt, or, sql } from "drizzle-
 import { incidents, notificationChannels, notificationDeliveries } from "@jerico/database/schema";
 import type { ApiBindings, JericoDatabase } from "./database";
 
-export type IncidentNotificationEvent = "incident.opened" | "incident.acknowledged" | "incident.resolved" | "incident.reopened";
+export type IncidentNotificationEvent = "incident.opened" | "incident.acknowledged" | "incident.resolved" | "incident.reopened" | "incident.escalated";
 export type EmailNotificationMessage = {
   schemaVersion: 1;
   type: "notification.email";
@@ -40,10 +40,11 @@ export function nextNotificationDeliveryAt(channel: QuietHoursChannel, now = new
 
 export const NOTIFICATION_ENQUEUE_LEASE_MS = 2 * 60_000;
 
-function isEventEnabled(channel: { notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean }, eventType: IncidentNotificationEvent): boolean {
+function isEventEnabled(channel: { notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean; notifyOnEscalated: boolean }, eventType: IncidentNotificationEvent): boolean {
   if (eventType === "incident.opened") return channel.notifyOnOpened;
   if (eventType === "incident.acknowledged") return channel.notifyOnAcknowledged;
   if (eventType === "incident.reopened") return channel.notifyOnReopened;
+  if (eventType === "incident.escalated") return channel.notifyOnEscalated;
   return channel.notifyOnResolved;
 }
 
@@ -82,7 +83,7 @@ function buildNotificationMessage(
 
   const eventLabel = delivery.eventType === "incident.opened"
     ? "Incident opened"
-    : delivery.eventType === "incident.acknowledged" ? "Incident acknowledged" : delivery.eventType === "incident.reopened" ? "Incident reopened" : "Incident resolved";
+    : delivery.eventType === "incident.acknowledged" ? "Incident acknowledged" : delivery.eventType === "incident.reopened" ? "Incident reopened" : delivery.eventType === "incident.escalated" ? "Incident escalated" : "Incident resolved";
   const dashboardUrl = (env.WEB_APP_URL ?? "http://localhost:3000")
     + "/dashboard/projects/" + encodeURIComponent(incident.projectId) + "/alerts";
   return {
