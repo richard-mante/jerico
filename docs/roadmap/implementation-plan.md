@@ -42,7 +42,10 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - PR #104 adds configurable escalation delays for unacknowledged incidents, durable escalation activity, and per-channel escalation notifications.
 - PR #102 refreshed the product/incident lifecycle handover; the current state is now tracked through PR #104.
 - PR #106 records the accepted provider-neutral queue architecture: PostgreSQL-backed queue for self-hosted deployments and Cloudflare Queues for managed hosting.
-- PR #108 introduces the shared queue contracts and Cloudflare batch adapter, and adopts the shared contracts in API, ingest, and Worker handlers. The self-hosted queue engine is not implemented by this change.
+- PR #108 introduces the shared queue contracts and Cloudflare batch adapter, and adopts the shared contracts in API, ingest, and Worker handlers.
+- PR #110 adds the PostgreSQL queue_messages schema/migration and durable adapter: publish, active deduplication, SKIP LOCKED claims, lease fencing, ack/retry/dead-letter, exponential backoff, health, and terminal retention. Migration 0022 is present but has not been executed against PostgreSQL.
+- PR #111 adds the portable polling consumer with per-message processing, automatic ack/retry, bounded polling/batch/lease settings, and graceful shutdown.
+- PR #112 adds a standalone Node telemetry worker using the PostgreSQL queue and ClickHouse writer, with startup schema validation and localhost-bound health/readiness endpoints. It consumes telemetry only; uptime/notification handlers are deliberately not moved yet because their current outbound SSRF protections depend on Cloudflare public egress.
 - Issue #107 tracks the PostgreSQL queue schema/operations, standalone Node worker, adapter parity, Docker Compose, and runtime acceptance criteria.
 - The latest known CI runner-allocation failure remains an infrastructure issue, not a source-check result. No successful full workspace validation or production runtime validation is confirmed.
 
@@ -81,7 +84,10 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - [x] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits (integration validation pending).
 - [x] Implement Cloudflare queue consumers, retries, and dead-letter routing (load/backpressure validation pending).
 - [x] Define provider-neutral queue publisher, delivery, batch, consumer, and health contracts; adapt API, ingest, and the Cloudflare Worker to the shared interfaces (PR #108; validation not yet run).
-- [ ] Implement the PostgreSQL-backed self-hosted queue engine, standalone Node worker, and Docker Compose runtime (see [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md) and [issue #107](https://github.com/richard-mante/jerico/issues/107)).
+- [x] Implement the PostgreSQL-backed queue schema/adapter and portable polling consumer (PRs #110–#111; migration/runtime validation pending).
+- [x] Add a standalone Node worker for telemetry ingestion and ClickHouse writes (PR #112; runtime validation pending).
+- [ ] Port uptime and notification consumers with equivalent SSRF-safe outbound networking and terminal dead-letter handling.
+- [ ] Add dead-letter inspection/replay, Docker Compose, fresh-install and backup/restore workflows (see [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md) and [issue #107](https://github.com/richard-mante/jerico/issues/107)).
 - [ ] Add ingestion/processing health metrics and execute integration tests.
 
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
