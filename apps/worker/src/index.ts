@@ -9,7 +9,7 @@ import { deliverWebhook, isSafeWebhookUrl } from "./webhook-delivery";
 
 
 
-type UptimeProbeMessage = {
+export type UptimeProbeMessage = {
   schemaVersion: 1;
   type: "uptime.probe";
   checkId: string;
@@ -21,14 +21,14 @@ type UptimeProbeMessage = {
   timeoutMs: number;
   expectedStatusCode: number;
 };
-type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; enqueueToken?: string; to: string; subject: string; text: string };
-type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
-type WebhookNotificationMessage = {
+export type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; deliveryId: string; enqueueToken?: string; to: string; subject: string; text: string };
+export type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
+export type WebhookNotificationMessage = {
   schemaVersion: 1; type: "notification.webhook"; deliveryId: string; enqueueToken?: string; url: string;
   secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved" | "incident.reopened" | "incident.escalated";
   incidentId: string; projectId: string; title: string; triggerValue: number; occurredAt: string;
 };
-type NotificationMessage = EmailNotificationMessage | WebhookVerificationMessage | WebhookNotificationMessage;
+export type NotificationMessage = EmailNotificationMessage | WebhookVerificationMessage | WebhookNotificationMessage;
 
 export type WorkerEnv = ClickHouseEnv & {
   API_URL?: string;
@@ -38,7 +38,23 @@ export type WorkerEnv = ClickHouseEnv & {
   EMAIL_FROM?: string;
   NOTIFICATION_DELIVERY_SECRET?: string;
   WEBHOOK_ENCRYPTION_KEY?: string;
+  PUBLIC_FETCHER?: typeof fetch;
+  ALLOW_INTERNAL_API_HTTP?: string;
 };
+
+function createApiCallbackUrl(env: WorkerEnv, path: string, label: string): URL {
+  if (!env.API_URL) throw new Error(label + " callback is not configured.");
+  const url = new URL(path, env.API_URL);
+  const secure = url.protocol === "https:";
+  const privateComposeHttp = env.ALLOW_INTERNAL_API_HTTP === "true"
+    && url.protocol === "http:"
+    && url.hostname === "api"
+    && url.port === "8787";
+  if (!secure && !privateComposeHttp) {
+    throw new Error(label + " callback must use HTTPS (or the explicitly enabled private Compose API endpoint).");
+  }
+  return url;
+}
 
 export function buildUptimeDeadLetterResult(message: UptimeProbeMessage, checkedAt = new Date().toISOString()) {
   return {
@@ -60,15 +76,14 @@ async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): 
   if (!env.API_URL || !env.UPTIME_RESULTS_SECRET || env.UPTIME_RESULTS_SECRET.length < 32 || !env.PROBE_WORKER_HOST) {
     throw new Error("Uptime result callback is not configured.");
   }
-  const apiUrl = new URL("/internal/uptime-results", env.API_URL);
-  if (apiUrl.protocol !== "https:") throw new Error("Uptime result callback must use HTTPS.");
+  const apiUrl = createApiCallbackUrl(env, "/internal/uptime-results", "Uptime result");
   const result = await probeEndpoint({
     url: message.url,
     method: message.method,
     timeoutMs: message.timeoutMs,
     expectedStatusCode: message.expectedStatusCode,
     blockedHosts: [env.PROBE_WORKER_HOST],
-  });
+  }, env.PUBLIC_FETCHER ?? fetch);
   const callbackController = new AbortController();
   const callbackTimeout = setTimeout(() => callbackController.abort(), 10000);
   try {
@@ -113,8 +128,7 @@ async function processUptimeDeadLetterBatch(batch: QueueBatch<UptimeProbeMessage
       if (!env.API_URL || !env.UPTIME_RESULTS_SECRET || env.UPTIME_RESULTS_SECRET.length < 32) {
         throw new Error("Uptime dead-letter callback is not configured.");
       }
-      const callbackUrl = new URL("/internal/uptime-results", env.API_URL);
-      if (callbackUrl.protocol !== "https:") throw new Error("Uptime dead-letter callback must use HTTPS.");
+      const callbackUrl = createApiCallbackUrl(env, "/internal/uptime-results", "Uptime dead-letter");
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
@@ -216,8 +230,7 @@ async function postNotificationResult(
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification result callback is not configured.");
   }
-  const callbackUrl = new URL("/internal/notification-delivery-results", env.API_URL);
-  if (callbackUrl.protocol !== "https:") throw new Error("Notification callback must use HTTPS.");
+  const callbackUrl = createApiCallbackUrl(env, "/internal/notification-delivery-results", "Notification");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
@@ -254,7 +267,7 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await (env.PUBLIC_FETCHER ?? fetch)("https://api.resend.com/emails", {
       method: "POST",
       redirect: "error",
       signal: controller.signal,
@@ -299,8 +312,7 @@ async function postNotificationDeadLetterResult(
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Notification dead-letter callback is not configured.");
   }
-  const callbackUrl = new URL("/internal/notification-dead-letter-results", env.API_URL);
-  if (callbackUrl.protocol !== "https:") throw new Error("Notification dead-letter callback must use HTTPS.");
+  const callbackUrl = createApiCallbackUrl(env, "/internal/notification-dead-letter-results", "Notification dead-letter");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
@@ -332,8 +344,7 @@ async function postWebhookVerificationResult(
   if (!env.API_URL || !env.NOTIFICATION_DELIVERY_SECRET || env.NOTIFICATION_DELIVERY_SECRET.length < 32) {
     throw new Error("Webhook verification callback is not configured.");
   }
-  const callbackUrl = new URL("/internal/webhook-verification-results", env.API_URL);
-  if (callbackUrl.protocol !== "https:") throw new Error("Webhook verification callback must use HTTPS.");
+  const callbackUrl = createApiCallbackUrl(env, "/internal/webhook-verification-results", "Webhook verification");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
@@ -378,7 +389,7 @@ async function processWebhookVerification(message: WebhookVerificationMessage, e
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch(message.url, {
+    const response = await (env.PUBLIC_FETCHER ?? fetch)(message.url, {
       method: "POST", redirect: "error", signal: controller.signal,
       headers: { "content-type": "application/json", "x-jerico-event": "webhook.verify" },
       body: JSON.stringify({ type: "jerico.webhook.verify", challenge: message.challenge }),
@@ -420,6 +431,7 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
       title: message.title,
       triggerValue: message.triggerValue,
       occurredAt: message.occurredAt,
+      fetcher: env.PUBLIC_FETCHER,
     });
     await postNotificationResult(env, { ...callbackIdentity, status: "sent" });
   } catch (error) {
@@ -477,6 +489,23 @@ async function processNotificationBatch(batch: QueueBatch<NotificationMessage>, 
       message.retry({ delaySeconds: 60 });
     }
   }
+}
+
+export type SelfHostedQueueName =
+  | "jerico-uptime-probes"
+  | "jerico-notifications";
+
+export async function processSelfHostedQueueDelivery(
+  queueName: SelfHostedQueueName,
+  delivery: QueueDelivery<UptimeProbeMessage | NotificationMessage>,
+  env: WorkerEnv,
+): Promise<void> {
+  const batch = { queue: queueName, messages: [delivery] };
+  if (queueName === "jerico-uptime-probes") {
+    await processUptimeProbeBatch(batch as QueueBatch<UptimeProbeMessage>, env);
+    return;
+  }
+  await processNotificationBatch(batch as QueueBatch<NotificationMessage>, env);
 }
 
 export default {
