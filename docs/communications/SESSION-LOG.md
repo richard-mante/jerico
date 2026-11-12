@@ -767,3 +767,14 @@
 - Add PostgreSQL-backed failure-injection and concurrency tests covering persisted envelope replay, queue-send failure, queue-accepted/status-commit-failed ambiguity, scheduled recovery, quota-once semantics, and stable timestamps.
 - Run ClickHouse integration checks for duplicate delivery and month-boundary identity.
 - Review the 100-row transaction's queue-send duration and recovery throughput with the real Hyperdrive/Cloudflare Queue environment.
+
+
+## 2026-11-12 — PR #75 merged
+
+- Merged durable telemetry idempotency outbox PR #75 into `main` using squash merge.
+- Merge commit: `4e78253ff95db91274cb55c363bcc54029ed67fc`.
+- Immutable idempotency envelopes and daily quota reservations commit before queue publication. Pending rows are replayed by request retries or the existing 15-minute Cron reconciler; expiry cleanup deletes only accepted records.
+- Updated current-state and roadmap docs to reflect the merge and outstanding validation.
+- No tests, typecheck, lint, build, PostgreSQL, ClickHouse, or Cloudflare runtime checks were executed. Merged does not mean validated or production-ready.
+- Next: add failure-injection/concurrency tests; verify quota-once behavior, Cron recovery, queue-send/status-commit ambiguity, and ClickHouse deduplication at month boundaries. Review Cron batch transaction duration and add oldest-pending age/backlog observability.
+- `pnpm-lock.yaml` remains untouched.
