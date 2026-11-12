@@ -1,6 +1,6 @@
 # Phase 3 — TypeScript SDKs
 
-**Status:** Initial SDK foundation merged to `main` in PR #6 (`d4894534940805f08ae0bc2e0d591e3762c7cd3a`). Automated validation and ingestion integration remain pending.
+**Status:** Initial SDK foundation and compiled ESM package structure merged to `main` (PR #6 and PR #136). Build/runtime validation, ingestion integration, licensing, and publication remain pending.
 
 ## Packages
 
@@ -47,7 +47,7 @@ These examples are documentation only; they have not yet been run in sample appl
 4. Add browser route navigation instrumentation and validate Core Web Vitals against the official `web-vitals` implementation across supported browsers.
 5. Add richer Node instrumentation and framework adapters.
 6. Add Astro/React examples (documentation added in PR #137; sample apps still need execution).
-7. Add OpenTelemetry-compatible export/ingestion and package build/release workflows.
+7. Add OpenTelemetry-compatible export/ingestion and controlled npm publishing/release automation after build and license validation.
 
 
 ## Request-level batch idempotency
@@ -70,4 +70,4 @@ The three SDK packages now have a compiled ESM package layout:
 
 Each package emits JavaScript, source maps, and TypeScript declarations to `dist/`. The browser package uses explicit `.js` relative specifiers so emitted ESM imports are compatible with NodeNext-style package output. Turbo's typecheck task builds workspace package dependencies first so declaration entrypoints exist before downstream typechecking.
 
-The packages intentionally remain `private: true`. Do not publish until the build output is validated, the ingestion endpoint and SDK compatibility are exercised, sample apps are executed, package metadata and licensing are approved, and a release/changelog policy is agreed. No npm publish workflow or credentials are configured by this change.
+The packages intentionally remain `private: true`. Do not publish until the build output is validated, the ingestion endpoint and SDK compatibility are exercised, sample apps are executed, package metadata and licensing are approved, and a release/changelog policy is agreed. No npm publish workflow or credentials are configured by this change. PR #137 adds React/Vite and Astro integration guides; those sample apps still need to be created/executed.
