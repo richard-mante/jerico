@@ -14,7 +14,8 @@
     "@jerico/ingest": "workspace:*",
     "@jerico/queue": "workspace:*",
     "@jerico/worker": "workspace:*",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "@hono/node-server": "^1.19.6"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
