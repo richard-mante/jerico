@@ -778,3 +778,17 @@
 - No tests, typecheck, lint, build, PostgreSQL, ClickHouse, or Cloudflare runtime checks were executed. Merged does not mean validated or production-ready.
 - Next: add failure-injection/concurrency tests; verify quota-once behavior, Cron recovery, queue-send/status-commit ambiguity, and ClickHouse deduplication at month boundaries. Review Cron batch transaction duration and add oldest-pending age/backlog observability.
 - `pnpm-lock.yaml` remains untouched.
+
+
+## 2026-11-12 — PR #76 merged and reliability continuation
+
+- Merged PR #76, which updates ingestion credential `last_used_at` for new idempotency reservations and matching retries, including already-accepted retries. Payload conflicts and expired idempotency keys do not update credential usage.
+- Merge commit: `a10d44d81ed75eabc1e77d1a3ddfafd5fac8f4f7`.
+- Confirmed the ingestion package exposes Vitest, but no ingestion test files existed. The CI workflow runs lint, typecheck, tests, API/ClickHouse integration tests, and build; no workflow run/status result was available for PR #76.
+- Refreshed handover/roadmap references to reflect PRs #75 and #76 being merged. `pnpm-lock.yaml` remains untouched.
+- No automated tests, typecheck, lint, build, PostgreSQL, ClickHouse, or Cloudflare runtime checks have been executed. The durable outbox still requires database failure-injection and Cron/Queue integration coverage before production validation.
+
+### Next
+- Add a real PostgreSQL-backed ingestion test harness rather than stopping at pure helper tests.
+- Cover concurrent same-key requests, quota-once behavior, queue send failure, queue-accepted/status-commit-failed recovery, Cron backlog recovery, and immutable envelope replay.
+- Verify ClickHouse `FINAL` deduplication for identical retry envelopes and inspect the current 100-row Cron transaction's duration/lock behavior.
