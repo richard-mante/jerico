@@ -12,6 +12,10 @@ if [[ ! "$STAMP" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
 fi
 
 umask 077
+if [[ -n "${AGE_RECIPIENT:-}" ]] && ! command -v age >/dev/null 2>&1; then
+  echo "AGE_RECIPIENT is set but the age command is not installed." >&2
+  exit 1
+fi
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 compose=(docker compose -f "$COMPOSE_FILE")
@@ -46,6 +50,16 @@ CLICKHOUSE_FILE="clickhouse-$STAMP.tar.gz"
 "${compose[@]}" exec -T clickhouse tar -C /var/lib/clickhouse/backups -czf - "$STAMP" \
   > "$BACKUP_DIR/$CLICKHOUSE_FILE"
 
+ENCRYPTION="none"
+if [[ -n "${AGE_RECIPIENT:-}" ]]; then
+  age --recipient "$AGE_RECIPIENT" --output "$BACKUP_DIR/$POSTGRES_FILE.age" "$BACKUP_DIR/$POSTGRES_FILE"
+  age --recipient "$AGE_RECIPIENT" --output "$BACKUP_DIR/$CLICKHOUSE_FILE.age" "$BACKUP_DIR/$CLICKHOUSE_FILE"
+  rm -f "$BACKUP_DIR/$POSTGRES_FILE" "$BACKUP_DIR/$CLICKHOUSE_FILE"
+  POSTGRES_FILE="$POSTGRES_FILE.age"
+  CLICKHOUSE_FILE="$CLICKHOUSE_FILE.age"
+  ENCRYPTION="age"
+fi
+
 (
   cd "$BACKUP_DIR"
   sha256sum "$POSTGRES_FILE" > "$POSTGRES_FILE.sha256"
@@ -58,6 +72,7 @@ cat > "$BACKUP_DIR/manifest-$STAMP.json" <<EOF
   "postgres": "$POSTGRES_FILE",
   "clickhouse": "$CLICKHOUSE_FILE",
   "format": "Jerico self-hosted backup v1",
+  "encryption": "${ENCRYPTION}",
   "restoreCommand": "bash scripts/self-hosted/restore.sh $STAMP"
 }
 EOF
