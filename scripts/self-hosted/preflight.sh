@@ -90,6 +90,20 @@ if [[ -n "$(read_env AGE_RECIPIENT)" ]]; then
   fi
 fi
 
+remote_target="$(read_env RCLONE_REMOTE)"
+if [[ -n "$remote_target" ]]; then
+  require_single_value RCLONE_REMOTE
+  [[ -n "$(read_env AGE_RECIPIENT)" ]] || fail "RCLONE_REMOTE requires AGE_RECIPIENT so off-site archives are encrypted."
+  command -v rclone >/dev/null 2>&1 || fail "RCLONE_REMOTE is configured, but rclone is not installed."
+  config_path="$(read_env RCLONE_CONFIG)"
+  if [[ -n "$config_path" ]]; then
+    require_single_value RCLONE_CONFIG
+    [[ -f "$config_path" && ! -L "$config_path" ]] || fail "RCLONE_CONFIG must point to an existing regular config file."
+    config_mode="$(stat -c "%a" "$config_path")"
+    [[ "$config_mode" == "600" || "$config_mode" == "400" ]] || fail "RCLONE_CONFIG must have mode 0600 or 0400."
+  fi
+fi
+
 docker compose -f "$COMPOSE_FILE" config --quiet || fail "Compose configuration is invalid or required environment values are missing."
 info "Required secrets and Compose configuration are valid."
 if [[ -z "$(read_env AGE_RECIPIENT)" ]]; then
