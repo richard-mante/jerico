@@ -752,3 +752,18 @@
 - Add a PostgreSQL-backed concurrency/failure-injection test for simultaneous retries, queue-accepted/DB-commit-failed ambiguity, and stable fallback timestamps.
 - Decide and document a telemetry poison-message policy: quarantine invalid envelopes with bounded payload retention/redaction before ack, and provide a DLQ inspection/replay or explicit operator runbook.
 - Continue with disposable PostgreSQL and ClickHouse integration validation when a runnable environment is available.
+
+
+## 2026-11-12 — Durable telemetry idempotency outbox
+
+- Inspected the merged ingestion implementation and confirmed `project_ingestion_requests` already stores the complete queue envelope in JSONB; no second outbox table or schema migration is needed.
+- Changed `apps/ingest/src/index.ts` to commit the immutable envelope and daily quota reservation before queue publication. The subsequent publish step locks the committed row, sends the stored envelope, and marks it accepted. If publication or the status commit fails, the pending record remains durable for a client retry.
+- Extended the existing 15-minute Cron reconciliation to publish up to 100 pending records using `FOR UPDATE SKIP LOCKED`. Expiry cleanup now deletes only accepted rows, never pending outbox work.
+- Preserved non-idempotent ingestion behavior and the existing database schema, ClickHouse DDL, and `pnpm-lock.yaml`.
+- Branch: `fix/durable-telemetry-idempotency-outbox`. Implementation commit: `966f2286c8b0458b9fb23749dd9ce2551a60a2d5`. Handover update commit: `c6dd316c2d32e178157c91565f20f4f6e653801b`.
+- No tests, typecheck, lint, build, PostgreSQL, or ClickHouse runtime validation were run. The change is not merged or production-validated.
+
+### Next
+- Add PostgreSQL-backed failure-injection and concurrency tests covering persisted envelope replay, queue-send failure, queue-accepted/status-commit-failed ambiguity, scheduled recovery, quota-once semantics, and stable timestamps.
+- Run ClickHouse integration checks for duplicate delivery and month-boundary identity.
+- Review the 100-row transaction's queue-send duration and recovery throughput with the real Hyperdrive/Cloudflare Queue environment.
