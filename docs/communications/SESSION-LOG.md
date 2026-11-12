@@ -964,3 +964,11 @@
 - Merged PR #134 (`531d7924fadf0d88fbef53e6ed5c74ced347281d`): migration, web, API, ingestion, and queue-worker Compose services use Docker init, `no-new-privileges`, and drop all Linux capabilities. PostgreSQL, ClickHouse, and Caddy capabilities were not changed.
 - No lockfile changes. No shell syntax, Compose parse, Docker build, migrations, backup/restore, retention deletion, tests, typecheck, lint, or runtime checks were run. No validation is claimed.
 - Next: complete measured resource and operations guidance, off-site backup strategy, and security review; then run the clean-install and restore drills when validation is resumed.
+
+
+### 2026-11-12 — TypeScript SDK package output and integration guides
+
+- Merged PR #136 (`e412888e76790aefccc2685204cb46057e9e5bed`): added NodeNext build configurations for `@jerico/sdk-core`, `@jerico/sdk-browser`, and `@jerico/sdk-node`; packages emit ESM JavaScript, source maps, and declarations into `dist/`. Updated package exports and Turbo typecheck dependencies. Browser relative imports now use `.js` specifiers for emitted ESM compatibility.
+- Kept all three SDK packages `private: true`; no npm publish workflow, credentials, or licensing assumptions were added. Publication remains gated on actual builds, integration/sample validation, and licensing/release policy.
+- Merged PR #137 (`f42299783c5a6536a9d7541627cd6983d6391bb5`): added React/Vite route-aware page view example and Astro `astro:page-load` integration example; updated Phase 3 SDK docs.
+- No build, typecheck, test, sample application, or ingestion integration was run. No lockfile changes.
