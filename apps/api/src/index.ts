@@ -38,6 +38,7 @@ import { decodeTelemetryCursor, encodeTelemetryCursor, parseQueryLimit, parseTim
 
 type Variables = { requestId: string };
 type AppEnvironment = { Bindings: ApiBindings & TelemetryQueryBindings; Variables: Variables };
+export type ApiServerBindings = ApiBindings & TelemetryQueryBindings;
 type ApiContext = Context<AppEnvironment>;
 const app = new Hono<AppEnvironment>();
 
@@ -1622,22 +1623,30 @@ app.onError((error, context) => {
 
 export { app };
 
+export async function runScheduledApiMaintenance(env: ApiServerBindings, includeDailyRetention = false): Promise<void> {
+  const tasks = [
+    evaluateAlertRules(env),
+    scheduleDueUptimeMonitors(env),
+    withDatabase(env, (database) => retryFailedNotificationEnqueues(database, env, new Date())),
+  ];
+  if (includeDailyRetention) tasks.push(pruneUptimeCheckHistory(env));
+  const results = await Promise.allSettled(tasks);
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length) {
+    for (const failure of failures) {
+      console.error("Jerico scheduled API maintenance task failed", {
+        errorName: failure.reason instanceof Error ? failure.reason.name : "UnknownError",
+      });
+    }
+    throw new AggregateError(failures.map((failure) => failure.reason), "One or more API maintenance tasks failed.");
+  }
+}
+
 export default {
   fetch: app.fetch.bind(app),
   scheduled(controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
-    context.waitUntil(evaluateAlertRules(env).catch((error) => {
-      console.error("Jerico alert evaluation failed", error instanceof Error ? error.message : String(error));
+    context.waitUntil(runScheduledApiMaintenance(env, controller.cron === "0 3 * * *").catch((error) => {
+      console.error("Jerico scheduled API maintenance failed", error instanceof Error ? error.message : String(error));
     }));
-    context.waitUntil(scheduleDueUptimeMonitors(env).catch((error) => {
-      console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
-    }));
-    context.waitUntil(withDatabase(env, (database) => retryFailedNotificationEnqueues(database, env, new Date())).catch((error) => {
-      console.error("Jerico notification enqueue reconciliation failed", error instanceof Error ? error.message : String(error));
-    }));
-    if (controller.cron === "0 3 * * *") {
-      context.waitUntil(pruneUptimeCheckHistory(env).catch((error) => {
-        console.error("Jerico uptime history retention failed", error instanceof Error ? error.message : String(error));
-      }));
-    }
   },
 };
