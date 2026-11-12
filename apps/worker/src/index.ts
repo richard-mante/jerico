@@ -121,7 +121,7 @@ async function processUptimeDeadLetterBatch(batch: QueueBatch<UptimeProbeMessage
       && typeof body.organizationId === "string" && body.organizationId.length > 0 && body.organizationId.length <= 128
       && typeof body.projectId === "string" && body.projectId.length > 0 && body.projectId.length <= 128;
     if (!valid) {
-      message.ack();
+      await message.ack();
       continue;
     }
     try {
@@ -147,14 +147,14 @@ async function processUptimeDeadLetterBatch(batch: QueueBatch<UptimeProbeMessage
       } finally {
         clearTimeout(timeout);
       }
-      message.ack();
+      await message.ack();
     } catch (error) {
       console.error("Jerico uptime dead-letter finalization failed", {
         checkId: body.checkId,
         monitorId: body.monitorId,
         error: error instanceof Error ? error.message : String(error),
       });
-      message.retry({ delaySeconds: 60 });
+      await message.retry({ delaySeconds: 60 });
     }
   }
 }
@@ -173,19 +173,19 @@ async function processUptimeProbeBatch(batch: QueueBatch<UptimeProbeMessage>, en
       && Number.isInteger(body.timeoutMs) && body.timeoutMs >= 1000 && body.timeoutMs <= 30000
       && Number.isInteger(body.expectedStatusCode) && body.expectedStatusCode >= 100 && body.expectedStatusCode <= 599;
     if (!validMessage) {
-      message.ack();
+      await message.ack();
       continue;
     }
     try {
       await processUptimeProbe(body, env);
-      message.ack();
+      await message.ack();
     } catch (error) {
       console.error("Jerico uptime probe processing failed", {
         checkId: body.checkId,
         monitorId: body.monitorId,
         error: error instanceof Error ? error.message : String(error),
       });
-      message.retry({ delaySeconds: 30 });
+      await message.retry({ delaySeconds: 30 });
     }
   }
 }
@@ -445,7 +445,7 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
 async function processNotificationDeadLetterBatch(batch: QueueBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
-      message.ack();
+      await message.ack();
       continue;
     }
     try {
@@ -459,13 +459,13 @@ async function processNotificationDeadLetterBatch(batch: QueueBatch<Notification
       } else {
         await postNotificationDeadLetterResult(env, message.body);
       }
-      message.ack();
+      await message.ack();
     } catch (error) {
       console.error("Jerico notification dead-letter finalization failed", {
         ...(message.body.type === "notification.webhook.verify" ? { channelId: message.body.channelId } : { deliveryId: message.body.deliveryId }),
         error: error instanceof Error ? error.message : String(error),
       });
-      message.retry({ delaySeconds: 60 });
+      await message.retry({ delaySeconds: 60 });
     }
   }
 }
@@ -473,20 +473,20 @@ async function processNotificationDeadLetterBatch(batch: QueueBatch<Notification
 async function processNotificationBatch(batch: QueueBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
-      message.ack();
+      await message.ack();
       continue;
     }
     try {
       if (message.body.type === "notification.email") await processNotification(message.body, env, message.attempts);
       else if (message.body.type === "notification.webhook.verify") await processWebhookVerification(message.body, env);
       else await processWebhookNotification(message.body, env, message.attempts);
-      message.ack();
+      await message.ack();
     } catch (error) {
       console.error("Jerico notification delivery failed", {
         ...(message.body.type === "notification.webhook.verify" ? { channelId: message.body.channelId } : { deliveryId: message.body.deliveryId }),
         error: error instanceof Error ? error.message : String(error),
       });
-      message.retry({ delaySeconds: 60 });
+      await message.retry({ delaySeconds: 60 });
     }
   }
 }
@@ -534,7 +534,7 @@ export default {
         console.error("Discarding invalid Jerico telemetry queue message", {
           queueMessageId: message.id,
         });
-        message.ack();
+        await message.ack();
       } else {
         valid.push(message);
       }
@@ -542,13 +542,13 @@ export default {
     if (!valid.length) return;
     try {
       await writeToClickHouse(env, valid.map((message) => message.body));
-      for (const message of valid) message.ack();
+      for (const message of valid) await message.ack();
     } catch (error) {
       console.error("Jerico telemetry batch write failed", {
         messageCount: valid.length,
         error: error instanceof Error ? error.message : String(error),
       });
-      for (const message of valid) message.retry({ delaySeconds: 30 });
+      for (const message of valid) await message.retry({ delaySeconds: 30 });
     }
   },
 };
