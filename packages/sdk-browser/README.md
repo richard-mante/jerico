@@ -20,7 +20,7 @@ export const jerico = createBrowserClient({
 });
 ```
 
-Use only a `jk_pub_` project key in browser code. Never put a `jk_sec_` key in a client bundle. The browser SDK limits public-key telemetry to events, errors, and the five allowlisted Core Web Vitals metrics. It does not expose custom logs, metrics, or spans.
+Use only a `jk_pub_` project key in browser code. Never put a `jk_sec_` key in a client bundle. The browser SDK limits public-key telemetry to events, errors, and the five allowlisted Core Web Vitals metrics. It uses Google's `web-vitals` library to measure LCP, CLS, INP, FCP, and TTFB with the library's published ratings and metric identifiers. It does not expose custom logs, metrics, or spans.
 
 Call `identify(userId)` only when the application has a legitimate reason to associate telemetry with a user, and call `reset()` on sign-out or account switching. Avoid sending personal or secret data as attributes.
 
