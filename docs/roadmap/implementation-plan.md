@@ -75,6 +75,7 @@ All of the above describes merged implementation, **not verified runtime behavio
 - [ ] Execute rclone upload, remote verification, and off-host restore against a disposable remote.
 - [ ] Configure storage-provider lifecycle/versioning and retention policy; the scripts never delete remote objects.
 - [x] Add daily terminal queue cleanup for completed and dead-lettered rows with configurable retention (PR #152).
+- [x] Quarantine invalid telemetry envelopes rather than acknowledging/discarding them (PR #154; provider DLQ routing still needs runtime verification).
 - [ ] Verify graceful shutdown, restart recovery, queue leases, dead-letter replay, and service health behavior.
 - [ ] Measure CPU, memory, disk, ClickHouse growth, queue throughput, and query latency under realistic workloads; current sizing values are starting guidance only.
 
