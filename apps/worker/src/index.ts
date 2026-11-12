@@ -531,10 +531,10 @@ export default {
     const valid: QueueDelivery<TelemetryMessage>[] = [];
     for (const message of telemetryBatch.messages) {
       if (!isValidTelemetryMessage(message.body)) {
-        console.error("Discarding invalid Jerico telemetry queue message", {
+        console.error("Quarantining invalid Jerico telemetry queue message", {
           queueMessageId: message.id,
         });
-        await message.ack();
+        await message.deadLetter("invalid_telemetry_envelope");
       } else {
         valid.push(message);
       }

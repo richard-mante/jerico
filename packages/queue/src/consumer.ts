@@ -105,6 +105,10 @@ export class PollingQueueConsumer<TMessage> {
         await message.retry(options);
         settled = true;
       },
+      deadLetter: async (errorCode) => {
+        await message.deadLetter(errorCode);
+        settled = true;
+      },
     };
 
     try {

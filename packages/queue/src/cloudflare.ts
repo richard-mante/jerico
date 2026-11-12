@@ -27,6 +27,8 @@ export function adaptCloudflareQueueBatch<TMessage>(
     attempts: message.attempts,
     ack: () => message.ack(),
     retry: (options) => message.retry(options ? { delaySeconds: options.delaySeconds } : undefined),
+    // Cloudflare sends the message to its configured DLQ after max_retries.
+    deadLetter: () => message.retry({ delaySeconds: 0 }),
   }));
 
   return { queue: batch.queue, messages };

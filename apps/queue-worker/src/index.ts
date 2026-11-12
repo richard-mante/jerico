@@ -92,8 +92,8 @@ const consumerOptions = { batchSize, visibilityTimeoutSeconds: visibilityTimeout
 const consumers = [
   new PollingQueueConsumer(telemetryQueue, async (delivery) => {
     if (!isValidTelemetryMessage(delivery.body)) {
-      console.warn("Acknowledging invalid self-hosted telemetry envelope", { queueMessageId: delivery.id });
-      await delivery.ack();
+      console.warn("Quarantining invalid self-hosted telemetry envelope", { queueMessageId: delivery.id });
+      await delivery.deadLetter("invalid_telemetry_envelope");
       return;
     }
     await writeToClickHouse(clickhouseEnv, [delivery.body]);
