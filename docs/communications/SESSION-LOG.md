@@ -792,3 +792,16 @@
 - Add a real PostgreSQL-backed ingestion test harness rather than stopping at pure helper tests.
 - Cover concurrent same-key requests, quota-once behavior, queue send failure, queue-accepted/status-commit-failed recovery, Cron backlog recovery, and immutable envelope replay.
 - Verify ClickHouse `FINAL` deduplication for identical retry envelopes and inspect the current 100-row Cron transaction's duration/lock behavior.
+
+
+## 2026-11-12 — PR #77 merged: outbox recovery observability
+
+- Merged PR #77 into `main` using squash merge.
+- Merge commit: `f68b84f637df72354c740e07c558cf5c6f982c1c`.
+- The 15-minute telemetry outbox reconciler now emits structured logs after successful non-empty batches with recovered row count, oldest recovered row creation timestamp, elapsed duration, and whether the 100-row batch cap was reached.
+- This provides initial visibility into recovery throughput and potential backlog without a schema migration or telemetry payload logging.
+- No automated tests, typecheck, lint, build, or Cloudflare runtime checks were executed; GitHub reported no commit status checks. `pnpm-lock.yaml` remains untouched.
+
+### Next
+- Rename the log field to `oldestRecoveredCreatedAt` for precision if revisiting this code; current field is `oldestPendingCreatedAt` and represents the oldest row in the recovered batch.
+- Add PostgreSQL-backed tests for durable outbox failure modes and validate recovery transaction duration/backlog behavior against the actual runtime.
