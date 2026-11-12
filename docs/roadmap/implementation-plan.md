@@ -113,7 +113,7 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Project-scoped uptime monitor CRUD, check-history storage/API, scheduled queue dispatch, bounded public probes, and idempotent result persistence (Cloudflare provisioning/runtime validation pending).
 - [x] Initial SSRF controls: reject IP literals/internal hostnames/unsafe ports, use public-only Worker fetch egress, manually revalidate up to three redirects, bound timeout, and cancel response bodies. DNS/private egress assumptions require deployed Workerd verification; `global_fetch_strictly_public` and an exact self-host block are configured, and the probe Worker must remain workers.dev-only with no VPC binding.
 - [x] Project-scoped alert rules for error count, failed uptime checks, and uptime response-time p95; owner/admin configuration, scheduled evaluation, and token-owned evaluation leases with stale-worker fencing (PR #43; migration and manual runtime validation pending).
-- [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve, and automatic recovery resolution (notification delivery is implemented in Phase 5D/5E; incident audit history remains open).
+- [x] Deduplicated incidents with open/acknowledged/resolved lifecycle, manual acknowledge/resolve/reopen, automatic recovery resolution, durable activity history, operational notes, assignment, and repeatable lifecycle notifications (PRs #89–#90 and #101).
 - [x] Verified email notification channels, Resend delivery through a Cloudflare Queue, retry/DLQ wiring, and delivery history (provider/runtime validation pending).
 - [x] Signed webhook channels with endpoint verification, timestamped HMAC-SHA256 delivery, retries, and delivery history (implementation and tests authored; execution/runtime validation pending).
 
@@ -166,7 +166,8 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Owner/admin-only manual retry endpoint for failed notification deliveries (PR #80).
 - [x] Conditional failed-row claim, fresh enqueue token, verified-channel/incident checks, and queue failure recovery (PR #80).
 - [x] Project Alerts & Incidents screen shows delivery history and offers retry for failed deliveries (PR #81).
-- [ ] Add per-event channel preferences, quiet hours, and escalation policies where they fit the product's initial release.
+- [x] Add per-event channel preferences for opened, acknowledged, resolved, and reopened events (PRs #92 and #101).
+- [ ] Add quiet hours and escalation policies where they fit the product's initial release.
 
 ### Manual uptime operation
 - [x] Owner/admin-only one-off check endpoint with active-check fencing and queue failure rollback (PR #83).
@@ -180,8 +181,9 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Edit alert rule configuration from the project dashboard (PR #85).
 - [x] Pause and re-enable verified notification channels (PR #86).
 - [x] Create and edit project environments, including transactional production designation changes (PR #87).
-- [ ] Incident ownership, activity timeline, and operator notes.
-- [ ] Per-event notification preferences and quiet-hour configuration.
+- [x] Incident ownership, activity timeline, and operator notes (PRs #89–#90).
+- [x] Per-event notification preferences, including reopened events (PRs #92 and #101).
+- [ ] Quiet-hour configuration and escalation policies.
 - [ ] Provider-neutral queue adapter and self-hosted runtime/deployment workflow.
 
 ### Current execution direction
@@ -192,7 +194,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Durable incident activity timeline and operational notes (PR #89).
 - [x] Record automated opened/resolved events and manual acknowledge/resolve actions (PR #89).
 - [x] Assign incidents to organization members and record assignment history (PR #90).
-- [ ] Reopen/resolution workflow and richer incident lifecycle controls.
+- [x] Reopen/resolution workflow with repeatable event identities and notifications (PR #101).
 
 ### Execution direction
 - Continue functional implementation; tests, end-to-end work, and GitHub builds remain deferred until requested.
@@ -206,3 +208,21 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 
 ### Execution direction
 - Continue functional implementation; tests, end-to-end work, and GitHub builds remain deferred until requested.
+
+### Product and organization administration
+- [x] Product create/edit/archive/restore and project linking (PR #98).
+- [x] Owner/admin-only product management controls (PR #99).
+- [x] Organization name and slug settings (PR #100).
+
+### Incident lifecycle completion
+- [x] Reopen resolved incidents when no other active incident exists for the alert rule (PR #101).
+- [x] Persist event keys for repeatable incident lifecycle notifications and retain deduplication for each transition (PR #101).
+- [x] Configure per-channel reopened notifications (PR #101).
+
+### Next implementation priority
+- [ ] Quiet hours and escalation policies.
+- [ ] Provider-neutral durable queue adapter and self-hosted runtime/deployment.
+- [ ] SDK integration and release experience.
+
+### Execution direction
+- Continue functional implementation; defer tests, end-to-end work, and GitHub builds until requested.
