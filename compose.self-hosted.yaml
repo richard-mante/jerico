@@ -1,7 +1,14 @@
 name: jerico-self-hosted
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
+    logging: *default-logging
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -17,6 +24,7 @@ services:
       retries: 20
 
   clickhouse:
+    logging: *default-logging
     image: clickhouse/clickhouse-server:25.8
     restart: unless-stopped
     environment:
@@ -35,6 +43,7 @@ services:
       retries: 20
 
   migrate:
+    logging: *default-logging
     build:
       context: .
       dockerfile: apps/queue-worker/Dockerfile
@@ -52,6 +61,7 @@ services:
         condition: service_healthy
 
   web:
+    logging: *default-logging
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -72,6 +82,7 @@ services:
     stop_grace_period: 40s
     depends_on:
       api:
+    logging: *default-logging
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
@@ -128,6 +139,7 @@ services:
       start_period: 20s
 
   ingest:
+    logging: *default-logging
     stop_grace_period: 40s
     build:
       context: .
@@ -163,6 +175,7 @@ services:
       start_period: 20s
 
   queue-worker:
+    logging: *default-logging
     stop_grace_period: 40s
     build:
       context: .
@@ -217,6 +230,7 @@ services:
       start_period: 20s
 
   caddy:
+    logging: *default-logging
     image: caddy:2.10-alpine
     restart: unless-stopped
     environment:
