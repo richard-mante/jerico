@@ -895,3 +895,13 @@
 - Merged PR #108, adding the shared @jerico/queue publisher, delivery, batch, consumer, and health contracts. Added a structural Cloudflare batch adapter without importing Workers SDK types into the shared package. API and ingest publishers now use the shared publisher contract; Worker handlers consume the shared batch/delivery contract.
 - Cloudflare remains the active runtime. No PostgreSQL queue engine, standalone Node worker, or self-hosted deployment has been implemented yet.
 - pnpm-lock.yaml was not modified. Tests, typecheck, lint, builds, and runtime checks were not run; the user will handle manual validation.
+
+
+## 2026-11-12 — PostgreSQL queue engine and self-hosted telemetry worker
+
+- Merged PR #110: added queue_messages schema and migration 0022, plus the PostgreSQL queue adapter. Publishing persists bounded JSONB envelopes; active deduplication is supported; claims use short SKIP LOCKED transactions; ack/retry/dead-letter and lease extension are fenced by opaque lease tokens. Default retry delay is exponential and bounded. Health and terminal retention methods are included.
+- Merged PR #111: added a provider-neutral polling consumer that processes messages independently, automatically acknowledges successful handlers, retries unhandled failures, bounds polling/batch/lease settings, and supports graceful stop.
+- Merged PR #112: extracted the ClickHouse telemetry pipeline into a portable module and added a standalone Node telemetry worker with PostgreSQL polling, schema validation, health/readiness endpoints, and SIGINT/SIGTERM handling. The health server binds to localhost by default.
+- The Node worker currently consumes telemetry only. Uptime probes and notifications remain on Cloudflare because their current outbound networking relies on Cloudflare public-egress/SSRF protections. Do not move them to Node until equivalent DNS/IP pinning, redirect blocking, and private-address protections are implemented and reviewed.
+- Dead-letter inspection/replay, uptime/notification Node handlers, Docker Compose, and self-hosted backup/restore remain outstanding. The Cloudflare managed runtime remains active.
+- Migration 0022, PostgreSQL queue concurrency/recovery, ClickHouse writes, typecheck, lint, tests, and builds were not executed. No validation is claimed. pnpm-lock.yaml was not modified.
