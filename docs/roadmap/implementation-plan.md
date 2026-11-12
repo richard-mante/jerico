@@ -188,3 +188,11 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - Prioritize functional product implementation and user-facing workflows.
 - Defer writing/running tests and all GitHub Actions/builds until the user explicitly asks to resume validation.
 - Keep `pnpm-lock.yaml` untouched.
+### Incident operations
+- [x] Durable incident activity timeline and operational notes (PR #89).
+- [x] Record automated opened/resolved events and manual acknowledge/resolve actions (PR #89).
+- [x] Assign incidents to organization members and record assignment history (PR #90).
+- [ ] Reopen/resolution workflow and richer incident lifecycle controls.
+
+### Execution direction
+- Continue functional implementation; tests, end-to-end work, and GitHub builds remain deferred until requested.
