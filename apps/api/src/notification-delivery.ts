@@ -326,3 +326,96 @@ export async function safelyQueueIncidentNotifications(
     });
   }
 }
+export type ManualNotificationRetryResult = "queued" | "not_found" | "not_retryable" | "channel_unavailable" | "queue_unavailable";
+
+export async function retryNotificationDelivery(
+  database: JericoDatabase,
+  env: ApiBindings,
+  input: { organizationId: string; projectId: string; deliveryId: string },
+): Promise<ManualNotificationRetryResult> {
+  const [delivery] = await database.select().from(notificationDeliveries).where(and(
+    eq(notificationDeliveries.id, input.deliveryId),
+    eq(notificationDeliveries.organizationId, input.organizationId),
+    eq(notificationDeliveries.projectId, input.projectId),
+  )).limit(1);
+  if (!delivery) return "not_found";
+  if (delivery.status !== "failed") return "not_retryable";
+
+  const [channel] = await database.select().from(notificationChannels).where(and(
+    eq(notificationChannels.id, delivery.channelId),
+    eq(notificationChannels.organizationId, input.organizationId),
+    eq(notificationChannels.enabled, true),
+    isNotNull(notificationChannels.verifiedAt),
+  )).limit(1);
+  if (!channel) return "channel_unavailable";
+  const [incident] = await database.select().from(incidents).where(and(
+    eq(incidents.id, delivery.incidentId),
+    eq(incidents.organizationId, input.organizationId),
+    eq(incidents.projectId, input.projectId),
+  )).limit(1);
+  if (!incident) return "not_found";
+  if (!env.NOTIFICATIONS) return "queue_unavailable";
+
+  const now = new Date();
+  const leaseExpiresAt = notificationEnqueueLeaseExpiresAt(now);
+  const enqueueToken = crypto.randomUUID();
+  const [claimed] = await database.update(notificationDeliveries).set({
+    status: "queued",
+    enqueueAttempts: 1,
+    nextEnqueueAt: leaseExpiresAt,
+    enqueuedAt: null,
+    activeEnqueueToken: enqueueToken,
+    activeConsumerAttempt: 0,
+    lastErrorCode: null,
+    updatedAt: now,
+  }).where(and(
+    eq(notificationDeliveries.id, delivery.id),
+    eq(notificationDeliveries.organizationId, input.organizationId),
+    eq(notificationDeliveries.projectId, input.projectId),
+    eq(notificationDeliveries.status, "failed"),
+    eq(notificationDeliveries.updatedAt, delivery.updatedAt),
+  )).returning({
+    id: notificationDeliveries.id,
+    enqueueAttempts: notificationDeliveries.enqueueAttempts,
+    attempts: notificationDeliveries.attempts,
+    eventType: notificationDeliveries.eventType,
+    createdAt: notificationDeliveries.createdAt,
+  });
+  if (!claimed) return "not_retryable";
+
+  const message = buildNotificationMessage({ ...claimed, enqueueToken }, channel, incident, env);
+  if (!message) {
+    await database.update(notificationDeliveries).set({
+      status: "failed", lastErrorCode: "configuration_missing", nextEnqueueAt: null, updatedAt: new Date(),
+    }).where(and(eq(notificationDeliveries.id, claimed.id), eq(notificationDeliveries.activeEnqueueToken, enqueueToken)));
+    return "channel_unavailable";
+  }
+
+  try {
+    await env.NOTIFICATIONS.send(message);
+    await database.update(notificationDeliveries).set({
+      nextEnqueueAt: null, enqueuedAt: new Date(), updatedAt: new Date(),
+    }).where(and(
+      eq(notificationDeliveries.id, claimed.id),
+      eq(notificationDeliveries.status, "queued"),
+      eq(notificationDeliveries.activeEnqueueToken, enqueueToken),
+      eq(notificationDeliveries.nextEnqueueAt, leaseExpiresAt),
+    ));
+    return "queued";
+  } catch (error) {
+    await database.update(notificationDeliveries).set({
+      status: "failed",
+      lastErrorCode: "queue_unavailable",
+      nextEnqueueAt: new Date(Date.now() + notificationEnqueueRetryDelay(1)),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(notificationDeliveries.id, claimed.id),
+      eq(notificationDeliveries.status, "queued"),
+      eq(notificationDeliveries.activeEnqueueToken, enqueueToken),
+    ));
+    console.error("Jerico manual notification retry could not enqueue delivery", {
+      deliveryId: claimed.id, error: error instanceof Error ? error.message : String(error),
+    });
+    return "queue_unavailable";
+  }
+}
