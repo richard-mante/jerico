@@ -6,6 +6,25 @@ COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/compose.self-hosted.yaml}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"
 STAMP="${BACKUP_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 
+read_dotenv() {
+  local key="$1"
+  local value=""
+  if [[ -f "$ROOT/.env" ]]; then
+    value="$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ROOT/.env")"
+  fi
+  if [[ "$value" == \"*\" ]]; then value="${value:1:-1}"; fi
+  if [[ "$value" == \'*\' ]]; then value="${value:1:-1}"; fi
+  printf '%s' "$value"
+}
+
+if [[ ! "${AGE_RECIPIENT+x}" && -f "$ROOT/.env" ]]; then AGE_RECIPIENT="$(read_dotenv AGE_RECIPIENT)"; fi
+if [[ ! "${BACKUP_RETENTION_DAYS+x}" && -f "$ROOT/.env" ]]; then BACKUP_RETENTION_DAYS="$(read_dotenv BACKUP_RETENTION_DAYS)"; fi
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-0}"
+if [[ ! "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( RETENTION_DAYS > 3650 )); then
+  echo "BACKUP_RETENTION_DAYS must be 0 (disabled) or an integer from 1 to 3650." >&2
+  exit 2
+fi
+
 if [[ ! "$STAMP" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
   echo "BACKUP_TIMESTAMP must use YYYYMMDDTHHMMSSZ." >&2
   exit 2
@@ -80,11 +99,6 @@ chmod 600 "$BACKUP_DIR/$POSTGRES_FILE" "$BACKUP_DIR/$CLICKHOUSE_FILE" \
   "$BACKUP_DIR/$POSTGRES_FILE.sha256" "$BACKUP_DIR/$CLICKHOUSE_FILE.sha256" \
   "$BACKUP_DIR/manifest-$STAMP.json"
 
-RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-0}"
-if [[ ! "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( RETENTION_DAYS > 3650 )); then
-  echo "BACKUP_RETENTION_DAYS must be 0 (disabled) or an integer from 1 to 3650." >&2
-  exit 2
-fi
 if (( RETENTION_DAYS > 0 )); then
   while IFS= read -r -d '' manifest; do
     name="$(basename "$manifest")"
