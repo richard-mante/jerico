@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #81 — notification delivery retry controls (`d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`)  
-**Latest main merge:** PR #81 — `d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`  
+**Latest feature merge:** PR #83 — manual one-off uptime checks (`d503e59e11316f3bf394f16bf69fbaae0a9c8297`)  
+**Latest main merge:** PR #83 — `d503e59e11316f3bf394f16bf69fbaae0a9c8297`  
 **Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency outbox is durable, credential usage timestamps include idempotent requests, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds, event-name redaction | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66, #68 | Merged |
 
-Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72), [PR #75 — durable telemetry idempotency outbox](https://github.com/richard-mante/jerico/pull/75), and [PR #76 — update credential usage for idempotent requests](https://github.com/richard-mante/jerico/pull/76),  [PR #77 — outbox recovery observability](https://github.com/richard-mante/jerico/pull/77), [PR #78 — recovery metric naming](https://github.com/richard-mante/jerico/pull/78), [PR #80 — manual notification retry API](https://github.com/richard-mante/jerico/pull/80), and [PR #81 — notification delivery history and retry controls](https://github.com/richard-mante/jerico/pull/81). Latest main commit: `d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`.
+Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72), [PR #75 — durable telemetry idempotency outbox](https://github.com/richard-mante/jerico/pull/75), and [PR #76 — update credential usage for idempotent requests](https://github.com/richard-mante/jerico/pull/76),  [PR #77 — outbox recovery observability](https://github.com/richard-mante/jerico/pull/77), [PR #78 — recovery metric naming](https://github.com/richard-mante/jerico/pull/78), [PR #80 — manual notification retry API](https://github.com/richard-mante/jerico/pull/80), [PR #81 — notification delivery history and retry controls](https://github.com/richard-mante/jerico/pull/81), and [PR #83 — manual one-off uptime checks](https://github.com/richard-mante/jerico/pull/83). Latest main commit: `d503e59e11316f3bf394f16bf69fbaae0a9c8297`.
 
 ### Phase 5 notification capabilities
 
@@ -194,7 +194,7 @@ Merged PR #68. Ingestion now applies the existing deterministic text-redaction p
 - Review caveat: queue sends and status updates still cannot be a distributed transaction. Recovery is intentionally at-least-once; duplicate sends carry the exact same envelope and must be collapsed by the existing ClickHouse replacement identity.
 - No tests, typecheck, lint, build, PostgreSQL, or ClickHouse runtime checks have been executed. The change is merged but not production-validated. `pnpm-lock.yaml` and ClickHouse DDL were not changed.
 
-### Next
-- Add PostgreSQL-backed tests for commit-before-publish durability, concurrent same-key requests, queue-send failure, queue-accepted/status-commit failure, and scheduled recovery with stable envelope timestamps.
-- Run ClickHouse integration tests proving identical retry envelopes collapse under `FINAL`, including timestamps near a month boundary.
-- Review transaction duration and batch recovery behavior against the deployed Hyperdrive/Cloudflare Queue runtime.
+### Next implementation work (tests/builds deferred)
+- Continue closing user-facing functionality: incident operations, notification preferences, and project/environment lifecycle management.
+- Complete the self-hosted runtime path: replace direct Cloudflare Queue assumptions with a provider-neutral durable queue adapter, then add the self-hosted services and deployment experience.
+- Keep `pnpm-lock.yaml` untouched. Do not run GitHub Actions or builds until the user asks to resume validation.
