@@ -42,6 +42,29 @@ services:
       timeout: 5s
       retries: 20
 
+  clickhouse-retention:
+    image: clickhouse/clickhouse-server:25.8
+    entrypoint: ["/bin/sh", "/scripts/apply-clickhouse-retention.sh"]
+    command: []
+    restart: "no"
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging: *default-logging
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_LOG_RETENTION_DAYS: ${CLICKHOUSE_LOG_RETENTION_DAYS:-7}
+      CLICKHOUSE_EVENT_RETENTION_DAYS: ${CLICKHOUSE_EVENT_RETENTION_DAYS:-30}
+    volumes:
+      - ./scripts/self-hosted/apply-clickhouse-retention.sh:/scripts/apply-clickhouse-retention.sh:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
   migrate:
     logging: *default-logging
     build:
@@ -131,6 +154,8 @@ services:
         condition: service_completed_successfully
       clickhouse:
         condition: service_healthy
+      clickhouse-retention:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 15s
@@ -220,6 +245,8 @@ services:
         condition: service_completed_successfully
       clickhouse:
         condition: service_healthy
+      clickhouse-retention:
+        condition: service_completed_successfully
       api:
         condition: service_healthy
     healthcheck:
