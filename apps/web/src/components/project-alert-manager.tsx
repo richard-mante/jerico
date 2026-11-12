@@ -45,6 +45,7 @@ export function ProjectAlertManager() {
   const [comparison, setComparison] = useState<"gt" | "gte">("gte");
   const [windowSeconds, setWindowSeconds] = useState("300");
   const [consecutiveBreaches, setConsecutiveBreaches] = useState("1");
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -83,18 +84,35 @@ export function ProjectAlertManager() {
     event.preventDefault();
     setBusy(true); setError(""); setNotice("");
     try {
-      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: name.trim(), metric, comparison, threshold: Number(threshold),
-          windowSeconds: Number(windowSeconds), consecutiveBreaches: Number(consecutiveBreaches), enabled: true,
-        }),
-      });
-      setNotice("Alert rule created. It will be evaluated by the next scheduled cycle.");
+      await request(
+        editingRuleId
+          ? `/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules/${encodeURIComponent(editingRuleId)}`
+          : `/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules`,
+        {
+          method: editingRuleId ? "PATCH" : "POST",
+          body: JSON.stringify({
+            name: name.trim(), metric, comparison, threshold: Number(threshold),
+            windowSeconds: Number(windowSeconds), consecutiveBreaches: Number(consecutiveBreaches),
+            ...(editingRuleId ? {} : { enabled: true }),
+          }),
+        },
+      );
+      setNotice(editingRuleId ? "Alert rule updated. The next evaluation will use the new settings." : "Alert rule created. It will be evaluated by the next scheduled cycle.");
+      setEditingRuleId(null);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create alert rule.");
     } finally { setBusy(false); }
+  }
+  function beginEditRule(rule: AlertRule) {
+    setEditingRuleId(rule.id); setName(rule.name); setMetric(rule.metric); setComparison(rule.comparison);
+    setThreshold(String(rule.threshold)); setWindowSeconds(String(rule.windowSeconds));
+    setConsecutiveBreaches(String(rule.consecutiveBreaches)); setError(""); setNotice("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function cancelEditRule() {
+    setEditingRuleId(null); setName("High error volume"); setMetric("error_count"); setComparison("gte");
+    setThreshold("10"); setWindowSeconds("300"); setConsecutiveBreaches("1");
   }
   async function toggleRule(rule: AlertRule) {
     setBusy(true); setError(""); setNotice("");
@@ -156,8 +174,8 @@ export function ProjectAlertManager() {
         {notice && <p role="status" className="mt-5 rounded-xl border border-[#d9f36a]/20 bg-[#d9f36a]/5 px-4 py-3 text-sm text-[#d9f36a]">{notice}</p>}
         <section className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
           <form onSubmit={createRule} className="h-fit rounded-2xl border border-white/10 bg-white/[0.035] p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d9f36a]">New rule</p>
-            <h2 className="mt-2 text-xl font-semibold">Create an alert</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d9f36a]">{editingRuleId ? "Edit rule" : "New rule"}</p>
+            <h2 className="mt-2 text-xl font-semibold">{editingRuleId ? "Update alert" : "Create an alert"}</h2>
             <label className="mt-5 block space-y-2 text-sm"><span className="text-[#a8afbd]">Rule name</span><input required minLength={2} maxLength={80} value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3 outline-none focus:border-[#d9f36a]/60" /></label>
             <label className="mt-4 block space-y-2 text-sm"><span className="text-[#a8afbd]">Signal</span><select value={metric} onChange={(event) => setMetric(event.target.value as Metric)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3">{Object.entries(metricLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-3">
@@ -167,14 +185,14 @@ export function ProjectAlertManager() {
             <label className="mt-4 block space-y-2 text-sm"><span className="text-[#a8afbd]">Evaluation window</span><select value={windowSeconds} onChange={(event) => setWindowSeconds(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3"><option value="300">5 minutes</option><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select></label>
             <label className="mt-4 block space-y-2 text-sm"><span className="text-[#a8afbd]">Consecutive breaches</span><select value={consecutiveBreaches} onChange={(event) => setConsecutiveBreaches(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3">{[1,2,3,4,5].map((value) => <option key={value} value={value}>{value} evaluation{value === 1 ? "" : "s"}</option>)}</select></label>
             <p className="mt-3 text-xs leading-5 text-[#737b89]">{metric === "error_count" ? "Counts error events in the selected window." : metric === "uptime_down" ? "Counts failed uptime checks in the selected window. No probe data means no evaluation." : "Uses the 95th percentile of recorded uptime response times in the selected window."} Rules are evaluated every minute.</p>
-            <button disabled={busy} className="mt-5 w-full rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Saving…" : "Create alert rule"}</button>
+            <div className="mt-5 flex gap-2"><button disabled={busy} className="flex-1 rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Saving…" : editingRuleId ? "Save changes" : "Create alert rule"}</button>{editingRuleId && <button type="button" disabled={busy} onClick={cancelEditRule} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-[#c2c8d3] disabled:opacity-50">Cancel</button>}</div>
           </form>
           <div className="space-y-6">
             <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
               <div className="flex items-center justify-between"><div><h2 className="font-semibold">Alert rules</h2><p className="mt-1 text-xs text-[#737b89]">Rules configured for this project</p></div><span className="text-xs text-[#929aaa]">{rules.length} total</span></div>
               <div className="mt-4 divide-y divide-white/10">
                 {rules.map((rule) => <div key={rule.id} className="py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{rule.name}</p><span className={`rounded-full px-2 py-1 text-[10px] ${rule.enabled ? "bg-[#d9f36a]/10 text-[#d9f36a]" : "bg-white/10 text-[#929aaa]"}`}>{rule.enabled ? "Enabled" : "Paused"}</span></div><p className="mt-2 text-xs text-[#929aaa]">{metricLabels[rule.metric]} · {rule.comparison === "gte" ? "≥" : ">"} {rule.threshold}{rule.metric === "response_time" ? " ms" : ""} · {Math.round(rule.windowSeconds / 60)}m window · {rule.consecutiveBreaches} consecutive</p></div><div className="flex gap-2"><button disabled={busy} onClick={() => void toggleRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">{rule.enabled ? "Pause" : "Enable"}</button><button disabled={busy} onClick={() => void deleteRule(rule)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 disabled:opacity-50">Delete</button></div></div>
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{rule.name}</p><span className={`rounded-full px-2 py-1 text-[10px] ${rule.enabled ? "bg-[#d9f36a]/10 text-[#d9f36a]" : "bg-white/10 text-[#929aaa]"}`}>{rule.enabled ? "Enabled" : "Paused"}</span></div><p className="mt-2 text-xs text-[#929aaa]">{metricLabels[rule.metric]} · {rule.comparison === "gte" ? "≥" : ">"} {rule.threshold}{rule.metric === "response_time" ? " ms" : ""} · {Math.round(rule.windowSeconds / 60)}m window · {rule.consecutiveBreaches} consecutive</p></div><div className="flex gap-2"><button disabled={busy} onClick={() => beginEditRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Edit</button><button disabled={busy} onClick={() => void toggleRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">{rule.enabled ? "Pause" : "Enable"}</button><button disabled={busy} onClick={() => void deleteRule(rule)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 disabled:opacity-50">Delete</button></div></div>
                 </div>)}
                 {!rules.length && <p className="py-8 text-center text-sm text-[#737b89]">No alert rules yet. Create one to start monitoring a signal.</p>}
               </div>
