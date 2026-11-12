@@ -155,6 +155,13 @@
       "when": 1794506000000,
       "tag": "0021_incident_escalation",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794507000000,
+      "tag": "0022_durable_queue_messages",
+      "breakpoints": true
     }
   ]
 }

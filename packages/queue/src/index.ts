@@ -20,6 +20,7 @@ export interface QueuePublisher<TMessage> {
 
 export type QueueRetryOptions = {
   delaySeconds?: number;
+  errorCode?: string;
 };
 
 export interface QueueDelivery<TMessage> {
