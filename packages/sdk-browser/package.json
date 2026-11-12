@@ -10,7 +10,8 @@
     }
   },
   "dependencies": {
-    "@jerico/sdk-core": "workspace:*"
+    "@jerico/sdk-core": "workspace:*",
+    "web-vitals": "^6.2.3"
   },
   "scripts": {
     "lint": "biome lint .",
