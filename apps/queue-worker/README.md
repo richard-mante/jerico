@@ -28,6 +28,7 @@ Optional:
 - `DATABASE_POOL_MAX` (default `8`, range 1–50)
 - `HOST` (default `127.0.0.1`; set to `0.0.0.0` only inside a private container network)
 - `PORT` (default `8789`)
+- `QUEUE_ADMIN_TOKEN` (optional; at least 32 characters; enables authenticated dead-letter inspection and replay)
 
 Do not expose the health server publicly. It has no user authentication and should be reachable only by the local host or private container network.
 
@@ -47,6 +48,16 @@ The worker validates the queue table at startup, polls with bounded batch size, 
 
 The process handles SIGINT/SIGTERM and attempts a graceful stop. If a handler outlives the shutdown timeout, its lease expires and the message becomes eligible for recovery.
 
+## Dead-letter administration
+
+When `QUEUE_ADMIN_TOKEN` is configured, the private health server also exposes:
+
+- `GET /dead-letters?limit=50`: list dead-letter metadata (limit 1–100)
+- `GET /dead-letters/:id`: inspect one stored payload and its failure metadata
+- `POST /dead-letters/:id/replay`: explicitly reset the message for another attempt
+
+Send `Authorization: Bearer <QUEUE_ADMIN_TOKEN>` with each request. Payload inspection may expose customer telemetry; keep this service on localhost/private networking and protect the token as a secret. Replay is allowed only for messages still in the dead-letter state; active deduplication conflicts are rejected.
+
 ## Current scope
 
-This worker consumes telemetry only. It does not yet consume uptime or notification jobs, provide a dead-letter inspection/replay interface, or switch production Cloudflare routing. Do not treat the self-hosted deployment as complete until those pieces and PostgreSQL/ClickHouse runtime validation are finished.
+This worker consumes telemetry only. It does not yet consume uptime or notification jobs or switch production Cloudflare routing. Do not treat the self-hosted deployment as complete until those handlers, Docker Compose, and PostgreSQL/ClickHouse runtime validation are finished.
