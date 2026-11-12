@@ -6,7 +6,8 @@
       "DOM"
     ],
     "types": [
-      "node"
+      "node",
+      "@cloudflare/workers-types"
     ]
   },
   "include": [

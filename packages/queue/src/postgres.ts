@@ -60,7 +60,7 @@ function safeErrorCode(value: string): string {
  * PostgreSQL-backed durable queue. It uses short transactions for claims and
  * never holds a database connection/transaction while a job handler executes.
  */
-export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
+export class PostgresQueueAdapter<TMessage>
   implements QueuePublisher<TMessage> {
   readonly queueName: string;
   private readonly pool: PostgresPoolLike;

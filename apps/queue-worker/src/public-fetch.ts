@@ -33,7 +33,6 @@ function closeAfterBody(response: Response, dispatcher: Agent): Response {
     void dispatcher.close();
     return response;
   }
-
   const reader = response.body.getReader();
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -42,9 +41,7 @@ function closeAfterBody(response: Response, dispatcher: Agent): Response {
         if (result.done) {
           controller.close();
           await dispatcher.close();
-        } else {
-          controller.enqueue(result.value);
-        }
+        } else controller.enqueue(result.value);
       } catch (error) {
         controller.error(error);
         await dispatcher.destroy(error instanceof Error ? error : undefined);
@@ -58,37 +55,17 @@ function closeAfterBody(response: Response, dispatcher: Agent): Response {
       }
     },
   });
-
-  return new Response(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
 }
 
-/**
- * Fetch one public DNS hostname while pinning the actual socket lookup to the
- * validated address. Redirects are never followed automatically: callers must
- * validate and resolve each redirect target independently.
- */
-export async function fetchPublicPinned(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-): Promise<Response> {
+/** Pin each request to a validated public DNS address; callers must revalidate redirects. */
+export async function fetchPublicPinned(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const url = input instanceof Request ? new URL(input.url) : new URL(input.toString());
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Only HTTP(S) outbound requests are supported.");
-  }
-  if (url.username || url.password) {
-    throw new Error("Outbound URLs must not contain embedded credentials.");
-  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Only HTTP(S) outbound requests are supported.");
+  if (url.username || url.password) throw new Error("Outbound URLs must not contain embedded credentials.");
 
   const pinned = await resolvePublicAddress(url.hostname);
-  const lookupPinned = (
-    _hostname: string,
-    options: { all?: boolean },
-    callback: LookupCallback,
-  ) => {
+  const lookupPinned = (_hostname: string, options: { all?: boolean }, callback: LookupCallback) => {
     if (options?.all) callback(null, [pinned]);
     else callback(null, pinned.address, pinned.family);
   };
@@ -97,13 +74,8 @@ export async function fetchPublicPinned(
     connections: 1,
     pipelining: 0,
   });
-
   try {
-    const response = await undiciFetch(url, {
-      ...init,
-      dispatcher,
-      redirect: init.redirect ?? "manual",
-    });
+    const response = await undiciFetch(url, { ...init, dispatcher, redirect: init.redirect ?? "manual" });
     return closeAfterBody(response, dispatcher);
   } catch (error) {
     await dispatcher.destroy(error instanceof Error ? error : undefined);

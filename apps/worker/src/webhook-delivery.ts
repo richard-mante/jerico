@@ -11,6 +11,7 @@ export type WebhookDeliveryInput = {
   title: string;
   triggerValue: number;
   occurredAt: string;
+  fetcher?: typeof fetch;
 };
 
 function decodeBase64Url(value: string): Uint8Array {
@@ -72,7 +73,7 @@ export async function deliverWebhook(input: WebhookDeliveryInput): Promise<void>
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch(input.url, {
+    const response = await (input.fetcher ?? fetch)(input.url, {
       method: "POST",
       redirect: "error",
       signal: controller.signal,
