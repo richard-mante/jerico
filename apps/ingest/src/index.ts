@@ -275,6 +275,9 @@ app.post("/ingest/v1/events", async (context) => {
             target: [projectIngestionRequests.credentialId, projectIngestionRequests.idempotencyKey],
           }).returning({ id: projectIngestionRequests.id });
 
+          let requestRecordId: string;
+          let pendingEnvelope: QueueMessage;
+
           if (created) {
             const limit = dailyEventLimit(context.env.INGEST_DAILY_EVENT_LIMIT);
             const [usage] = await transaction.insert(projectIngestionUsage).values({
@@ -291,33 +294,36 @@ app.post("/ingest/v1/events", async (context) => {
             if (!usage || usage.eventCount > limit) {
               throw new DailyQuotaExceeded(secondsUntilUtcMidnight());
             }
-            return { kind: "created" as const, id: created.id, envelope };
+            requestRecordId = created.id;
+            pendingEnvelope = envelope;
+          } else {
+            const [existing] = await transaction.select({
+              id: projectIngestionRequests.id,
+              requestHash: projectIngestionRequests.requestHash,
+              envelope: projectIngestionRequests.envelope,
+              status: projectIngestionRequests.status,
+              expiresAt: projectIngestionRequests.expiresAt,
+            }).from(projectIngestionRequests).where(and(
+              eq(projectIngestionRequests.credentialId, credential.id),
+              eq(projectIngestionRequests.idempotencyKey, idempotencyKey),
+            )).limit(1).for("update");
+
+            if (!existing) throw new Error("Idempotency record disappeared during reservation.");
+            if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
+            if (existing.expiresAt.getTime() <= Date.now()) return { kind: "expired" as const };
+            if (existing.status === "accepted") {
+              return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
+            }
+            requestRecordId = existing.id;
+            pendingEnvelope = existing.envelope as QueueMessage;
           }
 
-          const [existing] = await transaction.select({
-            id: projectIngestionRequests.id,
-            requestHash: projectIngestionRequests.requestHash,
-            envelope: projectIngestionRequests.envelope,
-            status: projectIngestionRequests.status,
-            expiresAt: projectIngestionRequests.expiresAt,
-          }).from(projectIngestionRequests).where(and(
-            eq(projectIngestionRequests.credentialId, credential.id),
-            eq(projectIngestionRequests.idempotencyKey, idempotencyKey),
-          )).limit(1).for("update");
-
-          if (!existing) throw new Error("Idempotency record disappeared during reservation.");
-          if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
-          if (existing.expiresAt.getTime() <= Date.now()) return { kind: "expired" as const };
-          if (existing.status === "accepted") {
-            return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
-          }
-          const pendingEnvelope = created ? envelope : existing.envelope as QueueMessage;
           // Keep the row lock and quota reservation transaction open until the
           // queue accepts the batch. Concurrent retries then observe "accepted"
           // instead of publishing the same pending envelope in parallel.
           await queue.send(pendingEnvelope);
           await transaction.update(projectIngestionRequests).set({ status: "accepted" })
-            .where(eq(projectIngestionRequests.id, created?.id ?? existing.id));
+            .where(eq(projectIngestionRequests.id, requestRecordId));
           return { kind: "published" as const, envelope: pendingEnvelope };
         }),
       );
