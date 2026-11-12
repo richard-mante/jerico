@@ -45,6 +45,35 @@ services:
       postgres:
         condition: service_healthy
 
+  ingest:
+    build:
+      context: .
+      dockerfile: apps/queue-worker/Dockerfile
+    command: ["pnpm", "--filter", "@jerico/ingest-node", "start"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8788
+      DATABASE_URL: postgresql://jerico:${POSTGRES_PASSWORD}@postgres:5432/jerico
+      TELEMETRY_QUEUE_NAME: jerico-telemetry
+      QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-5}
+      INGEST_DAILY_EVENT_LIMIT: ${INGEST_DAILY_EVENT_LIMIT:-100000}
+      INGEST_RATE_LIMIT_REQUESTS: ${INGEST_RATE_LIMIT_REQUESTS:-120}
+      INGEST_RATE_LIMIT_WINDOW_SECONDS: ${INGEST_RATE_LIMIT_WINDOW_SECONDS:-60}
+      DATABASE_POOL_MAX: ${INGEST_DATABASE_POOL_MAX:-12}
+    ports:
+      - "127.0.0.1:${INGEST_PORT:-8788}:8788"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   queue-worker:
     build:
       context: .
