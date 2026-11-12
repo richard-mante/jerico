@@ -815,3 +815,15 @@
 ### Next
 - Add PostgreSQL-backed failure-injection and concurrency coverage for the durable ingestion outbox.
 - Validate ClickHouse `FINAL` deduplication for identical stored envelopes, including month-boundary fixtures.
+### 2026-11-12 — manual notification delivery recovery (PRs #80–#81)
+
+- PR #80 adds an owner/admin-only API endpoint to retry a failed notification delivery. It verifies the original channel is still enabled and verified, checks the incident, conditionally claims the failed row, assigns a fresh enqueue token, and routes queue-send failures back into automatic reconciliation.
+- PR #81 adds recent delivery history to the project Alerts & Incidents screen and a Retry delivery action for failed entries. The API response includes enqueue attempts and provider-message metadata.
+- Both PRs were squash-merged to `main`; PR #80 merge commit `8d136500d3613935fe70948eead74d053f5d9f77`; PR #81 merge commit `d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`.
+- No tests or builds were run. No GitHub Actions/builds were requested.
+
+### Next implementation focus
+
+- Continue completing user-facing functionality, not tests: inspect the uptime monitor experience and close any gaps between monitor configuration, current status, and check history.
+- Then complete incident operations and notification configuration; proceed to the self-hosted runtime/queue adapter and deployment experience.
+- Keep `pnpm-lock.yaml` untouched.
