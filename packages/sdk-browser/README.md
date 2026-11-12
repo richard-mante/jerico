@@ -28,6 +28,7 @@ Call `identify(userId)` only when the application has a legitimate reason to ass
 
 - `flush()` explicitly sends buffered events.
 - Ingestion requests time out after 10 seconds by default; configure `requestTimeoutMs` (100–120,000 ms) for slower endpoints.
+- SDK batches are byte-aware (80 KiB default, 96 KiB maximum) so large event attributes do not exceed the ingestion request limit.
 - `close()` removes instrumentation listeners and flushes the remaining in-memory queue.
 - Buffered events are not persisted across a browser crash or forced page termination.
 
