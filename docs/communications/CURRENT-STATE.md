@@ -3,8 +3,7 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #166 — byte-aware SDK batching (`554be19bd8f7174f4aabf9e4901477819dbe1c13`)  
-**Latest main merge:** PR #167 — queue/SDK handover refresh (`3cc4d08482de553b1bde53e7d08953019d9fa5f2`)  
+**Latest feature/code merge:** PR #166 — byte-aware SDK batching (`554be19bd8f7174f4aabf9e4901477819dbe1c13`)  
 **Current milestone:** The self-hosted Compose stack includes the Next.js dashboard, Node management/ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy HTTPS. Backup/restore covers PostgreSQL and ClickHouse with checksums, destructive-restore confirmation, optional age encryption, opt-in local retention, and optional rclone encrypted off-site upload/verification/restore. Environment bootstrap/preflight, non-root/reduced-capability application containers, manifest-verified restores, optional daily systemd backups, daily terminal queue retention, invalid-message quarantine, configurable/idempotent ClickHouse TTL, bounded container logs, Caddy response/body limits, provider-neutral queue payload sizing, byte-aware SDK batching, and a security disclosure policy are implemented. Remaining gates: clean Linux install, local and off-host restore drills, storage-provider lifecycle policy, measured resource sizing, SDK validation/publication, private-reporting repository configuration, and runtime/security verification.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
