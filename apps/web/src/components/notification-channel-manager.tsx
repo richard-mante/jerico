@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean; lastVerificationErrorCode: string | null; createdAt: string };
+type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean; quietHoursEnabled: boolean; quietHoursStart: string; quietHoursEnd: string; timezone: string; lastVerificationErrorCode: string | null; createdAt: string };
 type Delivery = { id: string; incidentId: string; target: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -84,7 +84,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       setError(cause instanceof Error ? cause.message : "Could not resend verification email.");
     } finally { setBusy(false); }
   }
-  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved" | "notifyOnReopened">>) {
+  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved" | "notifyOnReopened" | "quietHoursEnabled" | "quietHoursStart" | "quietHoursEnd" | "timezone">>) {
     setBusy(true); setError(""); setNotice("");
     try { await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, { method: "PATCH", body: JSON.stringify(settings) }); setNotice(settings.enabled !== undefined ? settings.enabled ? "Notification channel enabled." : "Notification channel paused." : "Notification preferences saved."); await refresh(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update notification channel."); } finally { setBusy(false); }
