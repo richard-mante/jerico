@@ -53,7 +53,7 @@ export async function signWebhookPayload(secret: Uint8Array, body: string, times
   return "sha256=" + Array.from(signature, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function deliverWebhook(input: WebhookDeliveryInput): Promise<void> {
+export async function deliverWebhook(input: WebhookDeliveryInput, fetcher: typeof fetch = fetch): Promise<void> {
   if (!isSafeWebhookUrl(input.url, input.blockedHost)) throw new Error("Webhook URL is not an allowed public HTTPS endpoint.");
   const secret = await decryptWebhookSecret(input.secretCiphertext, input.secretIv, input.encryptionKey);
   const body = JSON.stringify({
@@ -72,7 +72,7 @@ export async function deliverWebhook(input: WebhookDeliveryInput): Promise<void>
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch(input.url, {
+    const response = await fetcher(input.url, {
       method: "POST",
       redirect: "error",
       signal: controller.signal,
