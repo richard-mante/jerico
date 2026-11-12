@@ -176,7 +176,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
       body: row.payload,
       attempts: row.attempts,
       ack: () => this.ack(row.id, leaseToken),
-      retry: (options) => this.retry(row.id, leaseToken, row.attempts, row.max_attempts, options?.delaySeconds ?? 0),
+      retry: (options) => this.retry(row.id, leaseToken, row.attempts, row.max_attempts, options?.delaySeconds ?? 0, options?.errorCode),
     }));
     return { queue: this.queueName, messages };
   }
