@@ -7,6 +7,7 @@ This Compose file is an infrastructure slice for the self-hosted telemetry consu
 - PostgreSQL 17: application database and durable queue storage.
 - ClickHouse 25.8: telemetry analytics store, initialized with the repository SQL scripts.
 - One-shot migration service: applies the repository Drizzle migrations.
+- Node.js ingestion API: reuses the managed Hono ingestion routes, but publishes telemetry directly to the PostgreSQL queue. Its per-credential rate limiter is backed by atomic PostgreSQL fixed-window counters.
 - Node.js queue worker: consumes `jerico-telemetry` from PostgreSQL and writes validated envelopes to ClickHouse.
 
 The queue worker includes health/readiness endpoints and token-protected dead-letter inspection/replay. Its host port is bound to loopback by default.
@@ -35,7 +36,7 @@ To intentionally delete the PostgreSQL and ClickHouse volumes, use `docker compo
 ## Current boundary
 
 - Cloudflare API and ingest are still the managed production path and continue to publish to Cloudflare Queues. They do not yet publish to this PostgreSQL queue.
-- This Compose slice does not include a self-hosted API/dashboard, authentication runtime, uptime/notification consumers, backups, restore, or a full operational deployment.
+- This Compose slice includes the ingestion API only; it does not yet include the dashboard, authentication/API management runtime, uptime/notification consumers, backups, restore, or a full operational deployment.
 - Do not expose the queue worker port publicly. Dead-letter payload inspection can reveal customer telemetry.
 - Docker build, Compose validation, migrations, and live PostgreSQL/ClickHouse checks have not yet been run.
 
