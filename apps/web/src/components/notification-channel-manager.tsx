@@ -126,11 +126,11 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
         <div className="mt-4 divide-y divide-white/10">
           {channels.map((channel) => <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div className="min-w-0 flex-1"><p className="text-sm">{channel.type === "webhook" ? "Webhook" : "Email"} · {channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}{channel.verifiedAt ? channel.enabled ? " · Active" : " · Paused" : ""}{channel.lastVerificationErrorCode ? " · " + channel.lastVerificationErrorCode : ""}</p>
-              {channel.verifiedAt && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">{[
-                ["notifyOnOpened", "Opened", channel.notifyOnOpened],
-                ["notifyOnAcknowledged", "Acknowledged", channel.notifyOnAcknowledged],
-                ["notifyOnResolved", "Resolved", channel.notifyOnResolved],
-              ].map(([key, label, checked]) => <label key={String(key)} className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={Boolean(checked)} onChange={() => void updateChannel(channel, { [String(key)]: !Boolean(checked) })} />{String(label)}</label>)}</div>}</div>
+              {channel.verifiedAt && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnOpened} onChange={() => void updateChannel(channel, { notifyOnOpened: !channel.notifyOnOpened })} />Opened</label>
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnAcknowledged} onChange={() => void updateChannel(channel, { notifyOnAcknowledged: !channel.notifyOnAcknowledged })} />Acknowledged</label>
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnResolved} onChange={() => void updateChannel(channel, { notifyOnResolved: !channel.notifyOnResolved })} />Resolved</label>
+              </div>}</div>
             <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}{channel.verifiedAt && <button disabled={busy} onClick={() => void toggleChannel(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{channel.enabled ? "Pause" : "Enable"}</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
           </div>)}
           {!channels.length && <p className="py-5 text-sm text-[#737b89]">No notification channels configured.</p>}
