@@ -955,3 +955,12 @@
 - Added conservative starting sizing guidance (2 vCPU/4 GiB/30 GiB evaluation; 4 vCPU/8 GiB/50 GiB small production) with explicit note that this is not measured capacity guidance.
 - PR #130 merged as `edfda14d2974256fa56997a985fb095e73342c32`. Updated issue #107 with PRs #127–#130 and remaining release gates.
 - No shell syntax, Compose parse, Docker build, migration, restore, tests, typecheck, lint, or runtime checks were run. `pnpm-lock.yaml` remains untouched.
+
+
+### 2026-11-12 — Backup retention and container privilege reduction
+
+- Merged PR #132 (`b74081df2663701ff84ab82cee32f36c998c4ad4`): optional `BACKUP_RETENTION_DAYS` local pruning, default disabled, after successful backup; only old manifest-backed artifacts/checksums are removed. Backup/restore scripts read `AGE_RECIPIENT`, `AGE_IDENTITY`, and retention settings from `.env` as data without sourcing it.
+- Merged PR #133 (`a68dc9e79ebf665f1778971f538eb4a59881c4db`): shared Node API/ingestion/queue-worker image and Next.js runtime use the non-root `node` account.
+- Merged PR #134 (`531d7924fadf0d88fbef53e6ed5c74ced347281d`): migration, web, API, ingestion, and queue-worker Compose services use Docker init, `no-new-privileges`, and drop all Linux capabilities. PostgreSQL, ClickHouse, and Caddy capabilities were not changed.
+- No lockfile changes. No shell syntax, Compose parse, Docker build, migrations, backup/restore, retention deletion, tests, typecheck, lint, or runtime checks were run. No validation is claimed.
+- Next: complete measured resource and operations guidance, off-site backup strategy, and security review; then run the clean-install and restore drills when validation is resumed.
