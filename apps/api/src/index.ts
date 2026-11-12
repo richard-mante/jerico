@@ -902,7 +902,7 @@ app.patch("/api/v1/notification-channels/:channelId", async (context) => withOrg
   const [channel] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt }).from(notificationChannels).where(and(eq(notificationChannels.id, context.req.param("channelId")), eq(notificationChannels.organizationId, organizationId))).limit(1);
   if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
   if (parsed.data.enabled === true && !channel.verifiedAt) return context.json({ error: { code: "CHANNEL_NOT_VERIFIED", message: "Verify this channel before enabling it." } }, 409);
-  const [updated] = await database.update(notificationChannels).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId))).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled, notifyOnOpened: notificationChannels.notifyOnOpened, notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged, notifyOnResolved: notificationChannels.notifyOnResolved });
+  const [updated] = await database.update(notificationChannels).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId))).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled, notifyOnOpened: notificationChannels.notifyOnOpened, notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged, notifyOnResolved: notificationChannels.notifyOnResolved, notifyOnReopened: notificationChannels.notifyOnReopened });
   return context.json({ data: updated });
 }));
 app.delete("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
@@ -1080,6 +1080,14 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async 
 
 app.post("/api/v1/projects/:projectId/incidents/:incidentId/reopen", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
   const now = new Date();
+  const [candidate] = await database.select({ id: incidents.id, alertRuleId: incidents.alertRuleId }).from(incidents).where(and(
+    eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "resolved"),
+  )).limit(1);
+  if (!candidate) return context.json({ error: { code: "NOT_REOPENABLE", message: "Only resolved incidents can be reopened." } }, 409);
+  const [active] = await database.select({ id: incidents.id }).from(incidents).where(and(
+    eq(incidents.alertRuleId, candidate.alertRuleId), or(eq(incidents.status, "open"), eq(incidents.status, "acknowledged")), ne(incidents.id, candidate.id),
+  )).limit(1);
+  if (active) return context.json({ error: { code: "ACTIVE_INCIDENT_EXISTS", message: "This alert rule already has an active incident. Resolve it before reopening this one." } }, 409);
   const [updated] = await database.update(incidents).set({ status: "open", resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null, updatedAt: now }).where(and(
     eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "resolved"),
   )).returning();
