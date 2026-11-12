@@ -27,7 +27,7 @@ until [ "$(clickhouse-client --host "$host" --user "$user" --password "$password
 done
 
 clickhouse-client --host "$host" --user "$user" --password "$password" --query "CREATE TABLE IF NOT EXISTS jerico.retention_policy (policy_name LowCardinality(String), log_days UInt16, event_days UInt16, applied_at DateTime64(3, 'UTC')) ENGINE = ReplacingMergeTree(applied_at) ORDER BY policy_name"
-current_policy="$(clickhouse-client --host "$host" --user "$user" --password "$password" --query "SELECT concat(toString(log_days), char(9), toString(event_days)) FROM jerico.retention_policy WHERE policy_name = 'telemetry_events' ORDER BY applied_at DESC LIMIT 1 FORMAT TSVRaw")"
+current_policy="$(clickhouse-client --host "$host" --user "$user" --password "$password" --query "SELECT log_days, event_days FROM jerico.retention_policy WHERE policy_name = 'telemetry_events' ORDER BY applied_at DESC LIMIT 1 FORMAT TSVRaw")"
 expected_policy="$(printf '%s\t%s' "$log_days" "$event_days")"
 if [ "$current_policy" = "$expected_policy" ]; then
   echo "ClickHouse telemetry retention policy is already current (logs=$log_days days, events=$event_days days)."
