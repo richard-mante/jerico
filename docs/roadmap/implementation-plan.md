@@ -280,6 +280,8 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] PostgreSQL custom-format and ClickHouse native backup/restore scripts, checksums, and explicit destructive restore confirmation (PR #124; restore drill pending).
 - [ ] Validate a clean Linux installation and perform a full restore exercise.
 - [x] Add optional age backup encryption (PR #128; configure an off-host private identity and test restore).
-- [ ] Define encrypted off-site storage and backup retention policy.
-- [ ] Complete security review, resource sizing, monitoring, and production hardening.
+- [x] Add opt-in local manifest-backed backup retention (PR #132; default disabled).
+- [x] Run application containers as non-root and drop unnecessary capabilities (PRs #133–#134; runtime compatibility pending).
+- [ ] Define encrypted off-site storage and retention policy.
+- [ ] Complete security review, measured resource sizing, monitoring, and production hardening.
 - [ ] Run typecheck, lint, build, Docker/Compose validation, migration, DNS/SSRF, and live database checks before release.
