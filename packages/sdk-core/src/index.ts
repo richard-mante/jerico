@@ -18,6 +18,7 @@ export type JericoClientOptions = {
   flushIntervalMs?: number;
   requestTimeoutMs?: number;
   maxBatchSize?: number;
+  maxBatchBytes?: number;
   maxQueueSize?: number;
   fetch?: typeof fetch;
   onError?: (error: Error) => void;
@@ -32,6 +33,8 @@ export class JericoHttpError extends Error {
 
 const DEFAULT_FLUSH_INTERVAL = 10_000;
 const DEFAULT_BATCH_SIZE = 50;
+const DEFAULT_BATCH_BYTES = 80 * 1024;
+const MAX_BATCH_BYTES = 96 * 1024;
 const DEFAULT_QUEUE_SIZE = 5_000;
 
 export class JericoClient {
@@ -44,6 +47,7 @@ export class JericoClient {
   private readonly fetcher: typeof fetch;
   private readonly endpoint: string;
   private readonly maxBatchSize: number;
+  private readonly maxBatchBytes: number;
   private readonly maxQueueSize: number;
   private readonly requestTimeoutMs: number;
 
@@ -54,10 +58,14 @@ export class JericoClient {
     if (endpoint.protocol !== "https:" && endpoint.protocol !== "http:") throw new Error("The ingestion endpoint must use HTTP or HTTPS.");
     this.endpoint = options.endpoint.replace(/\/$/, "");
     this.maxBatchSize = options.maxBatchSize ?? DEFAULT_BATCH_SIZE;
+    this.maxBatchBytes = options.maxBatchBytes ?? DEFAULT_BATCH_BYTES;
     this.maxQueueSize = options.maxQueueSize ?? DEFAULT_QUEUE_SIZE;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
     if (!Number.isInteger(this.requestTimeoutMs) || this.requestTimeoutMs < 100 || this.requestTimeoutMs > 120_000) {
       throw new Error("requestTimeoutMs must be an integer between 100 and 120000.");
+    }
+    if (!Number.isInteger(this.maxBatchBytes) || this.maxBatchBytes < 1024 || this.maxBatchBytes > MAX_BATCH_BYTES) {
+      throw new Error("maxBatchBytes must be an integer between 1024 and 98304.");
     }
     if (!Number.isInteger(this.maxBatchSize) || this.maxBatchSize < 1 || this.maxBatchSize > 100) {
       throw new Error("maxBatchSize must be an integer between 1 and 100.");
@@ -157,7 +165,13 @@ export class JericoClient {
       this.reportError(new Error("Jerico telemetry queue is full; the new event was dropped."));
       return false;
     }
-    this.queue.push({ ...event, name, timestamp: new Date().toISOString() });
+    const queuedEvent = { ...event, name, timestamp: new Date().toISOString() };
+    const singleEventBytes = new TextEncoder().encode(JSON.stringify({ events: [queuedEvent] })).byteLength;
+    if (singleEventBytes > this.maxBatchBytes) {
+      this.reportError(new Error("Jerico telemetry event exceeds maxBatchBytes and was dropped."));
+      return false;
+    }
+    this.queue.push(queuedEvent);
     if (!this.timerBlocked && this.queue.length >= this.maxBatchSize) {
       void this.flushBatch().catch(this.reportError);
     }
@@ -169,12 +183,23 @@ export class JericoClient {
     while (this.queue.length > 0 || this.retryBatch || this.inFlight) await this.flushBatch();
   }
 
+  private takeBatch(): TelemetryEvent[] {
+    const batch: TelemetryEvent[] = [];
+    while (batch.length < this.maxBatchSize && this.queue.length > 0) {
+      const candidate = [...batch, this.queue[0]];
+      const bytes = new TextEncoder().encode(JSON.stringify({ events: candidate })).byteLength;
+      if (bytes > this.maxBatchBytes) break;
+      batch.push(this.queue.shift()!);
+    }
+    return batch;
+  }
+
   private async flushBatch(): Promise<void> {
     if (this.inFlight) return this.inFlight;
     if (!this.retryBatch && this.queue.length === 0) return;
     const batch = this.retryBatch ?? {
       idempotencyKey: globalThis.crypto.randomUUID(),
-      events: this.queue.splice(0, this.maxBatchSize),
+      events: this.takeBatch(),
     };
     this.retryBatch = batch;
     this.inFlight = (async () => {
