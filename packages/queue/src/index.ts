@@ -26,7 +26,7 @@ export type QueueRetryOptions = {
 export interface QueueDelivery<TMessage> {
   /** Stable message identity assigned by the queue adapter. */
   readonly id: string;
-  /** Decoded, version-validated message envelope. */
+  /** Provider-decoded message body; consumers must validate its schema/version. */
   readonly body: TMessage;
   /** One-based delivery attempt count. */
   readonly attempts: number;
@@ -34,6 +34,8 @@ export interface QueueDelivery<TMessage> {
   ack(): void | Promise<void>;
   /** Release this active lease and schedule another attempt. */
   retry(options?: QueueRetryOptions): void | Promise<void>;
+  /** Mark this delivery as invalid/permanently unprocessable. */
+  deadLetter(errorCode: string): void | Promise<void>;
 }
 
 export interface QueueBatch<TMessage> {
