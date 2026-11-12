@@ -157,7 +157,8 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [ ] Verify retention, deletion, and secret redaction.
 - [ ] Accessibility and responsive UI review.
 - [ ] License/dependency review, security disclosure process, docs review.
-- [ ] Versioned SDK release, changelog, and migration policy.
+- [ ] Validate compiled SDK package output and sample applications; keep packages private until validation and licensing are complete.
+- [ ] Add npm publishing, versioned release, changelog, and migration policy.
 
 **MVP release gate:** Onboarding, project setup, browser and Node ingestion, event analytics, error monitoring, performance, uptime, alerts, notifications, retention/deletion, self-hosted install/restore, tenant isolation, and CI must all work.
 
@@ -244,7 +245,9 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 ### Next implementation priority
 - [ ] Quiet hours and escalation policies.
 - [x] Provider-neutral queue contracts and PostgreSQL adapter (PRs #108 and #110); full self-hosted producer/runtime integration remains open.
-- [ ] SDK integration and release experience.
+- [x] Add compiled ESM/declaration package output for SDK core/browser/Node (PR #136; not built/validated).
+- [x] Add React/Vite and Astro SDK integration guides (PR #137; sample apps not executed).
+- [ ] Validate SDK builds/integrations, decide licensing, and implement a controlled npm release workflow.
 
 ### Execution direction
 - Continue functional implementation; defer tests, end-to-end work, and GitHub builds until requested.
