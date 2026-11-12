@@ -17,7 +17,7 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; }
 info() { echo "OK: $*"; }
 
-for command_name in docker getent awk df ss; do
+for command_name in docker getent awk df ss grep getconf; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Required command '$command_name' is not installed."
 done
 
