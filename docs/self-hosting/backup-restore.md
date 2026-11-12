@@ -49,3 +49,21 @@ The restore script intentionally requires `CONFIRM_DESTRUCTIVE_RESTORE=YES`. Kee
 - Local backup pruning is opt-in: set `BACKUP_RETENTION_DAYS` in `.env` to a value from 1 to 3650. The default `0` disables deletion. After a successful backup, older manifest-backed artifacts and their checksums are removed. This does not prune off-site copies or orphaned files without a manifest.
 - A full disaster recovery plan should also preserve the `.env` secrets and Caddy's `jerico-caddy-data` volume (ACME certificates/state). Store secrets separately and securely.
 - Docker, ClickHouse backup/restore, PostgreSQL restore, and full application recovery have not yet been executed in this repository environment. Treat the scripts as an implementation, not a verified recovery guarantee.
+
+## Scheduled backups with systemd
+
+Optional systemd units are provided under `infrastructure/self-hosted/systemd/`. They run the same backup script daily at 02:30 UTC with a randomized delay and persistent catch-up after downtime.
+
+1. Install the repository at `/opt/jerico` (or edit `WorkingDirectory` and `ExecStart` in the service unit for your installation path).
+2. Ensure the `jerico` service account owns the repository `.env` and can write to `backups/`; add it to the Docker group so it can control the Compose stack.
+3. Install and enable the units:
+
+   `sudo install -m 0644 infrastructure/self-hosted/systemd/jerico-backup.service /etc/systemd/system/`
+
+   `sudo install -m 0644 infrastructure/self-hosted/systemd/jerico-backup.timer /etc/systemd/system/`
+
+   `sudo systemctl daemon-reload && sudo systemctl enable --now jerico-backup.timer`
+
+4. Check the next run with `systemctl list-timers jerico-backup.timer` and inspect logs with `journalctl -u jerico-backup.service`.
+
+The timer does not configure off-site storage or remote retention by itself. Those remain controlled by `RCLONE_REMOTE`, age encryption, and storage-provider lifecycle policy. The backup service runs with a restrictive umask and systemd hardening; review the service account and Docker socket access for your host.
