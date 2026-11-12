@@ -939,6 +939,24 @@ app.patch("/api/v1/projects/:projectId/alert-rules/:ruleId", async (context) => 
   return context.json({ data: updated });
 }));
 
+app.post("/api/v1/projects/:projectId/alert-rules/:ruleId/silence", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot silence alert rules." } }, 403);
+  const body = await context.req.json().catch(() => null) as { durationSeconds?: unknown } | null;
+  const allowed = [3600, 14400, 86400, 604800];
+  if (!body || typeof body.durationSeconds !== "number" || !allowed.includes(body.durationSeconds)) return context.json({ error: { code: "VALIDATION_ERROR", message: "Choose a silence duration of 1 hour, 4 hours, 24 hours, or 7 days." } }, 400);
+  const now = new Date();
+  const silencedUntil = new Date(now.getTime() + body.durationSeconds * 1000);
+  const [updated] = await database.update(alertRules).set({ silencedUntil, updatedAt: now }).where(and(eq(alertRules.id, context.req.param("ruleId")), eq(alertRules.projectId, context.req.param("projectId")), eq(alertRules.organizationId, organizationId))).returning();
+  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Alert rule not found in this project." } }, 404);
+  return context.json({ data: updated });
+}));
+
+app.post("/api/v1/projects/:projectId/alert-rules/:ruleId/unsilence", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot resume alert rules." } }, 403);
+  const [updated] = await database.update(alertRules).set({ silencedUntil: null, lastEvaluatedAt: null, updatedAt: new Date() }).where(and(eq(alertRules.id, context.req.param("ruleId")), eq(alertRules.projectId, context.req.param("projectId")), eq(alertRules.organizationId, organizationId))).returning();
+  if (!updated) return context.json({ error: { code: "NOT_FOUND", message: "Alert rule not found in this project." } }, 404);
+  return context.json({ data: updated });
+}));
 app.delete("/api/v1/projects/:projectId/alert-rules/:ruleId", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot manage alert rules." } }, 403);
   const projectId = context.req.param("projectId");

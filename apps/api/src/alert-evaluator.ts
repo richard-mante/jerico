@@ -29,7 +29,7 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
   return withDatabase(env, async (database) => {
     // Discover IDs only; mutable state comes from the atomic claim result.
     const candidates = await database.select({ id: alertRules.id }).from(alertRules)
-      .where(eq(alertRules.enabled, true));
+      .where(and(eq(alertRules.enabled, true), or(isNull(alertRules.silencedUntil), lte(alertRules.silencedUntil, now))));
     let evaluated = 0;
     let opened = 0;
     let resolved = 0;

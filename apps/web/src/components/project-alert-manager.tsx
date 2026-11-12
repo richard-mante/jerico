@@ -10,7 +10,7 @@ const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 type Metric = "error_count" | "uptime_down" | "response_time";
 type AlertRule = {
   id: string; name: string; metric: Metric; comparison: "gt" | "gte"; threshold: number;
-  windowSeconds: number; consecutiveBreaches: number; enabled: boolean; consecutiveCount: number;
+  windowSeconds: number; consecutiveBreaches: number; enabled: boolean; silencedUntil: string | null; consecutiveCount: number;
 };
 type Incident = {
   id: string; alertRuleId: string; title: string; assignedTo: string | null; status: "open" | "acknowledged" | "resolved";
@@ -134,6 +134,16 @@ export function ProjectAlertManager() {
       setError(cause instanceof Error ? cause.message : "Could not update alert rule.");
     } finally { setBusy(false); }
   }
+  async function silenceRule(rule: AlertRule, durationSeconds: number) {
+    setBusy(true); setError(""); setNotice("");
+    try { await request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules/${encodeURIComponent(rule.id)}/silence`, { method: "POST", body: JSON.stringify({ durationSeconds }) }); setNotice(`Alert rule snoozed for ${durationSeconds / 3600} hour${durationSeconds === 3600 ? "" : "s"}.`); await refresh(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not snooze alert rule."); } finally { setBusy(false); }
+  }
+  async function unsilenceRule(rule: AlertRule) {
+    setBusy(true); setError(""); setNotice("");
+    try { await request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules/${encodeURIComponent(rule.id)}/unsilence`, { method: "POST" }); setNotice("Alert rule resumed."); await refresh(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not resume alert rule."); } finally { setBusy(false); }
+  }
   async function deleteRule(rule: AlertRule) {
     if (!window.confirm(`Delete alert rule "${rule.name}" and its incident history?`)) return;
     setBusy(true); setError(""); setNotice("");
@@ -224,7 +234,7 @@ export function ProjectAlertManager() {
               <div className="flex items-center justify-between"><div><h2 className="font-semibold">Alert rules</h2><p className="mt-1 text-xs text-[#737b89]">Rules configured for this project</p></div><span className="text-xs text-[#929aaa]">{rules.length} total</span></div>
               <div className="mt-4 divide-y divide-white/10">
                 {rules.map((rule) => <div key={rule.id} className="py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{rule.name}</p><span className={`rounded-full px-2 py-1 text-[10px] ${rule.enabled ? "bg-[#d9f36a]/10 text-[#d9f36a]" : "bg-white/10 text-[#929aaa]"}`}>{rule.enabled ? "Enabled" : "Paused"}</span></div><p className="mt-2 text-xs text-[#929aaa]">{metricLabels[rule.metric]} · {rule.comparison === "gte" ? "≥" : ">"} {rule.threshold}{rule.metric === "response_time" ? " ms" : ""} · {Math.round(rule.windowSeconds / 60)}m window · {rule.consecutiveBreaches} consecutive</p></div><div className="flex gap-2"><button disabled={busy} onClick={() => beginEditRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Edit</button><button disabled={busy} onClick={() => void toggleRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">{rule.enabled ? "Pause" : "Enable"}</button><button disabled={busy} onClick={() => void deleteRule(rule)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 disabled:opacity-50">Delete</button></div></div>
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{rule.name}</p><span className={`rounded-full px-2 py-1 text-[10px] ${rule.enabled ? "bg-[#d9f36a]/10 text-[#d9f36a]" : "bg-white/10 text-[#929aaa]"}`}>{rule.enabled ? "Enabled" : "Paused"}</span></div><p className="mt-2 text-xs text-[#929aaa]">{metricLabels[rule.metric]} · {rule.comparison === "gte" ? "≥" : ">"} {rule.threshold}{rule.metric === "response_time" ? " ms" : ""} · {Math.round(rule.windowSeconds / 60)}m window · {rule.consecutiveBreaches} consecutive</p>{rule.silencedUntil && new Date(rule.silencedUntil).getTime() > Date.now() && <p className="mt-2 text-xs text-amber-200">Snoozed until {when(rule.silencedUntil)}</p>}</div><div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => beginEditRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Edit</button><button disabled={busy || !rule.enabled || Boolean(rule.silencedUntil && new Date(rule.silencedUntil).getTime() > Date.now())} onClick={() => void silenceRule(rule, 3600)} className="rounded-lg border border-amber-300/20 px-3 py-2 text-xs text-amber-100 disabled:opacity-40">Snooze 1h</button>{rule.silencedUntil && new Date(rule.silencedUntil).getTime() > Date.now() && <button disabled={busy} onClick={() => void unsilenceRule(rule)} className="rounded-lg border border-[#d9f36a]/20 px-3 py-2 text-xs text-[#d9f36a]">Resume</button>}<button disabled={busy} onClick={() => void toggleRule(rule)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">{rule.enabled ? "Pause" : "Enable"}</button><button disabled={busy} onClick={() => void deleteRule(rule)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 disabled:opacity-50">Delete</button></div></div>
                 </div>)}
                 {!rules.length && <p className="py-8 text-center text-sm text-[#737b89]">No alert rules yet. Create one to start monitoring a signal.</p>}
               </div>
