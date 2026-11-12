@@ -1,4 +1,6 @@
 import { telemetryEventSchema } from "@jerico/contracts";
+import { adaptCloudflareQueueBatch } from "@jerico/queue/cloudflare";
+import type { QueueBatch, QueueDelivery } from "@jerico/queue";
 import { probeEndpoint } from "./uptime-probe";
 import { deliverWebhook, isSafeWebhookUrl } from "./webhook-delivery";
 
@@ -183,7 +185,7 @@ async function processUptimeProbe(message: UptimeProbeMessage, env: WorkerEnv): 
   }
 }
 
-async function processUptimeDeadLetterBatch(batch: MessageBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
+async function processUptimeDeadLetterBatch(batch: QueueBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     const body = message.body;
     const valid = body?.schemaVersion === 1
@@ -232,7 +234,7 @@ async function processUptimeDeadLetterBatch(batch: MessageBatch<UptimeProbeMessa
   }
 }
 
-async function processUptimeProbeBatch(batch: MessageBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
+async function processUptimeProbeBatch(batch: QueueBatch<UptimeProbeMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     const body = message.body;
     const validMessage = body?.schemaVersion === 1
@@ -517,7 +519,7 @@ async function processWebhookNotification(message: WebhookNotificationMessage, e
   }
 }
 
-async function processNotificationDeadLetterBatch(batch: MessageBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
+async function processNotificationDeadLetterBatch(batch: QueueBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
       message.ack();
@@ -545,7 +547,7 @@ async function processNotificationDeadLetterBatch(batch: MessageBatch<Notificati
   }
 }
 
-async function processNotificationBatch(batch: MessageBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
+async function processNotificationBatch(batch: QueueBatch<NotificationMessage>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
     if (!isValidNotificationMessage(message.body, env.PROBE_WORKER_HOST)) {
       message.ack();
@@ -568,24 +570,25 @@ async function processNotificationBatch(batch: MessageBatch<NotificationMessage>
 
 export default {
   async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
+    const queueBatch = adaptCloudflareQueueBatch(batch);
     if (batch.queue === "jerico-notifications-dlq") {
-      await processNotificationDeadLetterBatch(batch as MessageBatch<NotificationMessage>, env);
+      await processNotificationDeadLetterBatch(queueBatch as QueueBatch<NotificationMessage>, env);
       return;
     }
     if (batch.queue === "jerico-uptime-probes-dlq") {
-      await processUptimeDeadLetterBatch(batch as MessageBatch<UptimeProbeMessage>, env);
+      await processUptimeDeadLetterBatch(queueBatch as QueueBatch<UptimeProbeMessage>, env);
       return;
     }
     if (batch.queue === "jerico-notifications") {
-      await processNotificationBatch(batch as MessageBatch<NotificationMessage>, env);
+      await processNotificationBatch(queueBatch as QueueBatch<NotificationMessage>, env);
       return;
     }
     if (batch.queue === "jerico-uptime-probes") {
-      await processUptimeProbeBatch(batch as MessageBatch<UptimeProbeMessage>, env);
+      await processUptimeProbeBatch(queueBatch as QueueBatch<UptimeProbeMessage>, env);
       return;
     }
-    const telemetryBatch = batch as MessageBatch<TelemetryMessage>;
-    const valid: Message<TelemetryMessage>[] = [];
+    const telemetryBatch = queueBatch as QueueBatch<TelemetryMessage>;
+    const valid: QueueDelivery<TelemetryMessage>[] = [];
     for (const message of telemetryBatch.messages) {
       if (!isValidTelemetryMessage(message.body)) {
         console.error("Discarding invalid Jerico telemetry queue message", {
