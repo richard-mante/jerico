@@ -887,3 +887,11 @@
 - Close remaining notification controls (quiet hours and escalation) and review the SDK integration/release experience.
 - Move into provider-neutral queue and self-hosted runtime/deployment implementation.
 - Keep `pnpm-lock.yaml` untouched; defer tests and builds.
+
+## 2026-11-12 — Provider-neutral queue foundation
+
+- Merged PR #106, accepting ADR 0001: PostgreSQL-backed queue for the self-hosted MVP; Cloudflare Queues remains the managed adapter. The decision defines publish, claim, lease fencing, ack, retry, dead-letter, health, retention, rollout, and operational requirements.
+- Opened issue #107 to track the full queue runtime implementation: PostgreSQL schema and SKIP LOCKED claims, bounded retries/dead letters, standalone Node worker, Cloudflare adapter parity, Docker Compose, and operational metrics.
+- Merged PR #108, adding the shared @jerico/queue publisher, delivery, batch, consumer, and health contracts. Added a structural Cloudflare batch adapter without importing Workers SDK types into the shared package. API and ingest publishers now use the shared publisher contract; Worker handlers consume the shared batch/delivery contract.
+- Cloudflare remains the active runtime. No PostgreSQL queue engine, standalone Node worker, or self-hosted deployment has been implemented yet.
+- pnpm-lock.yaml was not modified. Tests, typecheck, lint, builds, and runtime checks were not run; the user will handle manual validation.

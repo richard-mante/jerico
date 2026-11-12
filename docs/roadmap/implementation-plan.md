@@ -41,6 +41,9 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - PR #103 adds timezone-aware quiet hours per notification channel. Initial delivery, automatic enqueue retries, and manual retries are deferred until the local quiet window ends.
 - PR #104 adds configurable escalation delays for unacknowledged incidents, durable escalation activity, and per-channel escalation notifications.
 - PR #102 refreshed the product/incident lifecycle handover; the current state is now tracked through PR #104.
+- PR #106 records the accepted provider-neutral queue architecture: PostgreSQL-backed queue for self-hosted deployments and Cloudflare Queues for managed hosting.
+- PR #108 introduces the shared queue contracts and Cloudflare batch adapter, and adopts the shared contracts in API, ingest, and Worker handlers. The self-hosted queue engine is not implemented by this change.
+- Issue #107 tracks the PostgreSQL queue schema/operations, standalone Node worker, adapter parity, Docker Compose, and runtime acceptance criteria.
 - The latest known CI runner-allocation failure remains an infrastructure issue, not a source-check result. No successful full workspace validation or production runtime validation is confirmed.
 
 ## Phase 0 — Repository foundation
@@ -77,7 +80,8 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - [x] Add initial ClickHouse schema, order key, and TTL policy (apply and benchmark pending).
 - [x] Implement ingestion authentication, validation, redaction, configured rate limits, per-project daily quotas, and size limits (integration validation pending).
 - [x] Implement Cloudflare queue consumers, retries, and dead-letter routing (load/backpressure validation pending).
-- [ ] Implement the provider-neutral queue port and PostgreSQL-backed self-hosted adapter. The accepted design is documented in [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md); Cloudflare Queues remains the managed adapter until parity and recovery guarantees are demonstrated.
+- [x] Define provider-neutral queue publisher, delivery, batch, consumer, and health contracts; adapt API, ingest, and the Cloudflare Worker to the shared interfaces (PR #108; validation not yet run).
+- [ ] Implement the PostgreSQL-backed self-hosted queue engine, standalone Node worker, and Docker Compose runtime (see [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md) and [issue #107](https://github.com/richard-mante/jerico/issues/107)).
 - [ ] Add ingestion/processing health metrics and execute integration tests.
 
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
