@@ -425,7 +425,7 @@ async function recoverPendingIdempotencyRequests(env: Bindings): Promise<void> {
 
     return {
       recoveredCount: pending.length,
-      oldestPendingCreatedAt: pending[0]?.createdAt.toISOString() ?? null,
+      oldestRecoveredCreatedAt: pending[0]?.createdAt.toISOString() ?? null,
     };
   }));
 
