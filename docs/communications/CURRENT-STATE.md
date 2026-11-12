@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds, event-name redaction | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66, #68 | Merged |
 
-Latest merged reliability milestone: [PR #68 — redact sensitive telemetry event names](https://github.com/richard-mante/jerico/pull/68). Merge commit: `fbdda443b48ba6563238c810c3454e4644649f14`. Current implementation branch: `fix/ingest-idempotency-claim-race` (commit `69db56ee5d9e501e327e9b9e145a603fc2b67e1c`); not yet opened as a PR.
+Latest merged reliability milestone: [PR #68 — redact sensitive telemetry event names](https://github.com/richard-mante/jerico/pull/68). Merge commit: `fbdda443b48ba6563238c810c3454e4644649f14`. Open security follow-up: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70). Current implementation branch: `fix/ingest-idempotency-claim-race` (commit `69db56ee5d9e501e327e9b9e145a603fc2b67e1c`); not yet opened as a PR.
 
 ### Phase 5 notification capabilities
 
