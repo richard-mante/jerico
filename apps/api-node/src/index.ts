@@ -67,24 +67,29 @@ const queues = [uptimeQueue, notificationQueue];
 let server: ReturnType<typeof serve> | null = null;
 let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
 let maintenanceRunning = false;
+let activeMaintenance: Promise<void> | null = null;
 let lastDailyPruneDate = "";
 let shuttingDown = false;
 
 async function maintain(): Promise<void> {
   if (maintenanceRunning || shuttingDown) return;
   maintenanceRunning = true;
-  try {
+  activeMaintenance = (async () => {
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
     const includeDailyRetention = now.getUTCHours() >= 3 && lastDailyPruneDate !== today;
     await runScheduledApiMaintenance(bindings, includeDailyRetention);
     if (includeDailyRetention) lastDailyPruneDate = today;
-  } catch (error) {
+  })().catch((error) => {
     console.error("Self-hosted API maintenance failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
+  });
+  try {
+    await activeMaintenance;
   } finally {
     maintenanceRunning = false;
+    activeMaintenance = null;
   }
 }
 
@@ -142,6 +147,7 @@ async function shutdown(signal: string): Promise<void> {
       server!.close((error) => error ? reject(error) : resolve());
     });
   }
+  if (activeMaintenance) await activeMaintenance;
   await pool.end();
 }
 

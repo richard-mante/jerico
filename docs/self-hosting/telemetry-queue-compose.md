@@ -37,6 +37,12 @@ docker compose -f compose.self-hosted.yaml down
 
 To intentionally delete the PostgreSQL and ClickHouse volumes, use `docker compose -f compose.self-hosted.yaml down -v`.
 
+## Backup and restore
+
+- Create a consistent PostgreSQL + ClickHouse backup with `bash scripts/self-hosted/backup.sh`.
+- Restore a selected backup with `CONFIRM_DESTRUCTIVE_RESTORE=YES bash scripts/self-hosted/restore.sh YYYYMMDDTHHMMSSZ`.
+- Read the [backup and restore guide](./backup-restore.md) before running either script. Backups contain sensitive customer data and must be encrypted before off-site transfer.
+
 ## Current boundary
 
 - The managed Cloudflare API/ingest/worker deployment remains unchanged. The Compose Node API and ingestion service publish to PostgreSQL; their worker callbacks remain on the private Compose network.
