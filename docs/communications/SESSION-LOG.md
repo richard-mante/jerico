@@ -1020,7 +1020,7 @@
 
 ### 2026-11-12 — Self-hosted operational hardening through PR #161
 
-- PR #156 (`3a1d...`): bounded Docker JSON logs to 10 MiB × 5 files per service.
+- PR #156: bounded Docker JSON logs to 10 MiB × 5 files per service.
 - PR #157: common Caddy HTTPS security headers across dashboard/API/ingest; no CSP enforced pending origin validation.
 - PR #158: Caddy limits management API bodies to 2 MiB and telemetry ingestion event bodies to 1 MiB.
 - PR #159: `RESTORE_FROM_REMOTE=1` force-refreshes a timestamp's manifest, archives, and checksums from rclone remote before verification.
