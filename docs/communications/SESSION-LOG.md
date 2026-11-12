@@ -720,3 +720,18 @@
 
 ### Next
 - Continue ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
+
+
+## 2026-11-12 — ingestion idempotency publication race
+
+- Reviewed the PostgreSQL-backed idempotency and daily-quota reservation flow in `apps/ingest/src/index.ts`.
+- Confirmed that a pending idempotency row was read without a row lock, the transaction ended, and queue publication/status update happened afterward. Two concurrent retries could therefore both observe `pending` and publish the same envelope concurrently.
+- Updated the idempotent path to lock an existing request row with `SELECT ... FOR UPDATE`, and to hold the reservation transaction open through queue publication and the transition to `accepted`. For a new request, the idempotency row and daily quota reservation are in the same transaction as publication/status transition. Queue-send failure rolls back the database reservation so a later retry can safely try again.
+- This serializes concurrent retries for the same credential/key. It does not create a distributed transaction between PostgreSQL and Cloudflare Queues: a process/commit failure after queue acceptance can still result in a later duplicate publication. Stable event IDs and downstream ClickHouse deduplication remain necessary for that at-least-once boundary.
+- Branch: `fix/ingest-idempotency-claim-race`. Implementation commit: `69db56ee5d9e501e327e9b9e145a603fc2b67e1c`.
+- No tests, typecheck, lint, build, PostgreSQL concurrency test, or Cloudflare Queue runtime test were executed. The change requires review and real database/queue validation before merge.
+
+### Next
+- Add a PostgreSQL-backed concurrency regression test proving simultaneous identical retries produce one queue publication.
+- Validate transaction/queue failure behavior and lock duration against the deployed PostgreSQL/Hyperdrive and Cloudflare Queue runtime.
+- Continue the broader ingestion reliability review: quota boundary behavior, non-idempotent reservation/refund, expired-key cleanup, and queue consumer deduplication.
