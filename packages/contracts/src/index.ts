@@ -13,6 +13,9 @@ export const createProductSchema = z.object({
   description: z.string().trim().max(500).optional(),
   websiteUrl: z.string().url().max(2048).optional(),
 }).strict();
+export const updateProductSchema = createProductSchema.extend({ description: z.string().trim().max(500).nullable().optional(), websiteUrl: z.string().url().max(2048).nullable().optional(), status: z.enum(["active", "archived"]).optional() }).partial().strict()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one product field to update.");
+
 export const createProjectSchema = z.object({
   name: nameSchema,
   slug: slugSchema.optional(),

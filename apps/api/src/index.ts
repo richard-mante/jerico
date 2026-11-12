@@ -17,6 +17,7 @@ import {
   createIngestionKeySchema,
   createOrganizationSchema,
   createProductSchema,
+  updateProductSchema,
   createProjectSchema,
   updateProjectSchema,
   createUptimeMonitorSchema,
@@ -175,6 +176,21 @@ app.post("/api/v1/organizations", async (context) => withDatabase(context.env, a
 app.get("/api/v1/products", async (context) => withOrganization(context, async (database, organizationId) => {
   const rows = await database.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(asc(products.name));
   return context.json({ data: rows });
+}));
+app.get("/api/v1/products/:productId", async (context) => withOrganization(context, async (database, organizationId) => {
+  const [product] = await database.select().from(products).where(and(eq(products.id, context.req.param("productId")), eq(products.organizationId, organizationId))).limit(1);
+  if (!product) return context.json({ error: { code: "NOT_FOUND", message: "Product not found in this organization." } }, 404);
+  return context.json({ data: product });
+}));
+
+app.patch("/api/v1/products/:productId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot update products." } }, 403);
+  const parsed = updateProductSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The product details are invalid.", details: parsed.error.flatten() } }, 400);
+  const [existing] = await database.select({ id: products.id }).from(products).where(and(eq(products.id, context.req.param("productId")), eq(products.organizationId, organizationId))).limit(1);
+  if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Product not found in this organization." } }, 404);
+  try { const [updated] = await database.update(products).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(products.id, existing.id), eq(products.organizationId, organizationId))).returning(); return context.json({ data: updated }); }
+  catch (error) { if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "A product with this slug already exists in the organization." } }, 409); throw error; }
 }));
 app.post("/api/v1/products", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot create products." } }, 403);

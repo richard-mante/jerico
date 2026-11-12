@@ -4,7 +4,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { authClient } from "../lib/auth-client";
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-type Project = { id: string; name: string; slug: string; platform: "web" | "server" | "desktop" | "mobile" | "other"; framework: string | null; status: "active" | "archived" };
+type Product = { id: string; name: string; status: "active" | "archived" };
+type Project = { id: string; name: string; slug: string; productId: string | null; platform: "web" | "server" | "desktop" | "mobile" | "other"; framework: string | null; status: "active" | "archived" };
 const platforms = [{ value: "web", label: "Web application" }, { value: "server", label: "Backend / API" }, { value: "desktop", label: "Desktop application" }, { value: "mobile", label: "Mobile application" }, { value: "other", label: "Other" }];
 function slugify(value: string) { return value.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "project"; }
 export function ProjectSettingsManager() {
@@ -12,17 +13,19 @@ export function ProjectSettingsManager() {
   const { data: session, isPending } = authClient.useSession();
   const organizationId = session?.session.activeOrganizationId ?? "";
   const [project, setProject] = useState<Project | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productId, setProductId] = useState("");
   const [name, setName] = useState(""); const [slug, setSlug] = useState(""); const [platform, setPlatform] = useState<Project["platform"]>("web"); const [framework, setFramework] = useState("");
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
   async function request(path: string, init?: RequestInit) {
     const response = await fetch(apiBase + path, { ...init, credentials: "include", headers: { ...(init?.headers ?? {}), ...(init?.body ? { "Content-Type": "application/json" } : {}), "X-Jerico-Organization-Id": organizationId } });
     const payload = await response.json(); if (!response.ok) throw new Error(payload.error?.message ?? "The request could not be completed."); return payload.data;
   }
-  async function refresh() { if (!organizationId || !projectId) return; const row = await request(`/api/v1/projects/${encodeURIComponent(projectId)}`) as Project; setProject(row); setName(row.name); setSlug(row.slug); setPlatform(row.platform); setFramework(row.framework ?? ""); }
+  async function refresh() { if (!organizationId || !projectId) return; const [row, productRows] = await Promise.all([request(`/api/v1/projects/${encodeURIComponent(projectId)}`), request("/api/v1/products")]) as [Project, Product[]]; setProject(row); setProducts(productRows); setProductId(row.productId ?? ""); setName(row.name); setSlug(row.slug); setPlatform(row.platform); setFramework(row.framework ?? ""); }
   useEffect(() => { if (organizationId && projectId) void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load project settings.")); }, [organizationId, projectId]);
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
-    try { const updated = await request(`/api/v1/projects/${encodeURIComponent(projectId)}`, { method: "PATCH", body: JSON.stringify({ name: name.trim(), slug: slugify(slug || name), platform, framework: framework.trim() || null }) }) as Project; setProject(updated); setNotice("Project settings saved."); }
+    try { const updated = await request(`/api/v1/projects/${encodeURIComponent(projectId)}`, { method: "PATCH", body: JSON.stringify({ name: name.trim(), slug: slugify(slug || name), platform, framework: framework.trim() || null, productId: productId || null }) }) as Project; setProject(updated); setNotice("Project settings saved."); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save project settings."); } finally { setBusy(false); }
   }
   async function toggleArchive() {
@@ -41,6 +44,7 @@ export function ProjectSettingsManager() {
       <form onSubmit={save} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6"><h2 className="font-semibold">Project identity</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">Name</span><input required minLength={2} maxLength={80} value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3" /></label>
         <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">Slug</span><input required minLength={2} maxLength={60} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={slug} onChange={(event) => setSlug(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3" /></label>
+        <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">Product</span><select value={productId} onChange={(event) => setProductId(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3"><option value="">No product</option>{products.filter((item) => item.status === "active" || item.id === productId).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">Application type</span><select value={platform} onChange={(event) => setPlatform(event.target.value as Project["platform"])} className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3">{platforms.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label className="space-y-2 text-sm"><span className="text-[#a8afbd]">Framework (optional)</span><input maxLength={80} value={framework} onChange={(event) => setFramework(event.target.value)} placeholder="Next.js, Hono, Rails…" className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-4 py-3" /></label>
       </div><button disabled={busy} className="mt-5 rounded-xl bg-[#d9f36a] px-4 py-3 text-sm font-semibold text-[#15190b] disabled:opacity-50">{busy ? "Saving…" : "Save project"}</button></form>
