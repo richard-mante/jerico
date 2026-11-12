@@ -162,6 +162,13 @@
       "when": 1794507000000,
       "tag": "0022_durable_queue_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794508000000,
+      "tag": "0023_ingest_rate_limits",
+      "breakpoints": true
     }
   ]
 }
