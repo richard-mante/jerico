@@ -3,8 +3,8 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #78 — outbox recovery observability (`f68b84f637df72354c740e07c558cf5c6f982c1c`)  
-**Latest main merge:** PR #77 — `f68b84f637df72354c740e07c558cf5c6f982c1c`  
+**Latest feature merge:** PR #81 — notification delivery retry controls (`d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`)  
+**Latest main merge:** PR #81 — `d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`  
 **Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency outbox is durable, credential usage timestamps include idempotent requests, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds, event-name redaction | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66, #68 | Merged |
 
-Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72), [PR #75 — durable telemetry idempotency outbox](https://github.com/richard-mante/jerico/pull/75), and [PR #76 — update credential usage for idempotent requests](https://github.com/richard-mante/jerico/pull/76), and [PR #77 — outbox recovery observability](https://github.com/richard-mante/jerico/pull/77). Latest main commit: `f68b84f637df72354c740e07c558cf5c6f982c1c`.
+Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72), [PR #75 — durable telemetry idempotency outbox](https://github.com/richard-mante/jerico/pull/75), and [PR #76 — update credential usage for idempotent requests](https://github.com/richard-mante/jerico/pull/76),  [PR #77 — outbox recovery observability](https://github.com/richard-mante/jerico/pull/77), [PR #78 — recovery metric naming](https://github.com/richard-mante/jerico/pull/78), [PR #80 — manual notification retry API](https://github.com/richard-mante/jerico/pull/80), and [PR #81 — notification delivery history and retry controls](https://github.com/richard-mante/jerico/pull/81). Latest main commit: `d34f91ac2bc76e2bebafe7d6f3babf1f09bf88c4`.
 
 ### Phase 5 notification capabilities
 
@@ -98,7 +98,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 8. **Phase 6 — self-hosted release:** choose and benchmark a durable self-hosted queue adapter, add Docker Compose for web/API/ingest/workers/PostgreSQL/ClickHouse/queue, and validate a fresh Linux install and backup/restore.
 9. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
 
-Potential Phase 5 follow-ups include per-event notification preferences, quiet hours, escalation policies, manual retry controls, incident assignment/comments, and an audit timeline. Do not let these delay the essential validation and self-hosting release gates.
+Potential Phase 5 follow-ups include per-event notification preferences, quiet hours, escalation policies, incident assignment/comments, and an audit timeline. Manual retry controls are now implemented in PRs #80–#81. Do not let these delay the essential validation and self-hosting release gates.
 
 
 

@@ -124,14 +124,14 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [ ] Persistent volumes, health checks, secure setup, migrations, and environment validation.
 - [ ] Backup/restore test and upgrade instructions.
 - [ ] Retention configuration, TLS/reverse proxy guide, and resource sizing guide.
-- [ ] Fresh-install end-to-end test on a clean Linux server.
+- [ ] Fresh-install validation on a clean Linux server (deferred until implementation is complete).
 
 **Acceptance:** A developer can self-host Jerico and monitor an instrumented application without our hosted infrastructure.
 
 ## Phase 7 — Public beta hardening
-- [ ] Cross-tenant security review and SSRF/abuse testing.
-- [ ] Queue failure/recovery and ClickHouse performance tests.
-- [ ] Ingestion load tests and query performance tests.
+- [ ] Cross-tenant security and SSRF/abuse review (deferred until implementation is complete).
+- [ ] Queue failure/recovery and ClickHouse performance validation (deferred by current implementation-first instruction).
+- [ ] Ingestion load and query performance validation (deferred by current implementation-first instruction).
 - [ ] Verify retention, deletion, and secret redaction.
 - [ ] Accessibility and responsive UI review.
 - [ ] License/dependency review, security disclosure process, docs review.
@@ -161,3 +161,9 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [ ] Verify concurrent request/Cron publishers, quota-once behavior, and recovery throughput against PostgreSQL/Hyperdrive and Cloudflare Queues.
 - [ ] Verify identical event identity/timestamps collapse in ClickHouse `FINAL`, including month-boundary fixtures.
 - [x] Update `project_ingestion_keys.last_used_at` for new and matching idempotent requests in PR #76; conflicts and expired keys do not update it.
+
+### Manual notification recovery implementation
+- [x] Owner/admin-only manual retry endpoint for failed notification deliveries (PR #80).
+- [x] Conditional failed-row claim, fresh enqueue token, verified-channel/incident checks, and queue failure recovery (PR #80).
+- [x] Project Alerts & Incidents screen shows delivery history and offers retry for failed deliveries (PR #81).
+- [ ] Add per-event channel preferences, quiet hours, and escalation policies where they fit the product's initial release.
