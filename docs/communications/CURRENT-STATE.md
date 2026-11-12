@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14`  
-**Latest main merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14`  
-**Current milestone:** Phase 5E reliability hardening — implementation through Phase 5E is present; ingestion idempotency publication serialization is in branch `fix/ingest-idempotency-claim-race`; manual/runtime validation and infrastructure provisioning remain release blockers.
+**Latest feature merge:** PR #72 — `b0ca6d15a6616d4f10836a75212253573407b7d3`  
+**Latest main merge:** PR #72 — `b0ca6d15a6616d4f10836a75212253573407b7d3`  
+**Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency publication race is serialized, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -44,7 +44,7 @@ All implementation PRs through Phase 5E are merged into `main`:
 | Phase 5E — signed webhook notifications | #33 | Merged |
 | Phase 5 reliability hardening — ClickHouse bounds, notification enqueue retries, alert-evaluation leases, uptime scheduling, outbox/callback fencing, DLQ finalization, stale uptime result fencing, notification channel deletion fencing, ClickHouse read-time deduplication, future ingestion timestamp bounds, event-name redaction | #39, #41, #43–#44, #49, #53, #56, #58, #60, #62, #64, #66, #68 | Merged |
 
-Latest merged reliability milestone: [PR #68 — redact sensitive telemetry event names](https://github.com/richard-mante/jerico/pull/68). Merge commit: `fbdda443b48ba6563238c810c3454e4644649f14`. Open security follow-up: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70). Current implementation branch: `fix/ingest-idempotency-claim-race` (commit `69db56ee5d9e501e327e9b9e145a603fc2b67e1c`); not yet opened as a PR.
+Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assignment redaction](https://github.com/richard-mante/jerico/pull/70), [PR #71 — serialize idempotent queue publication](https://github.com/richard-mante/jerico/pull/71), and [PR #72 — validate telemetry queue envelopes](https://github.com/richard-mante/jerico/pull/72). Latest main commit: `b0ca6d15a6616d4f10836a75212253573407b7d3`.
 
 ### Phase 5 notification capabilities
 
@@ -88,14 +88,15 @@ Do not store any of these secrets in the repository. Use deployment secret store
 
 ## Outstanding work and next sequence
 
-1. **Ingestion idempotency race:** review branch `fix/ingest-idempotency-claim-race`; add a PostgreSQL-backed simultaneous-retry regression test and validate queue failure/commit ambiguity before merge.
-2. **Validation foundation:** restore GitHub-hosted runner allocation or establish a reachable local validation environment. The user will generate and commit the missing `pnpm-lock.yaml`; do not fabricate or modify it. Once it is present and a runner is available, install dependencies, run lint/typecheck/tests/build, and fix all findings. Latest run #213 failed before workflow steps were recorded; this is not a source-check result.
-3. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
-4. **Telemetry validation:** run ClickHouse integration tests and verify ingestion/query behavior, deduplication, and retention.
-5. **Phase 5 runtime validation:** exercise Cron → uptime queue → public probe → callback → PostgreSQL, and incident → notification queue → email/webhook → callback → delivery history, including retry and DLQ cases.
-6. **Security review:** cross-tenant authorization, webhook/uptime SSRF, public-only Worker egress, secret handling, replay protection, redaction, and retention/deletion.
-7. **Phase 6 — self-hosted release:** choose and benchmark a durable self-hosted queue adapter, add Docker Compose for web/API/ingest/workers/PostgreSQL/ClickHouse/queue, and validate a fresh Linux install and backup/restore.
-8. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
+1. **Ingestion idempotency validation:** PR #71 is merged. Add a PostgreSQL-backed simultaneous-retry regression test and validate queue failure/commit ambiguity. The PostgreSQL/Cloudflare Queue boundary is not a distributed transaction; stable event IDs and downstream deduplication remain essential.
+2. **ClickHouse event identity and deduplication:** the current `ReplacingMergeTree` uses `PARTITION BY toYYYYMM(timestamp)` and an `ORDER BY` containing `timestamp` before `event_id`. An idempotent retry can retain the same event ID but receive a different fallback timestamp when the queue publish succeeded and the PostgreSQL transaction did not commit; `FINAL` cannot collapse rows with different sorting keys or across month partitions. Design and test a durable identity-preserving solution before changing the table key or partitioning.  
+3. **Validation foundation:** restore GitHub-hosted runner allocation or establish a reachable local validation environment. The user will generate and commit the missing `pnpm-lock.yaml`; do not fabricate or modify it. Once it is present and a runner is available, install dependencies, run lint/typecheck/tests/build, and fix all findings. Latest run #213 failed before workflow steps were recorded; this is not a source-check result.
+4. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
+5. **Telemetry validation:** run ClickHouse integration tests and verify ingestion/query behavior, deduplication, and retention.
+6. **Phase 5 runtime validation:** exercise Cron → uptime queue → public probe → callback → PostgreSQL, and incident → notification queue → email/webhook → callback → delivery history, including retry and DLQ cases.
+7. **Security review:** cross-tenant authorization, webhook/uptime SSRF, public-only Worker egress, secret handling, replay protection, redaction, and retention/deletion.
+8. **Phase 6 — self-hosted release:** choose and benchmark a durable self-hosted queue adapter, add Docker Compose for web/API/ingest/workers/PostgreSQL/ClickHouse/queue, and validate a fresh Linux install and backup/restore.
+9. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
 
 Potential Phase 5 follow-ups include per-event notification preferences, quiet hours, escalation policies, manual retry controls, incident assignment/comments, and an audit timeline. Do not let these delay the essential validation and self-hosting release gates.
 
@@ -172,3 +173,12 @@ Merged PR #66. Ingestion now rejects a telemetry batch if any client-supplied ev
 ### 2026-11-03 telemetry event-name redaction
 
 Merged PR #68. Ingestion now applies the existing deterministic text-redaction patterns to event names as well as messages and string-valued attributes. This covers common emails, bearer credentials, JWTs, and password/token/API-key assignments that might otherwise be persisted and exposed through event catalogues. Static event names remain unchanged. Tests were added but not executed; manual ingestion/ClickHouse validation remains outstanding. No migration was required.
+
+
+### 2026-11-12 — reliability PRs #70–#72
+
+- PR #70 merged OAuth-style secret assignment redaction for snake_case, kebab-case, and camelCase token/secret keys in telemetry text and string attributes.
+- PR #71 merged serialization of same-key idempotent ingestion retries by locking the idempotency row through queue publication and the accepted-state update. This narrows the concurrent double-publication race but does not create a distributed transaction between PostgreSQL and Cloudflare Queues.
+- PR #72 merged Worker-side validation of telemetry queue envelopes against the shared telemetry event contract, including schema version, tenant/project/environment identity, accepted timestamp, event count, event IDs, and event payloads. Invalid messages are currently acknowledged and discarded; valid messages that exhaust queue retries route to the configured telemetry DLQ, which remains operator-managed and has no Worker consumer configured.
+- These PRs add regression tests, but no test, typecheck, lint, build, PostgreSQL integration, or ClickHouse integration run has been verified. The GitHub Actions runner allocation failure remains unresolved; do not treat it as a source-check result.
+- Current ClickHouse identity risk: `ReplacingMergeTree` partitions by event timestamp and sorts by tenant/project/environment, timestamp, event type, then event ID. A same-ID retry with a different fallback timestamp can therefore survive `FINAL`; month-boundary timestamp changes also cross partitions. A durable fix is under design and must preserve retention, query pagination, aggregation semantics, and tenant isolation.
