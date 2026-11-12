@@ -13,12 +13,15 @@
   "dependencies": {
     "@jerico/queue": "workspace:*",
     "@jerico/worker": "workspace:*",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "ipaddr.js": "^2.2.0",
+    "undici": "^7.16.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
     "@types/pg": "^8.15.5",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@cloudflare/workers-types": "^5.20261101.1"
   }
 }
