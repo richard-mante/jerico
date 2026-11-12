@@ -20,7 +20,7 @@ export const createProjectSchema = z.object({
   framework: z.string().trim().max(80).optional(),
   platform: z.enum(["web", "server", "desktop", "mobile", "other"]),
 }).strict();
-export const updateProjectSchema = createProjectSchema.extend({ status: z.enum(["active", "archived"]).optional() }).partial().strict()
+export const updateProjectSchema = createProjectSchema.extend({ framework: z.string().trim().max(80).nullable().optional(), status: z.enum(["active", "archived"]).optional() }).partial().strict()
   .refine((value) => Object.keys(value).length > 0, "Provide at least one project field to update.");
 
 export const createEnvironmentSchema = z.object({
