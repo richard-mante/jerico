@@ -13,9 +13,10 @@ type AlertRule = {
   windowSeconds: number; consecutiveBreaches: number; enabled: boolean; consecutiveCount: number;
 };
 type Incident = {
-  id: string; alertRuleId: string; title: string; status: "open" | "acknowledged" | "resolved";
+  id: string; alertRuleId: string; title: string; assignedTo: string | null; status: "open" | "acknowledged" | "resolved";
   triggerValue: number; startedAt: string; lastTriggeredAt: string; resolvedAt: string | null;
 };
+type TeamMember = { userId: string; name: string; email: string; role: string };
 type IncidentActivity = { id: string; activityType: "opened" | "acknowledged" | "resolved" | "note"; body: string | null; actorId: string | null; actorName: string | null; actorEmail: string | null; createdAt: string };
 type NotificationDelivery = {
   id: string; incidentId: string; channelId: string; target: string; eventType: string;
@@ -39,6 +40,7 @@ export function ProjectAlertManager() {
   const organizationId = session?.session.activeOrganizationId ?? "";
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [activity, setActivity] = useState<Record<string, IncidentActivity[]>>({});
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
@@ -70,14 +72,16 @@ export function ProjectAlertManager() {
   }
   async function refresh() {
     if (!organizationId || !projectId) return;
-    const [rulePayload, incidentPayload, deliveryPayload] = await Promise.all([
+    const [rulePayload, incidentPayload, deliveryPayload, memberPayload] = await Promise.all([
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules`),
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents?limit=50`),
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries?limit=50`),
+      request(`/api/v1/projects/${encodeURIComponent(projectId)}/members`),
     ]);
     setRules((rulePayload.data ?? []) as AlertRule[]);
     setIncidents((incidentPayload.data ?? []) as Incident[]);
     setDeliveries((deliveryPayload.data ?? []) as NotificationDelivery[]);
+    setTeamMembers((memberPayload.data ?? []) as TeamMember[]);
   }
   useEffect(() => {
     if (!organizationId || !projectId) return;
@@ -153,6 +157,14 @@ export function ProjectAlertManager() {
   }
 
 
+  async function assignIncident(incident: Incident, assignedTo: string | null) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incident.id)}/assignee`, { method: "PATCH", body: JSON.stringify({ assignedTo }) });
+      setNotice(assignedTo ? "Incident assignment updated." : "Incident unassigned."); await refresh();
+      if (activity[incident.id]) { const payload = await request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incident.id)}/activity`); setActivity((current) => ({ ...current, [incident.id]: (payload.data ?? []) as IncidentActivity[] })); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not assign incident."); } finally { setBusy(false); }
+  }
   async function toggleIncidentActivity(incidentId: string) {
     if (expandedIncidentId === incidentId) { setExpandedIncidentId(null); return; }
     setExpandedIncidentId(incidentId); if (activity[incidentId]) return;
@@ -233,7 +245,7 @@ export function ProjectAlertManager() {
               <div className="flex items-center justify-between"><div><h2 className="font-semibold">Incidents</h2><p className="mt-1 text-xs text-[#737b89]">Active and recent incident history</p></div><span className="text-xs text-[#929aaa]">{incidents.filter((item) => item.status !== "resolved").length} active</span></div>
               <div className="mt-4 divide-y divide-white/10">
                 {incidents.map((incident) => <div key={incident.id} className="py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{incident.title}</p><span className={`rounded-full px-2 py-1 text-[10px] ${incident.status === "resolved" ? "bg-white/10 text-[#929aaa]" : incident.status === "acknowledged" ? "bg-blue-400/10 text-blue-300" : "bg-red-400/10 text-red-300"}`}>{incident.status}</span></div><p className="mt-2 text-xs text-[#929aaa]">Triggered value: {incident.triggerValue} · Started {when(incident.startedAt)}</p>{incident.resolvedAt && <p className="mt-1 text-xs text-[#737b89]">Resolved {when(incident.resolvedAt)}</p>}</div><div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => void toggleIncidentActivity(incident.id)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{expandedIncidentId === incident.id ? "Hide activity" : "Activity"}</button>{incident.status === "open" && <button disabled={busy} onClick={() => void updateIncident(incident, "acknowledge")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Acknowledge</button>}{incident.status !== "resolved" && <button disabled={busy} onClick={() => void updateIncident(incident, "resolve")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Resolve</button>}</div></div>
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{incident.title}</p><span className={`rounded-full px-2 py-1 text-[10px] ${incident.status === "resolved" ? "bg-white/10 text-[#929aaa]" : incident.status === "acknowledged" ? "bg-blue-400/10 text-blue-300" : "bg-red-400/10 text-red-300"}`}>{incident.status}</span></div><p className="mt-2 text-xs text-[#929aaa]">Triggered value: {incident.triggerValue} · Started {when(incident.startedAt)}</p><label className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#929aaa]">Assigned to <select disabled={busy || incident.status === "resolved"} value={incident.assignedTo ?? ""} onChange={(event) => void assignIncident(incident, event.target.value || null)} className="rounded-lg border border-white/10 bg-[#0c1018] px-2 py-1.5 text-xs text-[#e3e7ef]"><option value="">Unassigned</option>{teamMembers.map((person) => <option key={person.userId} value={person.userId}>{person.name} · {person.email}</option>)}</select></label>{incident.resolvedAt && <p className="mt-1 text-xs text-[#737b89]">Resolved {when(incident.resolvedAt)}</p>}</div><div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => void toggleIncidentActivity(incident.id)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{expandedIncidentId === incident.id ? "Hide activity" : "Activity"}</button>{incident.status === "open" && <button disabled={busy} onClick={() => void updateIncident(incident, "acknowledge")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Acknowledge</button>}{incident.status !== "resolved" && <button disabled={busy} onClick={() => void updateIncident(incident, "resolve")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Resolve</button>}</div></div>
                   {expandedIncidentId === incident.id && <div className="mt-4 border-t border-white/[0.07] pt-4">
                     <h4 className="text-xs font-semibold text-[#a8afbd]">Incident activity</h4>
                     <div className="mt-3 space-y-3">{(activity[incident.id] ?? []).map((item) => <div key={item.id} className="rounded-xl border border-white/[0.07] bg-black/10 p-3">
