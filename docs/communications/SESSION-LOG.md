@@ -1027,3 +1027,12 @@
 - PR #160: self-hosted ClickHouse retention job, defaulting to 7-day logs and 30-day other events, with per-category `0` disable controls; API and queue worker wait for the one-shot job.
 - PR #161: persist applied retention policy and skip repeated TTL alterations; recognize existing 7/30-day DDL defaults on first boot without rematerializing existing parts.
 - No Compose parse, Caddy validation, ClickHouse SQL, rclone, backup/restore, Linux/systemd, tests, typecheck, or runtime validation was executed.
+
+
+### 2026-11-12 — Provider-neutral payload limits and byte-aware SDK batching
+
+- PR #163 adds ClickHouse retention settings to the preflight duplicate-key guard.
+- PR #164 changes the retention-policy lookup to native TSV columns.
+- PR #165 defines a 120,000-byte shared queue payload ceiling and applies it to the PostgreSQL adapter, leaving headroom under Cloudflare Queues' 128 KB message cap. The managed ingestion endpoint already limits raw request bodies to 96 KiB.
+- PR #166 adds SDK `maxBatchBytes` (80 KiB default, 96 KiB maximum), measures serialized request size, and rejects individually oversized events through the non-throwing error callback.
+- PR #166 merged as `554be19bd8f7174f4aabf9e4901477819dbe1c13`. No builds, typecheck, tests, queue sends, or runtime validation were run.
