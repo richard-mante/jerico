@@ -72,6 +72,14 @@ for key in POSTGRES_PASSWORD CLICKHOUSE_PASSWORD; do
   value="$(read_env "$key")"
   [[ "$value" =~ ^[A-Za-z0-9]{32,}$ ]] || fail "$key must use at least 32 URL-safe alphanumeric characters for the Compose DATABASE_URL."
 done
+for retention_key in CLICKHOUSE_LOG_RETENTION_DAYS CLICKHOUSE_EVENT_RETENTION_DAYS; do
+  retention_value="$(read_env "$retention_key")"
+  if [[ -n "$retention_value" ]]; then
+    require_single_value "$retention_key"
+    [[ "$retention_value" =~ ^[0-9]+$ ]] && (( retention_value <= 3650 )) || fail "$retention_key must be an integer between 0 and 3650."
+  fi
+done
+
 queue_retention_days="$(read_env QUEUE_RETENTION_DAYS)"
 if [[ -n "$queue_retention_days" ]]; then
   require_single_value QUEUE_RETENTION_DAYS
