@@ -58,3 +58,16 @@ The SDK core now generates one UUID idempotency key per batch and reuses the exa
 ## Core Web Vitals ratings
 
 When `captureWebVitals: true`, the browser SDK attaches a unit (`ms` for time-based metrics, `score` for CLS) and a rating. Thresholds are LCP 2500/4000 ms, INP 200/500 ms, CLS 0.1/0.25, FCP 1800/3000 ms, and TTFB 800/1800 ms for good/needs-improvement boundaries. These ratings are based on the captured page values; field aggregation and official-library equivalence still require validation.
+
+
+## Package build output and release boundary
+
+The three SDK packages now have a compiled ESM package layout:
+
+- `pnpm --filter @jerico/sdk-core build`
+- `pnpm --filter @jerico/sdk-browser build` (build core first)
+- `pnpm --filter @jerico/sdk-node build` (build core first)
+
+Each package emits JavaScript, source maps, and TypeScript declarations to `dist/`. The browser package uses explicit `.js` relative specifiers so emitted ESM imports are compatible with NodeNext-style package output. Turbo's typecheck task builds workspace package dependencies first so declaration entrypoints exist before downstream typechecking.
+
+The packages intentionally remain `private: true`. Do not publish until the build output is validated, the ingestion endpoint and SDK compatibility are exercised, sample apps are executed, package metadata and licensing are approved, and a release/changelog policy is agreed. No npm publish workflow or credentials are configured by this change.

@@ -1,6 +1,6 @@
 import { JericoClient, type JericoClientOptions, type LogLevel, type SpanContext, type TelemetryValue } from "@jerico/sdk-core";
-import { isPublicWebVitalMetric, rateWebVital } from "./web-vitals";
-import { resolveRoutePath } from "./route-path";
+import { isPublicWebVitalMetric, rateWebVital } from "./web-vitals.js";
+import { resolveRoutePath } from "./route-path.js";
 
 export type BrowserJericoOptions = JericoClientOptions & {
   capturePageViews?: boolean;
