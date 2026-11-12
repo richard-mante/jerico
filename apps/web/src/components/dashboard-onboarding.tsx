@@ -110,7 +110,7 @@ export function DashboardOnboarding() {
       <div className="mx-auto max-w-5xl">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
           <Link href="/" className="flex items-center gap-3 text-lg font-semibold"><span className="grid size-9 place-items-center rounded-xl bg-[#d9f36a] text-sm font-black text-[#15190b]">J</span>jerico</Link>
-          <div className="flex items-center gap-4 text-sm text-[#a8afbd]"><span>{session.user.name}</span><button onClick={() => authClient.signOut()} className="hover:text-white">Sign out</button></div>
+          <div className="flex items-center gap-4 text-sm text-[#a8afbd]"><Link href="/dashboard/team" className="hover:text-white">Team</Link><span>{session.user.name}</span><button onClick={() => authClient.signOut()} className="hover:text-white">Sign out</button></div>
         </header>
 
         <section className="py-12">
