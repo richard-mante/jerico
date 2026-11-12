@@ -6,6 +6,8 @@ COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/compose.self-hosted.yaml}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"
 STAMP="${1:-}"
 
+[[ ! -L "$ROOT/.env" ]] || { echo ".env must not be a symbolic link." >&2; exit 1; }
+
 read_dotenv() {
   local key="$1"
   local value=""
@@ -62,6 +64,9 @@ if [[ -f "$POSTGRES_FILE.age" && -f "$CLICKHOUSE_FILE.age" ]]; then
     echo "The age command is required to decrypt this backup." >&2
     exit 1
   fi
+  [[ -f "$AGE_IDENTITY" && ! -L "$AGE_IDENTITY" ]] || { echo "AGE_IDENTITY must be an existing regular private-key file." >&2; exit 1; }
+  identity_mode="$(stat -c "%a" "$AGE_IDENTITY")"
+  [[ "$identity_mode" == "600" || "$identity_mode" == "400" ]] || { echo "AGE_IDENTITY must have mode 0600 or 0400." >&2; exit 1; }
 fi
 for file in "$POSTGRES_FILE" "$CLICKHOUSE_FILE" "$POSTGRES_FILE.sha256" "$CLICKHOUSE_FILE.sha256"; do
   if [[ ! -f "$file" ]]; then
