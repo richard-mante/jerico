@@ -99,6 +99,8 @@ export type UptimeProbeResult = z.infer<typeof uptimeProbeResultSchema>;
 
 
 
+export const createIncidentNoteSchema = z.object({ body: z.string().trim().min(1).max(2000) }).strict();
+
 export const createAlertRuleSchema = z.object({
   name: z.string().trim().min(2).max(80),
   metric: z.enum(["error_count", "uptime_down", "response_time"]),
