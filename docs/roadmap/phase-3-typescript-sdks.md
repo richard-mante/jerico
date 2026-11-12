@@ -16,7 +16,7 @@ All packages are TypeScript-first workspace packages. They are intentionally pri
 
 The SDK requires both a project ingestion key and an explicit endpoint. No hosted Jerico ingest domain is assumed.
 
-- Browser applications must use a `jk_pub_` key. Public keys can submit events, errors, and only the allowlisted `web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, and `web.vitals.ttfb` metrics. Other browser metrics, logs, and spans remain blocked.
+- Browser applications must use a `jk_pub_` key. Public keys can submit events, errors, and only the allowlisted `web.vitals.lcp`, `web.vitals.cls`, `web.vitals.inp`, `web.vitals.fcp`, and `web.vitals.ttfb` metrics. Other browser metrics, logs, and spans remain blocked. Core Web Vitals are measured with the official `web-vitals` library rather than a hand-built PerformanceObserver approximation.
 - Node.js applications must use a `jk_sec_` key. Secret keys must never be exposed to browser code.
 - The browser SDK captures pathname and document title for page views; it does not collect query strings or URL fragments.
 - Automatic browser error capture is enabled by default and can be disabled.
@@ -57,7 +57,7 @@ The SDK core now generates one UUID idempotency key per batch and reuses the exa
 
 ## Core Web Vitals ratings
 
-When `captureWebVitals: true`, the browser SDK attaches a unit (`ms` for time-based metrics, `score` for CLS) and a rating. Thresholds are LCP 2500/4000 ms, INP 200/500 ms, CLS 0.1/0.25, FCP 1800/3000 ms, and TTFB 800/1800 ms for good/needs-improvement boundaries. These ratings are based on the captured page values; field aggregation and official-library equivalence still require validation.
+When `captureWebVitals: true`, the browser SDK uses Google's `web-vitals` package (`onLCP`, `onCLS`, `onINP`, `onFCP`, and `onTTFB`) and forwards the official metric value, rating, ID, navigation type, and delta. Jerico still enforces the public-key metric allowlist and attaches units/path context. Runtime behavior and browser compatibility remain unvalidated.
 
 
 ## Package build output and release boundary
