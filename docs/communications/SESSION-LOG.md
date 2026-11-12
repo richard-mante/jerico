@@ -805,3 +805,13 @@
 ### Next
 - Rename the log field to `oldestRecoveredCreatedAt` for precision if revisiting this code; current field is `oldestPendingCreatedAt` and represents the oldest row in the recovered batch.
 - Add PostgreSQL-backed tests for durable outbox failure modes and validate recovery transaction duration/backlog behavior against the actual runtime.
+
+### 2026-11-12 — outbox recovery metric naming (PR #78)
+
+- Renamed the recovery log field from `oldestPendingCreatedAt` to `oldestRecoveredCreatedAt`. The selected rows are marked accepted in the same transaction, so the old field name incorrectly described their post-recovery state.
+- PR #78 merged to `main` as `c7c50eaae141da6ab7c201da8a63381fb8a1c47e`.
+- No GitHub Actions/builds were run (commit uses `[skip ci]`); no local tests or builds were run.
+
+### Next
+- Add PostgreSQL-backed failure-injection and concurrency coverage for the durable ingestion outbox.
+- Validate ClickHouse `FINAL` deduplication for identical stored envelopes, including month-boundary fixtures.
