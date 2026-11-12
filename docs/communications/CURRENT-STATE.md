@@ -5,7 +5,7 @@
 **Main branch:** `main`  
 **Latest feature merge:** PR #146 — backup credential file guards (`f747d93765ba9125069fb3cb4ddeb9058f62295b`)  
 **Latest main merge:** PR #147 — roadmap/handover refresh (`ab5dd7c7f4ceaf1082ae9c71eb0632880dee9064`)  
-**Current milestone:** The self-hosted Compose stack now includes the Next.js dashboard, Node management and ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy automatic HTTPS. Backup/restore scripts now cover PostgreSQL and ClickHouse with checksums, an explicit destructive-restore gate, and optional age encryption. The Compose web dependency syntax was corrected in PR #127. The Linux deployment preflight, baseline sizing guidance, opt-in local backup retention, non-root Node/web images, and reduced-capability app containers are now present. Restore drills, fresh-install validation, storage-provider lifecycle/retention, measured resource sizing, SDK package validation/publication, and runtime verification remain outstanding.
+**Current milestone:** The self-hosted Compose stack includes the Next.js dashboard, Node management/ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy HTTPS. Backup/restore covers PostgreSQL and ClickHouse with checksums, destructive-restore confirmation, optional age encryption, opt-in local retention, and optional rclone encrypted off-site upload/verification/restore. Environment bootstrap/preflight and non-root/reduced-capability application containers are implemented. Remaining gates: clean Linux install, local and off-host restore drills, storage-provider lifecycle policy, measured resource sizing, SDK validation/publication, and runtime/security verification.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -76,7 +76,7 @@ Latest merged reliability milestones: [PR #70 — OAuth-style token/secret assig
 
 Before exercising the notification pipeline in a non-production environment:
 
-1. Apply migrations through `0014_uptime_active_check_fencing.sql` (includes notification enqueue retry migration 0009, alert evaluation lease migration 0010, channel organization FK migration 0011, and outbox lease migration 0012).
+1. Apply every checked-in migration through the latest entry in `packages/database/drizzle/meta/_journal.json` (currently through the durable queue and incident escalation migrations) (includes notification enqueue retry migration 0009, alert evaluation lease migration 0010, channel organization FK migration 0011, and outbox lease migration 0012).
 2. Provision `jerico-uptime-probes`, `jerico-uptime-probes-dlq`, `jerico-notifications`, and `jerico-notifications-dlq`.
 3. Configure matching `UPTIME_RESULTS_SECRET` on API and Worker.
 4. Configure matching `NOTIFICATION_DELIVERY_SECRET` on API and Worker.
