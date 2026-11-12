@@ -141,6 +141,8 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [ ] Complete clean Linux install, restore drill, backup encryption/off-site retention, resource sizing, and production operational hardening.
 - [x] Persistent PostgreSQL/ClickHouse volumes, service health checks, secret templates, and Drizzle migration execution are configured in the initial Compose slice (runtime validation pending).
 - [x] Implement backup/restore scripts and operator guide (PR #124; a real restore test is still required).
+- [x] Add optional age encryption for backup archives and private-key-based restore (PR #128; encrypted restore drill still required).
+- [x] Correct Compose dashboard/API dependency syntax (PR #127; full Compose validation still required).
 - [x] Configure Caddy automatic HTTPS and document DNS/ACME/firewall setup (PR #123; not verified).
 - [ ] Add resource sizing and production retention/operations guidance.
 - [ ] Fresh-install validation on a clean Linux server (deferred until implementation is complete).
@@ -276,6 +278,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Caddy automatic HTTPS reverse proxy for app/API/ingestion domains (PR #123; certificate validation pending).
 - [x] PostgreSQL custom-format and ClickHouse native backup/restore scripts, checksums, and explicit destructive restore confirmation (PR #124; restore drill pending).
 - [ ] Validate a clean Linux installation and perform a full restore exercise.
-- [ ] Add backup encryption/off-site storage and define retention policy.
+- [x] Add optional age backup encryption (PR #128; configure an off-host private identity and test restore).
+- [ ] Define encrypted off-site storage and backup retention policy.
 - [ ] Complete security review, resource sizing, monitoring, and production hardening.
 - [ ] Run typecheck, lint, build, Docker/Compose validation, migration, DNS/SSRF, and live database checks before release.
