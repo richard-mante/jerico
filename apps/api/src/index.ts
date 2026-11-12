@@ -11,6 +11,7 @@ import {
   createAlertRuleSchema,
   updateAlertRuleSchema,
   createEnvironmentSchema,
+  updateEnvironmentSchema,
   createIngestionKeySchema,
   createOrganizationSchema,
   createProductSchema,
@@ -626,6 +627,42 @@ app.post("/api/v1/projects/:projectId/environments", async (context) => withOrga
     throw error;
   }
 }));
+app.patch("/api/v1/projects/:projectId/environments/:environmentId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Your organization role cannot update environments." } }, 403);
+  const projectId = context.req.param("projectId");
+  const parsed = updateEnvironmentSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "The environment details are invalid.", details: parsed.error.flatten() } }, 400);
+  const [existing] = await database.select({ id: environments.id, isProduction: environments.isProduction })
+    .from(environments).where(and(
+      eq(environments.id, context.req.param("environmentId")),
+      eq(environments.projectId, projectId),
+      eq(environments.organizationId, organizationId),
+    )).limit(1);
+  if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Environment not found in this project." } }, 404);
+  try {
+    const updated = await database.transaction(async (transaction) => {
+      if (parsed.data.isProduction === true) {
+        await transaction.update(environments).set({ isProduction: false }).where(and(
+          eq(environments.organizationId, organizationId), eq(environments.projectId, projectId),
+          eq(environments.isProduction, true),
+        ));
+      }
+      const [row] = await transaction.update(environments).set({
+        ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+        ...(parsed.data.slug !== undefined ? { slug: parsed.data.slug } : {}),
+        ...(parsed.data.isProduction !== undefined ? { isProduction: parsed.data.isProduction } : {}),
+      }).where(and(
+        eq(environments.id, existing.id), eq(environments.projectId, projectId), eq(environments.organizationId, organizationId),
+      )).returning();
+      return row;
+    });
+    return context.json({ data: updated });
+  } catch (error) {
+    if (isUniqueViolation(error)) return context.json({ error: { code: "SLUG_CONFLICT", message: "An environment with this slug already exists for the project." } }, 409);
+    throw error;
+  }
+}));
+
 
 
 
