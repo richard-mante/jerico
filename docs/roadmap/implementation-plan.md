@@ -66,11 +66,15 @@ All of the above describes merged implementation, **not verified runtime behavio
 
 ### 1. Self-hosted release verification
 
+- [x] Add secure first-run `.env` bootstrap and host preflight (PRs #130 and #139).
 - [ ] Perform a clean Linux installation using `init-env.sh`, preflight, and Compose.
 - [ ] Verify PostgreSQL migrations, API/auth, ingestion, queue publishing/consumption, ClickHouse writes/queries, uptime probes, and notification delivery.
+- [x] Add restore manifest timestamp/format/archive/encryption verification before destructive restore (PR #149).
+- [x] Add optional daily systemd backup service/timer (PR #150).
 - [ ] Execute plaintext and age-encrypted local backup/restore drills.
 - [ ] Execute rclone upload, remote verification, and off-host restore against a disposable remote.
 - [ ] Configure storage-provider lifecycle/versioning and retention policy; the scripts never delete remote objects.
+- [x] Add daily terminal queue cleanup for completed and dead-lettered rows with configurable retention (PR #152).
 - [ ] Verify graceful shutdown, restart recovery, queue leases, dead-letter replay, and service health behavior.
 - [ ] Measure CPU, memory, disk, ClickHouse growth, queue throughput, and query latency under realistic workloads; current sizing values are starting guidance only.
 
@@ -81,7 +85,8 @@ All of the above describes merged implementation, **not verified runtime behavio
 - [ ] Review webhook signature replay protection, notification retry/DLQ behavior, secret rotation, redaction, and retention/deletion.
 - [ ] Define production alerting/monitoring for queue depth, oldest message age, dead letters, outbox backlog, ClickHouse failures, and service health.
 - [ ] Complete accessibility and responsive UI review.
-- [ ] Establish a security disclosure process and complete documentation review.
+- [x] Add `SECURITY.md` private vulnerability disclosure guidance (PR #151; GitHub private reporting still needs repository configuration).
+- [ ] Enable/configure private vulnerability reporting and complete documentation review.
 
 ### 3. Ingestion reliability verification
 

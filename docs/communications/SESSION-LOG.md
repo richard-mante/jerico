@@ -998,3 +998,12 @@
 - Merged PR #144 (`b47b9c6bf5b1add4a15d8b0336281a36c48366bf`): optional rclone encrypted off-site backup uploads and remote verification; restore can download missing timestamped artifacts/checksums/manifest. Requires age encryption for uploads. No remote objects are deleted; configure storage lifecycle separately.
 - Merged PR #146 (`f747d93765ba9125069fb3cb4ddeb9058f62295b`): backup/restore scripts reject symlinked `.env`, validate age identity file permissions, and preflight rejects duplicate optional backup settings.
 - No shell syntax, rclone, age, backup/restore, SDK build, typecheck, tests, Compose, Docker, or runtime checks were run. `pnpm-lock.yaml` remains untouched.
+
+
+### 2026-11-12 — Operational restore, scheduled backup, security, and queue retention
+
+- Merged PR #149 (`4d3111036aea9af1b5729e5d8e6b8e429dfe2839`): restore requires a matching manifest and checks timestamp, format, archive names, and encryption mode before verifying SHA-256 and stopping services.
+- Merged PR #150 (`b1660610a4dafa4f42c6d91a56b666174c06e2be`): optional systemd service/timer schedules daily backups at 02:30 UTC, catches up after downtime, uses a restrictive umask and systemd hardening, and disables start timeout for long backup jobs.
+- Merged PR #151 (`3e707e2f4fe71c48173f008bee51859195b05482`): expanded `SECURITY.md` with private vulnerability reporting instructions, scope, and handling expectations. GitHub private reporting still needs repository-level configuration.
+- Merged PR #152 (`380771dddc3f8c371127d0380b15e5dd24199bad`): queue worker prunes completed/dead-lettered rows at startup and daily using `QUEUE_RETENTION_DAYS` (default 7, range 1–365). The setting is wired through Compose and preflight.
+- No Linux systemd, queue retention, manifest restore, backup/restore, Compose, Docker, tests, typecheck, lint, or runtime validation was executed. No production-readiness claim is made.
