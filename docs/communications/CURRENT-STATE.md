@@ -95,7 +95,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 5. **Phase 5 runtime validation:** exercise Cron → uptime queue → public probe → callback → PostgreSQL, and incident → notification queue → email/webhook → callback → delivery history, including retry and DLQ cases.
 6. **Security review:** cross-tenant authorization, webhook/uptime SSRF, public-only Worker egress, secret handling, replay protection, redaction, and retention/deletion.
 7. **Phase 6 — self-hosted release:** choose and benchmark a durable self-hosted queue adapter, add Docker Compose for web/API/ingest/workers/PostgreSQL/ClickHouse/queue, and validate a fresh Linux install and backup/restore.
-7. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
+8. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
 
 Potential Phase 5 follow-ups include per-event notification preferences, quiet hours, escalation policies, manual retry controls, incident assignment/comments, and an audit timeline. Do not let these delay the essential validation and self-hosting release gates.
 
