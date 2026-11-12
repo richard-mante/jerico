@@ -22,7 +22,9 @@ restart_services() {
     "${compose[@]}" start api ingest queue-worker >/dev/null
   fi
 }
-trap restart_services EXIT INT TERM
+trap restart_services EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Pause all writers so PostgreSQL and ClickHouse snapshots represent one
 # application-consistent point in time. stop_grace_period lets queue workers
