@@ -13,7 +13,9 @@
   "dependencies": {
     "@jerico/queue": "workspace:*",
     "@jerico/worker": "workspace:*",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "ipaddr.js": "^2.2.0",
+    "undici": "^7.16.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
