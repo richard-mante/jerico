@@ -959,6 +959,8 @@ app.get("/api/v1/projects/:projectId/notification-deliveries", async (context) =
     eventType: notificationDeliveries.eventType,
     status: notificationDeliveries.status,
     attempts: notificationDeliveries.attempts,
+    enqueueAttempts: notificationDeliveries.enqueueAttempts,
+    providerMessageId: notificationDeliveries.providerMessageId,
     lastErrorCode: notificationDeliveries.lastErrorCode,
     lastAttemptAt: notificationDeliveries.lastAttemptAt,
     sentAt: notificationDeliveries.sentAt,
