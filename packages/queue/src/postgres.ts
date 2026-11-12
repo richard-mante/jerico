@@ -266,6 +266,88 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
     };
   }
 
+  async listDeadLetters(limit = 50): Promise<Array<{
+    id: string;
+    attempts: number;
+    maxAttempts: number;
+    lastErrorCode: string | null;
+    createdAt: Date;
+    completedAt: Date | null;
+  }>> {
+    boundedInteger(limit, 1, 100, "dead-letter limit");
+    const result = await this.pool.query<{
+      id: string;
+      attempts: number;
+      max_attempts: number;
+      last_error_code: string | null;
+      created_at: Date;
+      completed_at: Date | null;
+    }>(
+      `SELECT id, attempts, max_attempts, last_error_code, created_at, completed_at
+       FROM queue_messages
+       WHERE queue_name = $1 AND status = 'dead_lettered'
+       ORDER BY completed_at DESC NULLS LAST, created_at DESC
+       LIMIT $2`,
+      [this.queueName, limit],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      attempts: row.attempts,
+      maxAttempts: row.max_attempts,
+      lastErrorCode: row.last_error_code,
+      createdAt: row.created_at,
+      completedAt: row.completed_at,
+    }));
+  }
+
+  async getDeadLetter(messageId: string): Promise<{
+    id: string;
+    payload: TMessage;
+    attempts: number;
+    maxAttempts: number;
+    lastErrorCode: string | null;
+    createdAt: Date;
+    completedAt: Date | null;
+  } | null> {
+    const result = await this.pool.query<{
+      id: string;
+      payload: TMessage;
+      attempts: number;
+      max_attempts: number;
+      last_error_code: string | null;
+      created_at: Date;
+      completed_at: Date | null;
+    }>(
+      `SELECT id, payload, attempts, max_attempts, last_error_code, created_at, completed_at
+       FROM queue_messages
+       WHERE id = $1 AND queue_name = $2 AND status = 'dead_lettered'
+       LIMIT 1`,
+      [messageId, this.queueName],
+    );
+    const row = result.rows[0];
+    return row ? {
+      id: row.id,
+      payload: row.payload,
+      attempts: row.attempts,
+      maxAttempts: row.max_attempts,
+      lastErrorCode: row.last_error_code,
+      createdAt: row.created_at,
+      completedAt: row.completed_at,
+    } : null;
+  }
+
+  async replayDeadLetter(messageId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE queue_messages
+       SET status = 'available', attempts = 0, available_at = now(),
+           lease_token = NULL, lease_expires_at = NULL, last_error_code = NULL,
+           completed_at = NULL, updated_at = now()
+       WHERE id = $1 AND queue_name = $2 AND status = 'dead_lettered'`,
+      [messageId, this.queueName],
+    );
+    return result.rowCount === 1;
+  }
+
   async prune(retentionDays = 7, now = new Date()): Promise<number> {
     boundedInteger(retentionDays, 1, 365, "retentionDays");
     const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
