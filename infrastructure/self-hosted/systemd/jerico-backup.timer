@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Jerico self-hosted database backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+RandomizedDelaySec=20m
+AccuracySec=1m
+Unit=jerico-backup.service
+
+[Install]
+WantedBy=timers.target
