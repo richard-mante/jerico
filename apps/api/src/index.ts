@@ -1625,27 +1625,28 @@ export { app };
 
 export async function runScheduledApiMaintenance(env: ApiServerBindings, includeDailyRetention = false): Promise<void> {
   const tasks = [
-    evaluateAlertRules(env).catch((error) => {
-      console.error("Jerico alert evaluation failed", error instanceof Error ? error.message : String(error));
-    }),
-    scheduleDueUptimeMonitors(env).catch((error) => {
-      console.error("Jerico uptime scheduling failed", error instanceof Error ? error.message : String(error));
-    }),
-    withDatabase(env, (database) => retryFailedNotificationEnqueues(database, env, new Date())).catch((error) => {
-      console.error("Jerico notification enqueue reconciliation failed", error instanceof Error ? error.message : String(error));
-    }),
+    evaluateAlertRules(env),
+    scheduleDueUptimeMonitors(env),
+    withDatabase(env, (database) => retryFailedNotificationEnqueues(database, env, new Date())),
   ];
-  if (includeDailyRetention) {
-    tasks.push(pruneUptimeCheckHistory(env).catch((error) => {
-      console.error("Jerico uptime history retention failed", error instanceof Error ? error.message : String(error));
-    }));
+  if (includeDailyRetention) tasks.push(pruneUptimeCheckHistory(env));
+  const results = await Promise.allSettled(tasks);
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length) {
+    for (const failure of failures) {
+      console.error("Jerico scheduled API maintenance task failed", {
+        errorName: failure.reason instanceof Error ? failure.reason.name : "UnknownError",
+      });
+    }
+    throw new AggregateError(failures.map((failure) => failure.reason), "One or more API maintenance tasks failed.");
   }
-  await Promise.all(tasks);
 }
 
 export default {
   fetch: app.fetch.bind(app),
   scheduled(controller: ScheduledController, env: AppEnvironment["Bindings"], context: ExecutionContext) {
-    context.waitUntil(runScheduledApiMaintenance(env, controller.cron === "0 3 * * *"));
+    context.waitUntil(runScheduledApiMaintenance(env, controller.cron === "0 3 * * *").catch((error) => {
+      console.error("Jerico scheduled API maintenance failed", error instanceof Error ? error.message : String(error));
+    }));
   },
 };
