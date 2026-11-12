@@ -937,3 +937,12 @@
 - Backups are not encrypted by the scripts and are not automatically pruned. Encrypt before off-site transfer, configure retention, and preserve the Caddy data volume separately. The restore workflow has not been exercised.
 - PR #124 merged as `e7228b16ec28bfd1bed1c4938b12b8e6746fe7ee`.
 - No tests, typecheck, lint, build, Docker build, Compose validation, migrations, restore drill, or live database runtime checks were run. No validation is claimed. `pnpm-lock.yaml` was not modified.
+
+
+### 2026-11-12 — Self-hosted Compose correction and encrypted backups
+
+- Merged PR #127 (`206a86ec2c82f7ef9f4136032580725a0cd99879`): fixed malformed `web.depends_on` YAML in `compose.self-hosted.yaml`; dashboard now waits for API health and keeps its 40-second stop grace period.
+- Merged PR #128 (`44b5bc2cb134559d42d3fbb24542beca3a9e30d1`): optional age encryption for PostgreSQL and ClickHouse backup artifacts. The backup script checks for the `age` executable before stopping writers, encrypts both archives, removes plaintext copies, and checksums the encrypted outputs. Restore supports prior plaintext backups and encrypted archives, verifies checksums before downtime, requires an explicit private identity, decrypts to a private temporary directory, and cleans up on exit.
+- Updated backup/restore guide and `.env.example` with `AGE_RECIPIENT` and `AGE_IDENTITY` usage. The private identity must be kept outside the host/backup set.
+- No lockfile changes. No Compose parse, shell syntax, backup, restore, age encryption, migration, Docker build, tests, typecheck, lint, or runtime checks were run. Do not treat the implementation as validated.
+- Next: add a self-hosted deployment preflight and resource-sizing guidance, then complete a clean Linux install and actual encrypted/plaintext restore drills when validation is resumed.
