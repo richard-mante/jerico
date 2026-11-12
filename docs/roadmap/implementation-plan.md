@@ -288,6 +288,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Add opt-in local manifest-backed backup retention (PR #132; default disabled).
 - [x] Run application containers as non-root and drop unnecessary capabilities (PRs #133–#134; runtime compatibility pending).
 - [x] Add optional encrypted off-site backup upload/restore through rclone (PR #144; remote restore not exercised).
+- [x] Harden `.env`, age identity, and duplicate backup configuration handling (PR #146).
 - [ ] Configure storage-provider lifecycle/versioning policy and perform an off-host restore drill.
 - [ ] Complete security review, measured resource sizing, monitoring, and production hardening.
 - [ ] Run typecheck, lint, build, Docker/Compose validation, migration, DNS/SSRF, and live database checks before release.
