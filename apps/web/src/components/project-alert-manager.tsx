@@ -17,7 +17,7 @@ type Incident = {
   triggerValue: number; startedAt: string; lastTriggeredAt: string; resolvedAt: string | null;
 };
 type TeamMember = { userId: string; name: string; email: string; role: string };
-type IncidentActivity = { id: string; activityType: "opened" | "acknowledged" | "resolved" | "reopened" | "note"; body: string | null; actorId: string | null; actorName: string | null; actorEmail: string | null; createdAt: string };
+type IncidentActivity = { id: string; activityType: "opened" | "acknowledged" | "resolved" | "reopened" | "escalated" | "note"; body: string | null; actorId: string | null; actorName: string | null; actorEmail: string | null; createdAt: string };
 type NotificationDelivery = {
   id: string; incidentId: string; channelId: string; target: string; eventType: string;
   status: "queued" | "sent" | "failed"; attempts: number; enqueueAttempts: number;
