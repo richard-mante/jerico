@@ -15,6 +15,29 @@ export type EmailNotificationMessage = {
 const MAX_ENQUEUE_ATTEMPTS = 5;
 const ENQUEUE_RETRY_BASE_MS = 60_000;
 const ENQUEUE_RETRY_MAX_MS = 60 * 60_000;
+type QuietHoursChannel = { quietHoursEnabled: boolean; quietHoursStart: string; quietHoursEnd: string; timezone: string };
+function getLocalTimeParts(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute") };
+}
+function localDateTimeToUtc(year: number, month: number, day: number, hour: number, minute: number, timezone: string) {
+  const target = Date.UTC(year, month - 1, day, hour, minute); let guess = target;
+  for (let attempt = 0; attempt < 3; attempt += 1) { const local = getLocalTimeParts(new Date(guess), timezone); const represented = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute); guess += target - represented; }
+  return new Date(guess);
+}
+export function nextNotificationDeliveryAt(channel: QuietHoursChannel, now = new Date()): Date {
+  if (!channel.quietHoursEnabled) return now;
+  const [startHour, startMinute] = channel.quietHoursStart.split(":").map(Number); const [endHour, endMinute] = channel.quietHoursEnd.split(":").map(Number);
+  const start = startHour * 60 + startMinute; const end = endHour * 60 + endMinute;
+  const local = getLocalTimeParts(now, channel.timezone); const current = local.hour * 60 + local.minute;
+  const quiet = start < end ? current >= start && current < end : current >= start || current < end;
+  if (!quiet) return now;
+  const nextDay = start > end && current >= start; const targetDay = new Date(Date.UTC(local.year, local.month - 1, local.day + (nextDay ? 1 : 0)));
+  const scheduled = localDateTimeToUtc(targetDay.getUTCFullYear(), targetDay.getUTCMonth() + 1, targetDay.getUTCDate(), endHour, endMinute, channel.timezone);
+  return scheduled.getTime() > now.getTime() ? scheduled : new Date(scheduled.getTime() + 24 * 60 * 60 * 1000);
+}
+
 export const NOTIFICATION_ENQUEUE_LEASE_MS = 2 * 60_000;
 
 function isEventEnabled(channel: { notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean }, eventType: IncidentNotificationEvent): boolean {
@@ -114,8 +137,10 @@ export async function queueIncidentNotifications(
 
   for (const channel of eligibleChannels) {
     const enqueueStartedAt = new Date();
-    const enqueueLeaseExpiresAt = notificationEnqueueLeaseExpiresAt(enqueueStartedAt);
-    const enqueueToken = crypto.randomUUID();
+    const scheduledAt = nextNotificationDeliveryAt(channel, enqueueStartedAt);
+    const deferredByQuietHours = scheduledAt.getTime() > enqueueStartedAt.getTime();
+    const enqueueLeaseExpiresAt = deferredByQuietHours ? scheduledAt : notificationEnqueueLeaseExpiresAt(enqueueStartedAt);
+    const enqueueToken = deferredByQuietHours ? null : crypto.randomUUID();
     const [delivery] = await database.insert(notificationDeliveries).values({
       id: crypto.randomUUID(),
       organizationId: incident.organizationId,
@@ -126,7 +151,7 @@ export async function queueIncidentNotifications(
       eventType,
       eventKey,
       status: "queued",
-      enqueueAttempts: 1,
+      enqueueAttempts: deferredByQuietHours ? 0 : 1,
       nextEnqueueAt: enqueueLeaseExpiresAt,
       activeEnqueueToken: enqueueToken,
       activeConsumerAttempt: 0,
@@ -137,7 +162,7 @@ export async function queueIncidentNotifications(
       eventType: notificationDeliveries.eventType,
       createdAt: notificationDeliveries.createdAt,
     });
-    if (!delivery) continue;
+    if (!delivery || deferredByQuietHours) continue;
 
     const message = buildNotificationMessage({ ...delivery, enqueueToken }, channel, incident, env);
     if (!message) {
