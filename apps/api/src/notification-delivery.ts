@@ -266,6 +266,19 @@ export async function retryFailedNotificationEnqueues(
       continue;
     }
 
+    const scheduledAt = nextNotificationDeliveryAt(channel, now);
+    if (scheduledAt.getTime() > now.getTime()) {
+      await database.update(notificationDeliveries).set({
+        status: "queued", lastErrorCode: null, nextEnqueueAt: scheduledAt, activeEnqueueToken: null, updatedAt: now,
+      }).where(and(
+        eq(notificationDeliveries.id, delivery.id),
+        eq(notificationDeliveries.status, delivery.status),
+        eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
+        eq(notificationDeliveries.attempts, delivery.attempts),
+      ));
+      continue;
+    }
+
     if (!channel || !incident) {
       await database.update(notificationDeliveries).set({
         status: "failed",
@@ -406,6 +419,17 @@ export async function retryNotificationDelivery(
   if (!env.NOTIFICATIONS) return "queue_unavailable";
 
   const now = new Date();
+  const scheduledAt = nextNotificationDeliveryAt(channel, now);
+  if (scheduledAt.getTime() > now.getTime()) {
+    const [scheduled] = await database.update(notificationDeliveries).set({
+      status: "queued", enqueueAttempts: 0, nextEnqueueAt: scheduledAt, enqueuedAt: null,
+      activeEnqueueToken: null, activeConsumerAttempt: 0, lastErrorCode: null, updatedAt: now,
+    }).where(and(
+      eq(notificationDeliveries.id, delivery.id), eq(notificationDeliveries.status, "failed"),
+      eq(notificationDeliveries.updatedAt, delivery.updatedAt),
+    )).returning({ id: notificationDeliveries.id });
+    return scheduled ? "scheduled" : "not_retryable";
+  }
   const leaseExpiresAt = notificationEnqueueLeaseExpiresAt(now);
   const enqueueToken = crypto.randomUUID();
   const [claimed] = await database.update(notificationDeliveries).set({
