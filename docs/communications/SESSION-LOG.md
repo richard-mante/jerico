@@ -827,3 +827,15 @@
 - Continue completing user-facing functionality, not tests: inspect the uptime monitor experience and close any gaps between monitor configuration, current status, and check history.
 - Then complete incident operations and notification configuration; proceed to the self-hosted runtime/queue adapter and deployment experience.
 - Keep `pnpm-lock.yaml` untouched.
+### 2026-11-12 — manual one-off uptime checks (PR #83)
+
+- Added an owner/admin-only API action to enqueue an immediate uptime probe for a configured monitor.
+- The one-off check uses a fresh active-check token, so stale results cannot overwrite newer monitor state. Queue-send rollback clears only the matching token and does not alter the monitor's enabled state or scheduled cadence.
+- Added a Check now action to the uptime dashboard. It is disabled when the probe queue is not configured.
+- PR #83 merged to `main` as `d503e59e11316f3bf394f16bf69fbaae0a9c8297`.
+- No tests or builds were run. No GitHub Actions/builds were requested.
+
+### Next
+- Continue functional implementation: incident workflow improvements, notification configuration controls, and self-hosted queue/runtime support.
+- Do not spend time writing tests or triggering builds until the user asks to resume validation.
+- Keep `pnpm-lock.yaml` untouched.
