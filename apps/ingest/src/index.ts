@@ -404,10 +404,12 @@ async function publishPendingIdempotencyRequest(env: Bindings, requestRecordId: 
 
 async function recoverPendingIdempotencyRequests(env: Bindings): Promise<void> {
   if (!env.TELEMETRY_QUEUE) throw new Error("Telemetry queue is not configured.");
-  await withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
+  const startedAt = Date.now();
+  const recovered = await withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
     const pending = await transaction.select({
       id: projectIngestionRequests.id,
       envelope: projectIngestionRequests.envelope,
+      createdAt: projectIngestionRequests.createdAt,
     }).from(projectIngestionRequests)
       .where(eq(projectIngestionRequests.status, "pending"))
       .orderBy(projectIngestionRequests.createdAt)
@@ -420,7 +422,20 @@ async function recoverPendingIdempotencyRequests(env: Bindings): Promise<void> {
       await transaction.update(projectIngestionRequests).set({ status: "accepted" })
         .where(eq(projectIngestionRequests.id, record.id));
     }
+
+    return {
+      recoveredCount: pending.length,
+      oldestPendingCreatedAt: pending[0]?.createdAt.toISOString() ?? null,
+    };
   }));
+
+  if (recovered.recoveredCount > 0) {
+    console.info("Telemetry idempotency outbox recovery completed", {
+      ...recovered,
+      durationMs: Date.now() - startedAt,
+      batchLimitReached: recovered.recoveredCount === 100,
+    });
+  }
 }
 
 async function purgeExpiredIdempotencyRequests(env: Bindings): Promise<void> {
