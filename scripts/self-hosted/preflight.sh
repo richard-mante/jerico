@@ -17,13 +17,14 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; }
 info() { echo "OK: $*"; }
 
-for command_name in docker getent awk df ss grep getconf; do
+for command_name in docker getent awk df ss grep getconf stat; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Required command '$command_name' is not installed."
 done
 
 docker info >/dev/null 2>&1 || fail "Docker daemon is not reachable for the current user."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 plugin is required."
-[[ -f "$ENV_FILE" ]] || fail "Missing $ENV_FILE. Copy infrastructure/self-hosted/.env.example to .env first."
+[[ -f "$ENV_FILE" ]] || fail "Missing $ENV_FILE. Run scripts/self-hosted/init-env.sh first."
+[[ ! -L "$ENV_FILE" ]] || fail ".env must be a regular file, not a symbolic link."
 [[ -f "$COMPOSE_FILE" ]] || fail "Compose file not found: $COMPOSE_FILE"
 
 chmod 600 "$ENV_FILE"
@@ -33,8 +34,16 @@ read_env() {
   awk -F= -v key="$1" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
 }
 
+require_single_value() {
+  local key="$1"
+  local count
+  count="$(grep -cE "^${key}=" "$ENV_FILE" || true)"
+  [[ "$count" == "1" ]] || fail "$key must appear exactly once in .env."
+}
+
 require_secret() {
   local key="$1"
+  require_single_value "$key"
   local minimum="$2"
   local value
   value="$(read_env "$key")"
@@ -46,6 +55,7 @@ require_secret() {
 
 require_value() {
   local key="$1"
+  require_single_value "$key"
   local value
   value="$(read_env "$key")"
   [[ -n "$value" ]] || fail "$key is missing from .env."
@@ -66,8 +76,18 @@ for key in APP_DOMAIN API_DOMAIN INGEST_DOMAIN ACME_EMAIL; do
   require_value "$key"
 done
 
-if [[ -n "$(read_env AGE_RECIPIENT)" ]] && ! command -v age >/dev/null 2>&1; then
-  fail "AGE_RECIPIENT is configured, but age is not installed on this host."
+if [[ -n "$(read_env AGE_RECIPIENT)" ]]; then
+  require_single_value AGE_RECIPIENT
+  if ! command -v age >/dev/null 2>&1; then
+    fail "AGE_RECIPIENT is configured, but age is not installed on this host."
+  fi
+  identity_path="$(read_env AGE_IDENTITY)"
+  if [[ -n "$identity_path" ]]; then
+    require_single_value AGE_IDENTITY
+    [[ -f "$identity_path" && ! -L "$identity_path" ]] || fail "AGE_IDENTITY must point to an existing regular private-key file."
+    identity_mode="$(stat -c "%a" "$identity_path")"
+    [[ "$identity_mode" == "600" || "$identity_mode" == "400" ]] || fail "AGE_IDENTITY must have mode 0600 or 0400."
+  fi
 fi
 
 docker compose -f "$COMPOSE_FILE" config --quiet || fail "Compose configuration is invalid or required environment values are missing."
