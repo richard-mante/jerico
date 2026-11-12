@@ -25,6 +25,8 @@ export const createEnvironmentSchema = z.object({
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   isProduction: z.boolean().default(false),
 }).strict();
+export const updateEnvironmentSchema = createEnvironmentSchema.partial().strict()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one environment field to update.");
 export const createOrganizationSchema = z.object({ name: nameSchema, slug: slugSchema }).strict();
 
 export const createIngestionKeySchema = z.object({
