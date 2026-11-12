@@ -45,6 +45,48 @@ services:
       postgres:
         condition: service_healthy
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/queue-worker/Dockerfile
+    command: ["pnpm", "--filter", "@jerico/api-node", "start"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATABASE_URL: postgresql://jerico:${POSTGRES_PASSWORD}@postgres:5432/jerico
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL in .env}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      WEB_APP_URL: ${WEB_APP_URL:?Set WEB_APP_URL in .env}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      UPTIME_RESULTS_SECRET: ${UPTIME_RESULTS_SECRET:?Set UPTIME_RESULTS_SECRET in .env}
+      NOTIFICATION_DELIVERY_SECRET: ${NOTIFICATION_DELIVERY_SECRET:?Set NOTIFICATION_DELIVERY_SECRET in .env}
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?Set WEBHOOK_ENCRYPTION_KEY in .env}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: jerico
+      CLICKHOUSE_TABLE: telemetry_events
+      CLICKHOUSE_USERNAME: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-5}
+      DATABASE_POOL_MAX: ${API_DATABASE_POOL_MAX:-12}
+    ports:
+      - "127.0.0.1:${API_PORT:-8787}:8787"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   ingest:
     build:
       context: .
@@ -90,6 +132,16 @@ services:
       CLICKHOUSE_USERNAME: ${CLICKHOUSE_USER:-default}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       QUEUE_ADMIN_TOKEN: ${QUEUE_ADMIN_TOKEN:?Set QUEUE_ADMIN_TOKEN in .env}
+      API_URL: http://api:8787
+      ALLOW_INTERNAL_API_HTTP: "true"
+      PROBE_WORKER_HOST: api
+      UPTIME_RESULTS_SECRET: ${UPTIME_RESULTS_SECRET:?Set UPTIME_RESULTS_SECRET in .env}
+      NOTIFICATION_DELIVERY_SECRET: ${NOTIFICATION_DELIVERY_SECRET:?Set NOTIFICATION_DELIVERY_SECRET in .env}
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?Set WEBHOOK_ENCRYPTION_KEY in .env}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      UPTIME_QUEUE_NAME: jerico-uptime-probes
+      NOTIFICATION_QUEUE_NAME: jerico-notifications
       TELEMETRY_QUEUE_NAME: jerico-telemetry
       QUEUE_MAX_ATTEMPTS: ${QUEUE_MAX_ATTEMPTS:-5}
       QUEUE_BATCH_SIZE: ${QUEUE_BATCH_SIZE:-20}
@@ -101,6 +153,8 @@ services:
       migrate:
         condition: service_completed_successfully
       clickhouse:
+        condition: service_healthy
+      api:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8789/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
