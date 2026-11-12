@@ -2,7 +2,7 @@ import { and, asc, eq, gte, isNotNull, isNull, lte, lt, or, sql } from "drizzle-
 import { incidents, notificationChannels, notificationDeliveries } from "@jerico/database/schema";
 import type { ApiBindings, JericoDatabase } from "./database";
 
-export type IncidentNotificationEvent = "incident.opened" | "incident.acknowledged" | "incident.resolved";
+export type IncidentNotificationEvent = "incident.opened" | "incident.acknowledged" | "incident.resolved" | "incident.reopened";
 export type EmailNotificationMessage = {
   schemaVersion: 1;
   type: "notification.email";
@@ -17,9 +17,10 @@ const ENQUEUE_RETRY_BASE_MS = 60_000;
 const ENQUEUE_RETRY_MAX_MS = 60 * 60_000;
 export const NOTIFICATION_ENQUEUE_LEASE_MS = 2 * 60_000;
 
-function isEventEnabled(channel: { notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean }, eventType: IncidentNotificationEvent): boolean {
+function isEventEnabled(channel: { notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean }, eventType: IncidentNotificationEvent): boolean {
   if (eventType === "incident.opened") return channel.notifyOnOpened;
   if (eventType === "incident.acknowledged") return channel.notifyOnAcknowledged;
+  if (eventType === "incident.reopened") return channel.notifyOnReopened;
   return channel.notifyOnResolved;
 }
 
@@ -58,7 +59,7 @@ function buildNotificationMessage(
 
   const eventLabel = delivery.eventType === "incident.opened"
     ? "Incident opened"
-    : delivery.eventType === "incident.acknowledged" ? "Incident acknowledged" : "Incident resolved";
+    : delivery.eventType === "incident.acknowledged" ? "Incident acknowledged" : delivery.eventType === "incident.reopened" ? "Incident reopened" : "Incident resolved";
   const dashboardUrl = (env.WEB_APP_URL ?? "http://localhost:3000")
     + "/dashboard/projects/" + encodeURIComponent(incident.projectId) + "/alerts";
   return {
@@ -102,6 +103,7 @@ export async function queueIncidentNotifications(
   env: ApiBindings,
   incident: { id: string; organizationId: string; projectId: string; title: string; triggerValue: number },
   eventType: IncidentNotificationEvent,
+  eventKey: string = crypto.randomUUID(),
 ): Promise<void> {
   const channels = await database.select().from(notificationChannels).where(and(
     eq(notificationChannels.organizationId, incident.organizationId),
@@ -122,6 +124,7 @@ export async function queueIncidentNotifications(
       channelId: channel.id,
       target: channel.target,
       eventType,
+      eventKey,
       status: "queued",
       enqueueAttempts: 1,
       nextEnqueueAt: enqueueLeaseExpiresAt,
@@ -334,9 +337,10 @@ export async function safelyQueueIncidentNotifications(
   env: ApiBindings,
   incident: { id: string; organizationId: string; projectId: string; title: string; triggerValue: number },
   eventType: IncidentNotificationEvent,
+  eventKey?: string,
 ): Promise<void> {
   try {
-    await queueIncidentNotifications(database, env, incident, eventType);
+    await queueIncidentNotifications(database, env, incident, eventType, eventKey);
   } catch (error) {
     console.error("Jerico incident notification enqueue failed", {
       incidentId: incident.id,
