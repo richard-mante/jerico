@@ -16,6 +16,7 @@ type Incident = {
   id: string; alertRuleId: string; title: string; status: "open" | "acknowledged" | "resolved";
   triggerValue: number; startedAt: string; lastTriggeredAt: string; resolvedAt: string | null;
 };
+type IncidentActivity = { id: string; activityType: "opened" | "acknowledged" | "resolved" | "note"; body: string | null; actorId: string | null; actorName: string | null; actorEmail: string | null; createdAt: string };
 type NotificationDelivery = {
   id: string; incidentId: string; channelId: string; target: string; eventType: string;
   status: "queued" | "sent" | "failed"; attempts: number; enqueueAttempts: number;
@@ -39,6 +40,9 @@ export function ProjectAlertManager() {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
+  const [activity, setActivity] = useState<Record<string, IncidentActivity[]>>({});
+  const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [name, setName] = useState("High error volume");
   const [metric, setMetric] = useState<Metric>("error_count");
   const [threshold, setThreshold] = useState("10");
@@ -149,6 +153,22 @@ export function ProjectAlertManager() {
   }
 
 
+  async function toggleIncidentActivity(incidentId: string) {
+    if (expandedIncidentId === incidentId) { setExpandedIncidentId(null); return; }
+    setExpandedIncidentId(incidentId); if (activity[incidentId]) return;
+    try { const payload = await request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incidentId)}/activity`); setActivity((current) => ({ ...current, [incidentId]: (payload.data ?? []) as IncidentActivity[] })); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load incident activity."); setExpandedIncidentId(null); }
+  }
+  async function addIncidentNote(incidentId: string) {
+    const body = (noteDrafts[incidentId] ?? "").trim(); if (!body) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incidentId)}/notes`, { method: "POST", body: JSON.stringify({ body }) });
+      setNoteDrafts((current) => ({ ...current, [incidentId]: "" }));
+      const payload = await request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incidentId)}/activity`);
+      setActivity((current) => ({ ...current, [incidentId]: (payload.data ?? []) as IncidentActivity[] })); setNotice("Incident note added.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not add incident note."); } finally { setBusy(false); }
+  }
   async function retryDelivery(delivery: NotificationDelivery) {
     setBusy(true); setError(""); setNotice("");
     try {
@@ -213,7 +233,19 @@ export function ProjectAlertManager() {
               <div className="flex items-center justify-between"><div><h2 className="font-semibold">Incidents</h2><p className="mt-1 text-xs text-[#737b89]">Active and recent incident history</p></div><span className="text-xs text-[#929aaa]">{incidents.filter((item) => item.status !== "resolved").length} active</span></div>
               <div className="mt-4 divide-y divide-white/10">
                 {incidents.map((incident) => <div key={incident.id} className="py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{incident.title}</p><span className={`rounded-full px-2 py-1 text-[10px] ${incident.status === "resolved" ? "bg-white/10 text-[#929aaa]" : incident.status === "acknowledged" ? "bg-blue-400/10 text-blue-300" : "bg-red-400/10 text-red-300"}`}>{incident.status}</span></div><p className="mt-2 text-xs text-[#929aaa]">Triggered value: {incident.triggerValue} · Started {when(incident.startedAt)}</p>{incident.resolvedAt && <p className="mt-1 text-xs text-[#737b89]">Resolved {when(incident.resolvedAt)}</p>}</div><div className="flex gap-2">{incident.status === "open" && <button disabled={busy} onClick={() => void updateIncident(incident, "acknowledge")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Acknowledge</button>}{incident.status !== "resolved" && <button disabled={busy} onClick={() => void updateIncident(incident, "resolve")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Resolve</button>}</div></div>
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="text-sm font-medium">{incident.title}</p><span className={`rounded-full px-2 py-1 text-[10px] ${incident.status === "resolved" ? "bg-white/10 text-[#929aaa]" : incident.status === "acknowledged" ? "bg-blue-400/10 text-blue-300" : "bg-red-400/10 text-red-300"}`}>{incident.status}</span></div><p className="mt-2 text-xs text-[#929aaa]">Triggered value: {incident.triggerValue} · Started {when(incident.startedAt)}</p>{incident.resolvedAt && <p className="mt-1 text-xs text-[#737b89]">Resolved {when(incident.resolvedAt)}</p>}</div><div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => void toggleIncidentActivity(incident.id)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{expandedIncidentId === incident.id ? "Hide activity" : "Activity"}</button>{incident.status === "open" && <button disabled={busy} onClick={() => void updateIncident(incident, "acknowledge")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Acknowledge</button>}{incident.status !== "resolved" && <button disabled={busy} onClick={() => void updateIncident(incident, "resolve")} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Resolve</button>}</div></div>
+                  {expandedIncidentId === incident.id && <div className="mt-4 border-t border-white/[0.07] pt-4">
+                    <h4 className="text-xs font-semibold text-[#a8afbd]">Incident activity</h4>
+                    <div className="mt-3 space-y-3">{(activity[incident.id] ?? []).map((item) => <div key={item.id} className="rounded-xl border border-white/[0.07] bg-black/10 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-medium capitalize">{item.activityType.replaceAll("_", " ")}</p><span className="text-[10px] text-[#737b89]">{when(item.createdAt)}</span></div>
+                      {item.body && <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[#c2c8d3]">{item.body}</p>}
+                      <p className="mt-1 text-[10px] text-[#737b89]">{item.actorName ?? (item.actorId ? item.actorId : "Jerico automation")}{item.actorEmail ? ` · ${item.actorEmail}` : ""}</p>
+                    </div>)}{!activity[incident.id]?.length && <p className="text-xs text-[#737b89]">No activity recorded yet.</p>}</div>
+                    {incident.status !== "resolved" && <form onSubmit={(event) => { event.preventDefault(); void addIncidentNote(incident.id); }} className="mt-4 space-y-2">
+                      <textarea maxLength={2000} rows={3} value={noteDrafts[incident.id] ?? ""} onChange={(event) => setNoteDrafts((current) => ({ ...current, [incident.id]: event.target.value }))} placeholder="Add an operational note for your team…" className="w-full rounded-xl border border-white/10 bg-[#0c1018] px-3 py-3 text-xs text-white outline-none focus:border-[#d9f36a]/50" />
+                      <div className="flex justify-end"><button disabled={busy || !(noteDrafts[incident.id] ?? "").trim()} className="rounded-lg bg-[#d9f36a] px-3 py-2 text-xs font-semibold text-[#15190b] disabled:opacity-50">Add note</button></div>
+                    </form>}
+                  </div>}
                 </div>)}
                 {!incidents.length && <p className="py-8 text-center text-sm text-[#737b89]">No incidents recorded. Incidents will appear when an alert rule breaches its threshold.</p>}
               </div>
