@@ -1,6 +1,6 @@
 # Architecture decision: provider-neutral durable queue
 
-- **Status:** Accepted for the self-hosted MVP; implementation pending
+- **Status:** Implemented in stages; runtime validation pending
 - **Date:** 2026-11-12
 - **Decision owners:** Jerico maintainers
 
