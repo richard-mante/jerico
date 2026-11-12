@@ -22,11 +22,18 @@
 {$API_DOMAIN} {
   encode zstd gzip
   import security_headers
+  request_body {
+    max_size 2MB
+  }
   reverse_proxy api:8787
 }
 
 {$INGEST_DOMAIN} {
   encode zstd gzip
   import security_headers
+  @ingest_events path /ingest/v1/events
+  request_body @ingest_events {
+    max_size 1MB
+  }
   reverse_proxy ingest:8788
 }
