@@ -9,6 +9,7 @@ import {
   notificationDeliveryResultSchema,
   notificationDeadLetterResultSchema,
   createAlertRuleSchema,
+  createIncidentNoteSchema,
   updateAlertRuleSchema,
   createEnvironmentSchema,
   updateEnvironmentSchema,
@@ -20,7 +21,7 @@ import {
   updateUptimeMonitorSchema,
   uptimeProbeResultSchema,
 } from "@jerico/contracts";
-import { alertRules, environments, incidents, notificationChannels, notificationDeliveries, member, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
+import { alertRules, environments, incidents, incidentActivity, notificationChannels, notificationDeliveries, member, user as users, products, projectErrorGroupStates, projectIngestionKeys, projects, uptimeCheckResults, uptimeMonitors } from "@jerico/database/schema";
 import { createAuth } from "./auth";
 import { canManageOrganizationResources } from "./permissions";
 import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
@@ -965,6 +966,22 @@ app.get("/api/v1/projects/:projectId/incidents", async (context) => withOrganiza
   return context.json({ data });
 }));
 
+app.get("/api/v1/projects/:projectId/incidents/:incidentId/activity", async (context) => withOrganization(context, async (database, organizationId) => {
+  const [incident] = await database.select({ id: incidents.id }).from(incidents).where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
+  if (!incident) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
+  const data = await database.select({ id: incidentActivity.id, activityType: incidentActivity.activityType, body: incidentActivity.body, actorId: incidentActivity.actorId, actorName: users.name, actorEmail: users.email, createdAt: incidentActivity.createdAt })
+    .from(incidentActivity).leftJoin(users, eq(incidentActivity.actorId, users.id)).where(eq(incidentActivity.incidentId, incident.id)).orderBy(asc(incidentActivity.createdAt)).limit(200);
+  return context.json({ data });
+}));
+
+app.post("/api/v1/projects/:projectId/incidents/:incidentId/notes", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
+  const [incident] = await database.select({ id: incidents.id }).from(incidents).where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
+  if (!incident) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
+  const parsed = createIncidentNoteSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Incident notes must contain between 1 and 2,000 characters.", details: parsed.error.flatten() } }, 400);
+  const [created] = await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: context.req.param("projectId"), incidentId: incident.id, actorId: userId, activityType: "note", body: parsed.data.body }).returning();
+  return context.json({ data: created }, 201);
+}));
 app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
   const [updated] = await database.update(incidents).set({ status: "acknowledged", acknowledgedAt: new Date(), acknowledgedBy: userId, updatedAt: new Date() })
     .where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "open"))).returning();
@@ -974,6 +991,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async 
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
+  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "acknowledged", body: null });
   await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
   }, "incident.acknowledged");
@@ -990,6 +1008,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (con
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
+  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: null, activityType: "resolved", body: "Resolved manually." });
   await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
   }, "incident.resolved");
