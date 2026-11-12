@@ -989,3 +989,12 @@
 - Preflight requires rclone and age when off-site backup is configured, and validates optional rclone config file type and permissions. `.env.example` and backup/restore docs updated.
 - Remote objects are never deleted by the script; storage-provider lifecycle/versioning is an operator responsibility. A real remote upload/download and off-host restore drill remain outstanding.
 - PR #144 merged as `b47b9c6bf5b1add4a15d8b0336281a36c48366bf`. No shell syntax, rclone, age, restore, Compose, Docker, test, typecheck, or runtime validation was run.
+
+
+### 2026-11-12 — SDK request timeout and off-site backup safety
+
+- Merged PR #142 (`aff99e1817af044fa62b485d823197ff030b612d`): shared SDK client supports configurable request timeouts (10-second default, 100–120,000 ms). Aborted/ambiguous requests retain the same idempotency key and payload for explicit retry.
+- Merged PR #143 (`a3195d60cf98d32661806bfa5b7f6a3937c735fb`): preflight rejects symlinked `.env`, duplicate required values, and insecure optional age identity files.
+- Merged PR #144 (`b47b9c6bf5b1add4a15d8b0336281a36c48366bf`): optional rclone encrypted off-site backup uploads and remote verification; restore can download missing timestamped artifacts/checksums/manifest. Requires age encryption for uploads. No remote objects are deleted; configure storage lifecycle separately.
+- Merged PR #146 (`f747d93765ba9125069fb3cb4ddeb9058f62295b`): backup/restore scripts reject symlinked `.env`, validate age identity file permissions, and preflight rejects duplicate optional backup settings.
+- No shell syntax, rclone, age, backup/restore, SDK build, typecheck, tests, Compose, Docker, or runtime checks were run. `pnpm-lock.yaml` remains untouched.
