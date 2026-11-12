@@ -1,3 +1,4 @@
+import { telemetryEventSchema } from "@jerico/contracts";
 import { probeEndpoint } from "./uptime-probe";
 import { deliverWebhook, isSafeWebhookUrl } from "./webhook-delivery";
 
@@ -76,6 +77,26 @@ export function escapeIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) throw new Error("Invalid ClickHouse identifier.");
   return value;
 }
+export function isValidTelemetryMessage(value: unknown): value is TelemetryMessage {
+  if (typeof value !== "object" || value === null) return false;
+  const message = value as Record<string, unknown>;
+  if (message.schemaVersion !== 1) return false;
+  for (const field of ["requestId", "credentialId", "organizationId", "projectId", "environmentId"] as const) {
+    if (typeof message[field] !== "string" || message[field].length < 1 || message[field].length > 128) return false;
+  }
+  if (typeof message.acceptedAt !== "string" || !Number.isFinite(Date.parse(message.acceptedAt))) return false;
+  if (!Array.isArray(message.events) || message.events.length < 1 || message.events.length > 100) return false;
+
+  return message.events.every((event) => {
+    if (typeof event !== "object" || event === null || Array.isArray(event)) return false;
+    const { eventId, ...telemetryEvent } = event as Record<string, unknown>;
+    return typeof eventId === "string"
+      && eventId.length >= 1
+      && eventId.length <= 256
+      && telemetryEventSchema.safeParse(telemetryEvent).success;
+  });
+}
+
 export function toRow(message: TelemetryMessage, event: TelemetryEvent, eventIndex = 0) {
   return {
     // Legacy schemaVersion 1 messages already in the queue have no eventId.
@@ -566,7 +587,10 @@ export default {
     const telemetryBatch = batch as MessageBatch<TelemetryMessage>;
     const valid: Message<TelemetryMessage>[] = [];
     for (const message of telemetryBatch.messages) {
-      if (message.body?.schemaVersion !== 1 || !Array.isArray(message.body.events)) {
+      if (!isValidTelemetryMessage(message.body)) {
+        console.error("Discarding invalid Jerico telemetry queue message", {
+          queueMessageId: message.id,
+        });
         message.ack();
       } else {
         valid.push(message);
