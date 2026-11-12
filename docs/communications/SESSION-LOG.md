@@ -1016,3 +1016,14 @@
 - Managed and self-hosted telemetry consumers now quarantine invalid envelopes rather than acknowledge/discard them. The queue ADR documents the provider-specific behavior.
 - PR #154 merged as `21b78a8fe262b48dc339fea5209f46c7f5253964`; issue #107 updated with the remaining live routing/replay validation.
 - No tests, typecheck, builds, Cloudflare DLQ, PostgreSQL queue, or runtime validation were run.
+
+
+### 2026-11-12 — Self-hosted operational hardening through PR #161
+
+- PR #156 (`3a1d...`): bounded Docker JSON logs to 10 MiB × 5 files per service.
+- PR #157: common Caddy HTTPS security headers across dashboard/API/ingest; no CSP enforced pending origin validation.
+- PR #158: Caddy limits management API bodies to 2 MiB and telemetry ingestion event bodies to 1 MiB.
+- PR #159: `RESTORE_FROM_REMOTE=1` force-refreshes a timestamp's manifest, archives, and checksums from rclone remote before verification.
+- PR #160: self-hosted ClickHouse retention job, defaulting to 7-day logs and 30-day other events, with per-category `0` disable controls; API and queue worker wait for the one-shot job.
+- PR #161: persist applied retention policy and skip repeated TTL alterations; recognize existing 7/30-day DDL defaults on first boot without rematerializing existing parts.
+- No Compose parse, Caddy validation, ClickHouse SQL, rclone, backup/restore, Linux/systemd, tests, typecheck, or runtime validation was executed.
