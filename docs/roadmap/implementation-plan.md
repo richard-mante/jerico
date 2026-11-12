@@ -197,7 +197,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Incident ownership, activity timeline, and operator notes (PRs #89–#90).
 - [x] Per-event notification preferences, including reopened events (PRs #92 and #101).
 - [ ] Quiet-hour configuration and escalation policies.
-- [ ] Provider-neutral queue adapter and self-hosted runtime/deployment workflow.
+- [x] Provider-neutral queue contracts and PostgreSQL adapter (PRs #108 and #110); full self-hosted producer/runtime integration remains open.
 
 ### Current execution direction
 - Prioritize functional product implementation and user-facing workflows.
@@ -217,7 +217,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Project identity editing and archive/restore, with ingestion blocked for archived projects (PR #95).
 - [x] Organization member invitations, role changes, removal, and pending invitation cancellation (PR #96).
 - [ ] Complete incident lifecycle controls, including reopen semantics and repeat notification delivery identity.
-- [ ] Provider-neutral queue adapter and self-hosted runtime/deployment workflow.
+- [x] Provider-neutral queue contracts and PostgreSQL adapter (PRs #108 and #110); full self-hosted producer/runtime integration remains open.
 
 ### Execution direction
 - Continue functional implementation; tests, end-to-end work, and GitHub builds remain deferred until requested.
@@ -234,8 +234,18 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 
 ### Next implementation priority
 - [ ] Quiet hours and escalation policies.
-- [ ] Provider-neutral durable queue adapter and self-hosted runtime/deployment.
+- [x] Provider-neutral queue contracts and PostgreSQL adapter (PRs #108 and #110); full self-hosted producer/runtime integration remains open.
 - [ ] SDK integration and release experience.
 
 ### Execution direction
 - Continue functional implementation; defer tests, end-to-end work, and GitHub builds until requested.
+
+
+### 2026-11-12 — Self-hosted telemetry Compose slice
+
+- [x] PostgreSQL-backed queue storage and portable polling consumer (PRs #110–#111).
+- [x] Standalone telemetry-only Node consumer with health/readiness and dead-letter inspection/replay (PR #112).
+- [x] Initial PostgreSQL 17 + ClickHouse 25.8 + migration + telemetry-worker Compose slice (PR #116; configuration and runtime validation still pending).
+- [ ] Route self-hosted API/ingest producers into PostgreSQL rather than Cloudflare Queues.
+- [ ] Port uptime and notification consumers only after equivalent outbound SSRF protections are implemented and reviewed.
+- [ ] Complete self-hosted API/dashboard/auth deployment, backup/restore, fresh-install validation, and operational hardening.
