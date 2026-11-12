@@ -1,6 +1,12 @@
 # @jerico/sdk-node
 
-Use a **secret** project key only in trusted server-side environments. Never expose it in browser bundles, mobile apps, or public repositories.
+Server-side TypeScript SDK for sending application telemetry to Jerico Observability.
+
+## Install status
+
+This package remains private and is not published to npm yet. Its workspace package build emits ESM JavaScript and TypeScript declarations to `dist/`.
+
+## Quick start
 
 ```ts
 import { createNodeClient } from "@jerico/sdk-node";
@@ -8,28 +14,23 @@ import { createNodeClient } from "@jerico/sdk-node";
 const jerico = createNodeClient({
   apiKey: process.env.JERICO_SECRET_KEY!,
   endpoint: process.env.JERICO_INGEST_URL!,
-  captureUnhandledRejections: true,
 });
 
 jerico.track("order.completed", { orderId: "order_123" });
-jerico.log("billing.invoice.created", "Invoice created", { amount: 49 }); // defaults to info
-jerico.logWithLevel("warn", "billing.payment.retry", "Payment retry scheduled", { attempt: 2 });
-jerico.metric("queue.depth", 12);
-
-await jerico.withSpan("http.request", async (trace) => {
-  await jerico.withSpan("database.query", async () => {
-    // Perform the database operation.
-  }, { table: "orders" }, trace);
-}, { method: "GET" });
 
 await jerico.flush();
+// Call close() during graceful process shutdown.
 await jerico.close();
 ```
 
-Call `close()` during graceful shutdown to stop the timer and flush pending events. The SDK does not install process exit handlers or terminate the host process. Unhandled rejection capture is opt-in and does not suppress Node's normal process behavior.
+The Node SDK requires a `jk_sec_` project key. Keep it in server-only environment variables and never expose it to browser bundles or source control.
 
+Unhandled rejection capture is opt-in with `captureUnhandledRejections: true`. The SDK does not install process exit handlers. Always close the client during graceful shutdown; the queue is in-memory and cannot survive forced termination.
 
-Supported log levels are `debug`, `info`, `warn`, `error`, and `fatal`. Existing `log(name, message, attributes)` calls remain compatible and are recorded at `info` by default. Use `logWithLevel(level, name, message, attributes)` when the severity is known.
+## Build
 
+```sh
+pnpm --filter @jerico/sdk-node build
+```
 
-`startSpan(name, attributes?, parentContext?)` returns a span handle with a generated `traceId`/`spanId` context and an idempotent `end()` method. Pass the returned context to child spans to preserve the parent relationship. `withSpan(name, operation, attributes?, parentContext?)` measures duration automatically and records `status: "ok"` or `status: "error"`. Context propagation is explicit; the SDK does not patch async-local or framework request context automatically.
+The Node package depends on the workspace `@jerico/sdk-core` package. Turbo builds dependencies before this package.
