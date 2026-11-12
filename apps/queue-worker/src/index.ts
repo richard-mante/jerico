@@ -33,6 +33,34 @@ const clickhouseEnv: ClickHouseEnv = {
   CLICKHOUSE_PASSWORD: process.env.CLICKHOUSE_PASSWORD,
   CLICKHOUSE_TOKEN: process.env.CLICKHOUSE_TOKEN,
 };
+const maxAttempts = integerEnv("QUEUE_MAX_ATTEMPTS", 5, 1, 100);
+const workerEnv: WorkerEnv = {
+  ...clickhouseEnv,
+  API_URL: required("API_URL"),
+  UPTIME_RESULTS_SECRET: required("UPTIME_RESULTS_SECRET"),
+  PROBE_WORKER_HOST: process.env.PROBE_WORKER_HOST ?? "api",
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  EMAIL_FROM: process.env.EMAIL_FROM,
+  NOTIFICATION_DELIVERY_SECRET: required("NOTIFICATION_DELIVERY_SECRET"),
+  WEBHOOK_ENCRYPTION_KEY: required("WEBHOOK_ENCRYPTION_KEY"),
+  ALLOW_INTERNAL_API_HTTP: process.env.ALLOW_INTERNAL_API_HTTP,
+  PUBLIC_FETCHER: fetchPublicPinned,
+};
+const uptimeQueue = new PostgresQueueAdapter<UptimeProbeMessage>(
+  pool as unknown as PostgresPoolLike,
+  process.env.UPTIME_QUEUE_NAME ?? "jerico-uptime-probes",
+  { maxAttempts },
+);
+const notificationQueue = new PostgresQueueAdapter<NotificationMessage>(
+  pool as unknown as PostgresPoolLike,
+  process.env.NOTIFICATION_QUEUE_NAME ?? "jerico-notifications",
+  { maxAttempts },
+);
+const queueByName = new Map<string, PostgresQueueAdapter<unknown>>([
+  [telemetryQueue.queueName, telemetryQueue as unknown as PostgresQueueAdapter<unknown>],
+  [uptimeQueue.queueName, uptimeQueue as unknown as PostgresQueueAdapter<unknown>],
+  [notificationQueue.queueName, notificationQueue as unknown as PostgresQueueAdapter<unknown>],
+]);
 const port = integerEnv("PORT", 8789, 1, 65_535);
 const host = process.env.HOST?.trim() || "127.0.0.1";
 const pool = new Pool({
@@ -48,24 +76,24 @@ const telemetryQueue = new PostgresQueueAdapter<TelemetryMessage>(
   { maxAttempts: integerEnv("QUEUE_MAX_ATTEMPTS", 5, 1, 100) },
 );
 
-const consumer = new PollingQueueConsumer(
-  telemetryQueue,
-  async (delivery) => {
+const batchSize = integerEnv("QUEUE_BATCH_SIZE", 20, 1, 100);
+const visibilityTimeout = integerEnv("QUEUE_VISIBILITY_TIMEOUT_SECONDS", 60, 1, 3_600);
+const pollInterval = integerEnv("QUEUE_POLL_INTERVAL_MS", 1_000, 100, 30_000);
+const consumerOptions = { batchSize, visibilityTimeoutSeconds: visibilityTimeout, pollIntervalMs: pollInterval };
+const consumers = [
+  new PollingQueueConsumer(telemetryQueue, async (delivery) => {
     if (!isValidTelemetryMessage(delivery.body)) {
-      console.warn("Acknowledging invalid self-hosted telemetry envelope", {
-        queueMessageId: delivery.id,
-      });
+      console.warn("Acknowledging invalid self-hosted telemetry envelope", { queueMessageId: delivery.id });
       await delivery.ack();
       return;
     }
     await writeToClickHouse(clickhouseEnv, [delivery.body]);
-  },
-  {
-    batchSize: integerEnv("QUEUE_BATCH_SIZE", 20, 1, 100),
-    visibilityTimeoutSeconds: integerEnv("QUEUE_VISIBILITY_TIMEOUT_SECONDS", 60, 1, 3_600),
-    pollIntervalMs: integerEnv("QUEUE_POLL_INTERVAL_MS", 1_000, 100, 30_000),
-  },
-);
+  }, consumerOptions),
+  new PollingQueueConsumer(uptimeQueue, (delivery) =>
+    processSelfHostedQueueDelivery("jerico-uptime-probes", delivery as QueueDelivery<UptimeProbeMessage | NotificationMessage>, workerEnv), consumerOptions),
+  new PollingQueueConsumer(notificationQueue, (delivery) =>
+    processSelfHostedQueueDelivery("jerico-notifications", delivery as QueueDelivery<UptimeProbeMessage | NotificationMessage>, workerEnv), consumerOptions),
+];
 
 let shuttingDown = false;
 const queueAdminToken = process.env.QUEUE_ADMIN_TOKEN;
@@ -91,12 +119,18 @@ const server = createServer(async (request, response) => {
   if (request.method === "GET" && (url.pathname === "/health" || url.pathname === "/ready")) {
     try {
       await pool.query("SELECT 1");
-      const queue = await telemetryQueue.health();
-      respond(response, queue.status === "unavailable" ? 503 : 200, {
-        status: queue.status,
+      const queueStatuses = await Promise.all([...queueByName.entries()].map(async ([name, queue]) => ({
+        name,
+        ...(await queue.health()),
+      })));
+      const status = queueStatuses.some((queue) => queue.status === "unavailable")
+        ? "unavailable"
+        : queueStatuses.some((queue) => queue.status === "degraded") ? "degraded" : "healthy";
+      respond(response, status === "unavailable" ? 503 : 200, {
+        status,
         service: "jerico-queue-worker",
         ready: true,
-        ...(url.pathname === "/ready" ? { queue } : {}),
+        ...(url.pathname === "/ready" ? { queues: queueStatuses } : {}),
       });
     } catch {
       respond(response, 503, { status: "unavailable", service: "jerico-queue-worker", ready: false });
@@ -121,6 +155,13 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  const queueName = url.searchParams.get("queue") ?? telemetryQueue.queueName;
+  const selectedQueue = queueByName.get(queueName);
+  if (!selectedQueue) {
+    respond(response, 400, { error: "invalid_queue" });
+    return;
+  }
+
   try {
     if (request.method === "GET" && url.pathname === "/dead-letters") {
       const rawLimit = url.searchParams.get("limit");
@@ -129,13 +170,13 @@ const server = createServer(async (request, response) => {
         respond(response, 400, { error: "invalid_limit", message: "Limit must be between 1 and 100." });
         return;
       }
-      respond(response, 200, { data: await telemetryQueue.listDeadLetters(limit) });
+      respond(response, 200, { data: await selectedQueue.listDeadLetters(limit) });
       return;
     }
 
     const replayMatch = url.pathname.match(/^\/dead-letters\/([^/]+)\/replay$/);
     if (request.method === "POST" && replayMatch) {
-      const replayed = await telemetryQueue.replayDeadLetter(decodeURIComponent(replayMatch[1]!));
+      const replayed = await selectedQueue.replayDeadLetter(decodeURIComponent(replayMatch[1]!));
       respond(response, replayed ? 202 : 409, replayed
         ? { data: { replayed: true } }
         : { error: "not_replayable", message: "The dead-letter message is missing, already replayed, or conflicts with an active deduplication key." });
@@ -144,7 +185,7 @@ const server = createServer(async (request, response) => {
 
     const detailMatch = url.pathname.match(/^\/dead-letters\/([^/]+)$/);
     if (request.method === "GET" && detailMatch) {
-      const message = await telemetryQueue.getDeadLetter(decodeURIComponent(detailMatch[1]!));
+      const message = await selectedQueue.getDeadLetter(decodeURIComponent(detailMatch[1]!));
       if (!message) {
         respond(response, 404, { error: "not_found" });
         return;
@@ -170,16 +211,16 @@ async function shutdown(signal: string): Promise<void> {
       server.close((error) => error ? reject(error) : resolve());
     });
   }
-  await consumer.stop({ timeoutMs: 25_000 });
+  await Promise.all(consumers.map((consumer) => consumer.stop({ timeoutMs: 25_000 })));
   await pool.end();
 }
 
 async function main(): Promise<void> {
   await pool.query("SELECT 1");
-  await telemetryQueue.health();
-  await consumer.start();
+  await Promise.all([...queueByName.values()].map((queue) => queue.health()));
+  await Promise.all(consumers.map((consumer) => consumer.start()));
   server.listen(port, host, () => {
-    console.info("Jerico self-hosted telemetry worker is ready", { host, port });
+    console.info("Jerico self-hosted queue workers are ready", { host, port, queues: [...queueByName.keys()] });
   });
 }
 
