@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #112 — self-hosted telemetry worker (`49e7b147828080c721c9b221492cd5d34aa0eb35`)  
-**Latest main merge:** PR #112 — `49e7b147828080c721c9b221492cd5d34aa0eb35`  
-**Current milestone:** Managed observability workflows are functionally broad. Provider-neutral queue contracts, the PostgreSQL queue engine, portable polling consumer, and a standalone self-hosted telemetry worker are merged. Self-hosted uptime/notification workers, dead-letter inspection/replay, Docker Compose, provisioning, and full validation remain outstanding.
+**Latest feature merge:** PR #116 — telemetry queue Compose infrastructure (`572b5c4b21e165a0337c4ae9bbb6af961bcdc192`)  
+**Latest main merge:** PR #116 — `572b5c4b21e165a0337c4ae9bbb6af961bcdc192`  
+**Current milestone:** Provider-neutral queue contracts, PostgreSQL queue storage, portable polling, the telemetry-only Node worker, dead-letter inspection/replay, and an initial PostgreSQL/ClickHouse/telemetry-worker Compose slice are merged. Managed Cloudflare producers remain active; self-hosted producer routing, API/dashboard, uptime/notification workers, full deployment, backup/restore, and runtime validation remain outstanding.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
@@ -23,7 +23,7 @@ Jerico is an extensible, open-source Founder Operating System. Jerico Observabil
 - ClickHouse for telemetry analytics.
 - Better Auth self-hosted inside the Hono API Worker; it is not a separate hosted authentication service.
 - Cloudflare Queues for the current managed buffering and notification pipeline.
-- Self-hosted deployment remains a core requirement. Shared queue ports (PR #108), the PostgreSQL queue engine (PR #110), the polling consumer (PR #111), and the telemetry-only Node worker (PR #112) are implemented. Uptime/notification Node handlers, dead-letter inspection/replay, and Docker Compose are still outstanding.
+- Self-hosted deployment remains a core requirement. Shared queue ports (PR #108), PostgreSQL queue engine (PR #110), polling consumer (PR #111), telemetry-only Node worker and authenticated dead-letter administration (PR #112), plus the initial PostgreSQL/ClickHouse/telemetry-worker Compose slice (PR #116) are implemented. Managed API/ingest still publish to Cloudflare Queues. Uptime/notification Node handlers, self-hosted producer routing, full API/dashboard deployment, backup/restore, and runtime validation remain outstanding.
 - The accepted queue architecture is documented in [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md). Track implementation in [issue #107](https://github.com/richard-mante/jerico/issues/107). The Cloudflare managed runtime remains active; do not describe self-hosting as production-ready.
 
 ## Merged implementation
@@ -100,7 +100,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 8. **Phase 6 — self-hosted release:** complete Node queue handlers for uptime and notifications with equivalent SSRF-safe outbound networking, add dead-letter inspection/replay, Docker Compose for web/API/ingest/workers/PostgreSQL/ClickHouse, and validate a fresh Linux install plus backup/restore. The telemetry-only queue worker and PostgreSQL queue engine are already implemented but not runtime-validated.
 9. **Public beta hardening:** accessibility, responsive UX, load/performance, package publishing, licensing, security disclosure, and complete product documentation.
 
-Per-event notification preferences, timezone-aware quiet hours, escalation policies, incident assignment/comments, incident reopening, and manual retry controls are implemented. The queue foundation is now provider-neutral and has a PostgreSQL adapter plus a telemetry-only Node worker. The next milestone is safe Node-side uptime/notification processing, dead-letter inspection/replay, then Docker Compose and self-hosted operations. Do not describe the current deployment as self-hosting-ready.
+Per-event notification preferences, timezone-aware quiet hours, escalation policies, incident assignment/comments, incident reopening, and manual retry controls are implemented. The queue foundation is now provider-neutral and has a PostgreSQL adapter plus a telemetry-only Node worker. The next milestone is connecting API/ingest producers to the PostgreSQL queue in a self-hosted runtime, then porting uptime/notification processing with equivalent SSRF protections and completing full deployment/backup/restore. Do not describe the current deployment as self-hosting-ready.
 
 
 
@@ -200,3 +200,13 @@ Merged PR #68. Ingestion now applies the existing deterministic text-redaction p
 - Continue closing user-facing functionality: remaining notification quiet-hour/escalation controls, SDK integration and release workflow, then provider-neutral queue and self-hosted runtime. Project/product/team/environment administration and incident lifecycle controls are now implemented.
 - Complete the self-hosted runtime path: replace direct Cloudflare Queue assumptions with a provider-neutral durable queue adapter, then add the self-hosted services and deployment experience.
 - Keep `pnpm-lock.yaml` untouched. Do not run GitHub Actions or builds until the user asks to resume validation.
+
+
+### 2026-11-12 — Compose infrastructure slice (PR #116 merged)
+
+- Added `compose.self-hosted.yaml` with PostgreSQL 17, ClickHouse 25.8, one-shot Drizzle migration, and the standalone telemetry queue worker.
+- Added a Dockerfile for the queue worker, root `.dockerignore`, URL-safe secret template, and setup/operations guide. Worker host port binds to 127.0.0.1; dead-letter administration uses a required bearer token.
+- Added expiry checks to lease-token-fenced ack/retry/dead-letter/extend operations so an expired lease cannot settle a message before a competing worker reclaims it.
+- The Compose slice consumes only the PostgreSQL `jerico-telemetry` queue. Current Cloudflare API/ingest producers still publish to Cloudflare Queues, so this is not yet an end-to-end self-hosted product stack.
+- PR #116 merged as `572b5c4b21e165a0337c4ae9bbb6af961bcdc192`. The superseded draft PR #115 was closed after its worker changes were found already present on main.
+- Docker build, Compose config validation, migration execution, PostgreSQL/ClickHouse runtime, typecheck, lint, and tests have not been run. No validation is claimed. `pnpm-lock.yaml` remains untouched.
