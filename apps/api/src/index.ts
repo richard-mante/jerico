@@ -998,7 +998,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async 
   return context.json({ data: updated });
 }));
 
-app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (context) => withOrganization(context, async (database, organizationId) => {
+app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
   const now = new Date();
   const [updated] = await database.update(incidents).set({ status: "resolved", resolvedAt: now, updatedAt: now })
     .where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), or(eq(incidents.status, "open"), eq(incidents.status, "acknowledged")))).returning();
@@ -1008,7 +1008,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (con
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
-  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: null, activityType: "resolved", body: "Resolved manually." });
+  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "resolved", body: "Resolved manually." });
   await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
   }, "incident.resolved");
