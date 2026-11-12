@@ -141,6 +141,13 @@
       "when": 1794504000000,
       "tag": "0019_incident_reopen_events",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794505000000,
+      "tag": "0020_notification_quiet_hours",
+      "breakpoints": true
     }
   ]
 }

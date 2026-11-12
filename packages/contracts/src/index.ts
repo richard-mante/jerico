@@ -125,7 +125,7 @@ export type UpdateAlertRule = z.infer<typeof updateAlertRuleSchema>;
 export const createNotificationChannelSchema = z.object({
   email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
 }).strict();
-export const updateNotificationChannelSchema = z.object({ enabled: z.boolean().optional(), notifyOnOpened: z.boolean().optional(), notifyOnAcknowledged: z.boolean().optional(), notifyOnResolved: z.boolean().optional(), notifyOnReopened: z.boolean().optional() }).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one notification channel setting.");
+export const updateNotificationChannelSchema = z.object({ enabled: z.boolean().optional(), notifyOnOpened: z.boolean().optional(), notifyOnAcknowledged: z.boolean().optional(), notifyOnResolved: z.boolean().optional(), notifyOnReopened: z.boolean().optional(), quietHoursEnabled: z.boolean().optional(), quietHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), quietHoursEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), timezone: z.string().trim().min(1).max(64).optional() }).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one notification channel setting.");
 export const verifyNotificationChannelSchema = z.object({
   token: z.string().min(32).max(128),
 }).strict();
