@@ -87,7 +87,8 @@ The implementation through Phase 5E and the subsequent reliability hardening is 
 - [x] Implement the PostgreSQL-backed queue schema/adapter and portable polling consumer (PRs #110–#111; migration/runtime validation pending).
 - [x] Add a standalone Node worker for telemetry ingestion and ClickHouse writes (PR #112; runtime validation pending).
 - [ ] Port uptime and notification consumers with equivalent SSRF-safe outbound networking and terminal dead-letter handling.
-- [ ] Add dead-letter inspection/replay, Docker Compose, fresh-install and backup/restore workflows (see [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md) and [issue #107](https://github.com/richard-mante/jerico/issues/107)).
+- [x] Add PostgreSQL/ClickHouse + migration + Node API/ingest + multi-queue worker Compose slice, with authenticated dead-letter inspection/replay (PRs #116, #118, #120; not runtime-validated).
+- [ ] Add web dashboard deployment, fresh-install validation, backup/restore, TLS/reverse-proxy provisioning, and production operations (see [ADR 0001](../architecture/0001-provider-neutral-durable-queue.md) and [issue #107](https://github.com/richard-mante/jerico/issues/107)).
 - [ ] Add ingestion/processing health metrics and execute integration tests.
 
 **Acceptance:** Authenticated telemetry is queued and stored; invalid, revoked, and cross-project credentials are rejected. Current code is not production-ready until database, queue, ClickHouse, and rate-limit resources are provisioned and integration tests pass.
@@ -133,10 +134,11 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 **Acceptance:** An unavailable test endpoint creates one incident, sends a notification, and resolves after recovery according to configured thresholds.
 
 ## Phase 6 — Self-hosted release
-- [ ] Docker Compose for web, API, ingest, workers, PostgreSQL, ClickHouse, and queue.
-- [ ] Persistent volumes, health checks, secure setup, migrations, and environment validation.
+- [x] Compose for Node API, ingestion, telemetry/uptime/notification workers, PostgreSQL, ClickHouse, and migrations (PR #116, expanded by #118 and #120; no runtime validation).
+- [ ] Add the web dashboard, TLS/reverse proxy, backup/restore, and production operational configuration to the self-hosted deployment.
+- [x] Persistent PostgreSQL/ClickHouse volumes, service health checks, secret templates, and Drizzle migration execution are configured in the initial Compose slice (runtime validation pending).
 - [ ] Backup/restore test and upgrade instructions.
-- [ ] Retention configuration, TLS/reverse proxy guide, and resource sizing guide.
+- [ ] External TLS/reverse proxy guide, resource sizing, and production retention/operations guidance.
 - [ ] Fresh-install validation on a clean Linux server (deferred until implementation is complete).
 
 **Acceptance:** A developer can self-host Jerico and monitor an instrumented application without our hosted infrastructure.
@@ -249,3 +251,15 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [ ] Route self-hosted API/ingest producers into PostgreSQL rather than Cloudflare Queues.
 - [ ] Port uptime and notification consumers only after equivalent outbound SSRF protections are implemented and reviewed.
 - [ ] Complete self-hosted API/dashboard/auth deployment, backup/restore, fresh-install validation, and operational hardening.
+
+
+### 2026-11-12 — Self-hosted API and safe worker runtime
+
+- [x] Add Node management API and Better Auth runtime using existing Hono handlers (PR #120).
+- [x] Add Node ingestion API with PostgreSQL queue publishing, PostgreSQL per-credential rate limits, and scheduled idempotency-outbox recovery (PR #118).
+- [x] Add PostgreSQL-backed telemetry, uptime, and notification queue consumers with authenticated dead-letter inspection/replay (PR #120).
+- [x] Add DNS-pinned outbound networking for Node workers; reject non-public DNS results, pin connections, revalidate uptime redirects, and reject webhook redirects (PR #120).
+- [x] Expand Compose to run PostgreSQL, ClickHouse, migrations, Node API, ingestion, and queue workers (PRs #116, #118, #120; runtime validation pending).
+- [ ] Add the web dashboard and external TLS/reverse-proxy deployment configuration.
+- [ ] Add automated backup/restore and fresh-install validation.
+- [ ] Run typecheck, lint, builds, migrations, Docker/Compose validation, SSRF integration checks, and PostgreSQL/ClickHouse runtime verification before production release.
