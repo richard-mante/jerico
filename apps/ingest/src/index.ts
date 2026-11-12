@@ -27,7 +27,7 @@ type QueueMessage = {
   events: Array<TelemetryEvent & { eventId: string }>;
 };
 type RateLimitBinding = { limit(options: { key: string }): Promise<{ success: boolean }> };
-type Bindings = {
+export type Bindings = {
   APP_ENV?: string;
   DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
@@ -37,6 +37,7 @@ type Bindings = {
 };
 type Variables = { requestId: string };
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+export { app as ingestApp };
 
 app.use("*", async (context, next) => {
   const requestId = context.req.header("x-request-id") ?? crypto.randomUUID();
@@ -453,14 +454,16 @@ async function purgeExpiredIdempotencyRequests(env: Bindings): Promise<void> {
   });
 }
 
+export async function runScheduledIngestMaintenance(env: Bindings): Promise<void> {
+  await recoverPendingIdempotencyRequests(env);
+  await purgeExpiredIdempotencyRequests(env);
+}
+
 export default {
   fetch: (request: Request, env: Bindings, executionContext: ExecutionContext) =>
     app.fetch(request, env, executionContext),
   scheduled: (_controller: ScheduledController, env: Bindings, executionContext: ExecutionContext) => {
-    executionContext.waitUntil((async () => {
-      await recoverPendingIdempotencyRequests(env);
-      await purgeExpiredIdempotencyRequests(env);
-    })().catch((error) => {
+    executionContext.waitUntil(runScheduledIngestMaintenance(env).catch((error) => {
       console.error("Telemetry idempotency outbox reconciliation failed", { error });
     }));
   },
