@@ -136,9 +136,9 @@ if [[ -n "${RCLONE_REMOTE:-}" ]]; then
   for file in "${remote_files[@]}"; do
     rclone copyto --immutable "$BACKUP_DIR/$file" "$RCLONE_REMOTE/$file"
   done
-  rclone check "$BACKUP_DIR" "$RCLONE_REMOTE" --one-way --download \\
-    --include "manifest-$STAMP.json" \\
-    --include "$POSTGRES_FILE" --include "$POSTGRES_FILE.sha256" \\
+  rclone check "$BACKUP_DIR" "$RCLONE_REMOTE" --one-way --download \
+    --include "manifest-$STAMP.json" \
+    --include "$POSTGRES_FILE" --include "$POSTGRES_FILE.sha256" \
     --include "$CLICKHOUSE_FILE" --include "$CLICKHOUSE_FILE.sha256"
   echo "Encrypted off-site backup verified at $RCLONE_REMOTE."
 fi
