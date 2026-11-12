@@ -3,9 +3,9 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #130 — deployment preflight (`edfda14d2974256fa56997a985fb095e73342c32`)  
-**Latest main merge:** PR #130 — `edfda14d2974256fa56997a985fb095e73342c32`  
-**Current milestone:** The self-hosted Compose stack now includes the Next.js dashboard, Node management and ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy automatic HTTPS. Backup/restore scripts now cover PostgreSQL and ClickHouse with checksums, an explicit destructive-restore gate, and optional age encryption. The Compose web dependency syntax was corrected in PR #127. The Linux deployment preflight and baseline sizing guidance are now present. Restore drills, fresh-install validation, off-site backup/retention policy, production hardening, and runtime verification remain outstanding.
+**Latest feature merge:** PR #134 — Compose container hardening (`531d7924fadf0d88fbef53e6ed5c74ced347281d`)  
+**Latest main merge:** PR #134 — `531d7924fadf0d88fbef53e6ed5c74ced347281d`  
+**Current milestone:** The self-hosted Compose stack now includes the Next.js dashboard, Node management and ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy automatic HTTPS. Backup/restore scripts now cover PostgreSQL and ClickHouse with checksums, an explicit destructive-restore gate, and optional age encryption. The Compose web dependency syntax was corrected in PR #127. The Linux deployment preflight, baseline sizing guidance, opt-in local backup retention, non-root Node/web images, and reduced-capability app containers are now present. Restore drills, fresh-install validation, off-site backup storage/retention, measured resource sizing, and runtime verification remain outstanding.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
 
