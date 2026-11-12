@@ -720,3 +720,18 @@
 
 ### Next
 - Continue ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
+
+
+## 2026-11-12 — telemetry queue consumer validation
+
+- Reviewed the telemetry consumer boundary in `apps/worker/src/index.ts`. It previously acknowledged any message with only `schemaVersion === 1` and an array-valued `events` field, allowing malformed envelopes/events to reach the ClickHouse adapter.
+- Added strict envelope validation for tenant/project/environment/credential identifiers, accepted timestamp, event count, stable event IDs, and event payloads validated against the shared `@jerico/contracts` telemetry event schema.
+- Invalid telemetry queue messages are now logged with their queue message ID and acknowledged rather than repeatedly retried into the telemetry DLQ. This is intentional for poison/malformed messages; it does not change retries for ClickHouse write failures.
+- Added regression cases for malformed envelope identity, timestamp, event counts, missing event IDs, invalid event types, and unexpected event properties.
+- Branch: `fix/worker-telemetry-message-validation`. The worker now declares its dependency on the shared contracts workspace package. The repository lockfile was not modified.
+- Tests, typecheck, lint, build, and Cloudflare queue runtime validation were not executed.
+
+### Next
+- Run the worker package checks and verify the workspace dependency/lockfile update with the repository's package manager (the lockfile remains user-owned).
+- Add an explicit malformed-message/DLQ operational policy and test the actual Cloudflare Queue consumer behavior.
+- Continue the ingestion reliability review and validate PR #71 against PostgreSQL/Hyperdrive and Queue behavior.
