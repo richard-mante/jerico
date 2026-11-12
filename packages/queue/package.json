@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./cloudflare": "./src/cloudflare.ts",
-    "./postgres": "./src/postgres.ts"
+    "./postgres": "./src/postgres.ts",
+    "./consumer": "./src/consumer.ts"
   },
   "scripts": {
     "lint": "biome lint .",
