@@ -851,3 +851,13 @@
 - Continue implementing the incident workflow and notification preferences without starting test/build work.
 - Review project lifecycle and ingestion-key operations, then move into the provider-neutral queue and self-hosted runtime.
 - Keep `pnpm-lock.yaml` untouched.
+### 2026-11-12 — incident activity, notes, and assignment (PRs #89–#90)
+
+- PR #89 adds a durable `incident_activity` table and migration. Alert evaluation records incident opened/automatic resolution events; manual acknowledgement/resolution is attributed to the acting member; the Alerts dashboard exposes a timeline and operational note composer.
+- PR #90 adds incident assignees, an organization-scoped member list, assignment validation, assignment/unassignment timeline entries, and an assignee selector for active incidents. The migration adds `incidents.assigned_to` and expands allowed activity types.
+- Both PRs were squash-merged: #89 `564773bcd2375b2c7838403b3aa6132102c4420d`; #90 `4cc56bf622200e2d6c8826f968141bec69e99b84`.
+- No tests or builds were run. No GitHub Actions/builds were requested.
+
+### Next
+- Continue notification preferences and incident lifecycle controls, then finish project lifecycle and provider-neutral queue/self-hosted runtime work.
+- Keep `pnpm-lock.yaml` untouched; defer tests and builds.
