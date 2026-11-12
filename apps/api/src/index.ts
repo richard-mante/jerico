@@ -903,7 +903,7 @@ app.patch("/api/v1/notification-channels/:channelId", async (context) => withOrg
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
   const parsed = updateNotificationChannelSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide at least one valid notification channel setting.", details: parsed.error.flatten() } }, 400);
-  const [channel] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt }).from(notificationChannels).where(and(eq(notificationChannels.id, context.req.param("channelId")), eq(notificationChannels.organizationId, organizationId))).limit(1);
+  const [channel] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt, quietHoursEnabled: notificationChannels.quietHoursEnabled, quietHoursStart: notificationChannels.quietHoursStart, quietHoursEnd: notificationChannels.quietHoursEnd }).from(notificationChannels).where(and(eq(notificationChannels.id, context.req.param("channelId")), eq(notificationChannels.organizationId, organizationId))).limit(1);
   if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
   if (parsed.data.enabled === true && !channel.verifiedAt) return context.json({ error: { code: "CHANNEL_NOT_VERIFIED", message: "Verify this channel before enabling it." } }, 409);
   if (parsed.data.timezone !== undefined) {
