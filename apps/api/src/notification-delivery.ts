@@ -102,8 +102,11 @@ export async function queueIncidentNotifications(
     eq(notificationChannels.enabled, true),
     isNotNull(notificationChannels.verifiedAt),
   ));
+  const eligibleChannels = channels.filter((channel) => eventType === "incident.opened"
+    ? channel.notifyOnOpened
+    : eventType === "incident.acknowledged" ? channel.notifyOnAcknowledged : channel.notifyOnResolved);
 
-  for (const channel of channels) {
+  for (const channel of eligibleChannels) {
     const enqueueStartedAt = new Date();
     const enqueueLeaseExpiresAt = notificationEnqueueLeaseExpiresAt(enqueueStartedAt);
     const enqueueToken = crypto.randomUUID();
