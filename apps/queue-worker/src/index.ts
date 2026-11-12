@@ -101,6 +101,7 @@ async function shutdown(signal: string): Promise<void> {
 
 async function main(): Promise<void> {
   await pool.query("SELECT 1");
+  await telemetryQueue.health();
   await consumer.start();
   server.listen(port, "0.0.0.0", () => {
     console.info("Jerico self-hosted telemetry worker is ready", { port });
