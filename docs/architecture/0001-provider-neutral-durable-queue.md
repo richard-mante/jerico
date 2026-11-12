@@ -84,3 +84,8 @@ The self-hosted runtime must document database sizing, connection-pool limits, p
 - Queue polling adds database load and must be bounded, indexed, and benchmarked.
 - Cloudflare remains the managed-hosting implementation; no production routing changes are part of this decision.
 - Existing ingestion and notification outboxes remain in place during the migration and are not deleted until parity and recovery guarantees are demonstrated.
+
+
+## Invalid-message quarantine
+
+Queue consumers must validate message schema/version before processing. The provider-neutral `QueueDelivery.deadLetter(errorCode)` action is used for permanently invalid or unprocessable envelopes instead of acknowledging and silently discarding them. The PostgreSQL adapter immediately marks the active lease dead-lettered with a bounded error code. The Cloudflare adapter requests immediate retry so the configured `max_retries` policy routes the message to its configured dead-letter queue. Provider-specific timing differs, but the message is not acknowledged as successful. Telemetry DLQ inspection/replay remains operator-managed in the managed Cloudflare deployment; the self-hosted API exposes authenticated DLQ inspection/replay.
