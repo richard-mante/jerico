@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { Pool } from "pg";
-import { PostgresQueueAdapter } from "@jerico/queue/postgres";
+import { PostgresQueueAdapter, type PostgresPoolLike } from "@jerico/queue/postgres";
 import { PollingQueueConsumer } from "@jerico/queue/consumer";
 import {
   isValidTelemetryMessage,
@@ -42,7 +42,7 @@ const pool = new Pool({
 });
 
 const telemetryQueue = new PostgresQueueAdapter<TelemetryMessage>(
-  pool,
+  pool as unknown as PostgresPoolLike,
   process.env.TELEMETRY_QUEUE_NAME ?? "jerico-telemetry",
   { maxAttempts: integerEnv("QUEUE_MAX_ATTEMPTS", 5, 1, 100) },
 );
