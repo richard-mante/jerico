@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #72 — `b0ca6d15a6616d4f10836a75212253573407b7d3` (durable ingestion outbox work is in an unmerged PR)  
+**Latest feature merge:** PR #75 — durable telemetry idempotency outbox (`4e78253ff95db91274cb55c363bcc54029ed67fc`)  
 **Latest main merge:** PR #72 — `b0ca6d15a6616d4f10836a75212253573407b7d3`  
 **Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency publication race is serialized, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
 
@@ -88,7 +88,7 @@ Do not store any of these secrets in the repository. Use deployment secret store
 
 ## Outstanding work and next sequence
 
-1. **Durable ingestion outbox:** implementation is in review on branch `fix/durable-telemetry-idempotency-outbox`. The immutable envelope and daily quota reservation now commit before queue publication; request retries and the scheduled reconciler publish the stored envelope under a row lock. Pending rows are excluded from expiry cleanup. Add PostgreSQL-backed failure-injection and concurrency tests, then validate Cron/Queue behavior before merge.
+1. **Durable ingestion outbox:** PR #75 is merged. The immutable envelope and daily quota reservation commit before queue publication; request retries and the scheduled reconciler publish the stored envelope under a row lock. Pending rows are excluded from expiry cleanup. PostgreSQL-backed failure-injection/concurrency tests and real Cron/Queue validation remain outstanding.
 2. **ClickHouse event identity and deduplication:** the durable envelope preserves the original `acceptedAt`, event IDs, and any client timestamps across ambiguous queue/DB outcomes. This should keep retry rows on the same ReplacingMergeTree sorting key and partition. Verify this with ClickHouse integration tests, including a month-boundary retry fixture, before considering any table-key or partitioning change.  
 3. **Validation foundation:** restore GitHub-hosted runner allocation or establish a reachable local validation environment. The user will generate and commit the missing `pnpm-lock.yaml`; do not fabricate or modify it. Once it is present and a runner is available, install dependencies, run lint/typecheck/tests/build, and fix all findings. Latest run #213 failed before workflow steps were recorded; this is not a source-check result.
 4. **Database validation:** verify Drizzle schema/migration consistency; apply migrations to disposable PostgreSQL; test auth, tenant isolation, callback idempotency, and notification channel lifecycle.
@@ -184,17 +184,17 @@ Merged PR #68. Ingestion now applies the existing deterministic text-redaction p
 - Current ClickHouse identity risk: `ReplacingMergeTree` partitions by event timestamp and sorts by tenant/project/environment, timestamp, event type, then event ID. A same-ID retry with a different fallback timestamp can therefore survive `FINAL`; month-boundary timestamp changes also cross partitions. A durable fix is under design and must preserve retention, query pagination, aggregation semantics, and tenant isolation.
 
 
-### 2026-11-12 — durable telemetry idempotency outbox implementation (under review)
+### 2026-11-12 — durable telemetry idempotency outbox (PR #75 merged)
 
 - Reworked `apps/ingest/src/index.ts` so an idempotent request's immutable queue envelope and daily quota reservation commit in PostgreSQL before Cloudflare Queue publication begins.
 - Queue publication then locks the committed idempotency row, sends its stored envelope, and marks it accepted. If queue acceptance succeeds but the status transaction fails, the row remains pending; the next client retry or scheduled reconciliation republishes the same event IDs, acceptedAt, and fallback timestamps.
 - The existing 15-minute ingest Cron now recovers up to 100 pending rows per run using `FOR UPDATE SKIP LOCKED`, then removes only expired accepted rows. Pending records are never deleted by retention cleanup, so queue outages cannot silently erase reserved work.
 - No schema or migration change was required; the existing `project_ingestion_requests.envelope` JSONB field and pending/accepted status are reused. Non-idempotent ingestion behavior is unchanged.
-- Branch: `fix/durable-telemetry-idempotency-outbox`. Source commit: `966f2286c8b0458b9fb23749dd9ce2551a60a2d5`.
+- PR #75 merged to `main` as `4e78253ff95db91274cb55c363bcc54029ed67fc`; branch: `fix/durable-telemetry-idempotency-outbox`.
 - Review caveat: queue sends and status updates still cannot be a distributed transaction. Recovery is intentionally at-least-once; duplicate sends carry the exact same envelope and must be collapsed by the existing ClickHouse replacement identity.
-- No tests, typecheck, lint, build, PostgreSQL, or ClickHouse runtime checks have been executed. This work is not merged or production-validated. `pnpm-lock.yaml` and ClickHouse DDL were not changed.
+- No tests, typecheck, lint, build, PostgreSQL, or ClickHouse runtime checks have been executed. The change is merged but not production-validated. `pnpm-lock.yaml` and ClickHouse DDL were not changed.
 
 ### Next
 - Add PostgreSQL-backed tests for commit-before-publish durability, concurrent same-key requests, queue-send failure, queue-accepted/status-commit failure, and scheduled recovery with stable envelope timestamps.
 - Run ClickHouse integration tests proving identical retry envelopes collapse under `FINAL`, including timestamps near a month boundary.
-- Review transaction duration and batch recovery behavior against the deployed Hyperdrive/Cloudflare Queue runtime before merge.
+- Review transaction duration and batch recovery behavior against the deployed Hyperdrive/Cloudflare Queue runtime.
