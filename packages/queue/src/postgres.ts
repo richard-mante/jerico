@@ -150,8 +150,8 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
              OR (status = 'leased' AND lease_expires_at <= $2 AND attempts < max_attempts)
            )
          ORDER BY available_at ASC, created_at ASC
-         FOR UPDATE SKIP LOCKED
-         LIMIT $3`,
+         LIMIT $3
+         FOR UPDATE SKIP LOCKED`,
         [this.queueName, now, limit],
       );
       for (const row of candidates.rows) {
