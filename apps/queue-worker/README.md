@@ -1,6 +1,6 @@
 # Jerico self-hosted telemetry queue worker
 
-This Node.js service consumes telemetry envelopes from the PostgreSQL-backed queue and writes them to ClickHouse. It is the first self-hosted queue consumer; uptime probes and notification delivery remain on the managed Cloudflare runtime until their outbound-network security requirements are ported and reviewed.
+This Node.js service consumes telemetry, uptime-probe, and notification envelopes from PostgreSQL-backed queues. Telemetry is written to ClickHouse; uptime and notification handlers reuse the managed worker's business logic with a Node outbound transport that validates DNS results and pins each connection to a verified public IP.
 
 ## Requirements
 
@@ -21,6 +21,8 @@ Optional:
 - `CLICKHOUSE_TABLE` (default `telemetry_events`)
 - `CLICKHOUSE_USERNAME` / `CLICKHOUSE_PASSWORD`, or `CLICKHOUSE_TOKEN`
 - `TELEMETRY_QUEUE_NAME` (default `jerico-telemetry`)
+- `UPTIME_QUEUE_NAME` (default `jerico-uptime-probes`)
+- `NOTIFICATION_QUEUE_NAME` (default `jerico-notifications`)
 - `QUEUE_MAX_ATTEMPTS` (default `5`, range 1–100)
 - `QUEUE_BATCH_SIZE` (default `20`, range 1–100)
 - `QUEUE_VISIBILITY_TIMEOUT_SECONDS` (default `60`, range 1–3600)
@@ -29,6 +31,11 @@ Optional:
 - `HOST` (default `127.0.0.1`; set to `0.0.0.0` only inside a private container network)
 - `PORT` (default `8789`)
 - `QUEUE_ADMIN_TOKEN` (optional; at least 32 characters; enables authenticated dead-letter inspection and replay)
+- `API_URL` (required; private Compose uses `http://api:8787`)
+- `UPTIME_RESULTS_SECRET`, `NOTIFICATION_DELIVERY_SECRET`, and `WEBHOOK_ENCRYPTION_KEY` (required)
+- `PROBE_WORKER_HOST` (default `api`)
+- `ALLOW_INTERNAL_API_HTTP` (only set to `true` for the private Compose service `api:8787`)
+- `RESEND_API_KEY` and `EMAIL_FROM` (required for email notifications)
 
 Do not expose the health server publicly. It has no user authentication and should be reachable only by the local host or private container network.
 
@@ -52,15 +59,17 @@ The process handles SIGINT/SIGTERM and attempts a graceful stop. If a handler ou
 
 When `QUEUE_ADMIN_TOKEN` is configured, the private health server also exposes:
 
-- `GET /dead-letters?limit=50`: list dead-letter metadata (limit 1–100)
-- `GET /dead-letters/:id`: inspect one stored payload and its failure metadata
-- `POST /dead-letters/:id/replay`: explicitly reset the message for another attempt
+- `GET /dead-letters?queue=jerico-telemetry&limit=50`: list dead-letter metadata (limit 1–100)
+- `GET /dead-letters/:id?queue=jerico-uptime-probes`: inspect one stored payload and its failure metadata
+- `POST /dead-letters/:id/replay?queue=jerico-notifications`: explicitly reset the message for another attempt
+
+The `queue` query parameter accepts only the three configured queue names; it defaults to telemetry.
 
 Send `Authorization: Bearer <QUEUE_ADMIN_TOKEN>` with each request. Payload inspection may expose customer telemetry; keep this service on localhost/private networking and protect the token as a secret. Replay is allowed only for messages still in the dead-letter state; active deduplication conflicts are rejected.
 
 ## Compose infrastructure slice
 
-A PostgreSQL + ClickHouse + migration + telemetry-worker Compose stack is available at the repository root:
+A PostgreSQL + ClickHouse + migration + API + ingestion + multi-queue worker Compose stack is available at the repository root:
 
 ```sh
 cp infrastructure/self-hosted/.env.example .env
@@ -72,4 +81,4 @@ See [the self-hosted Compose guide](../../docs/self-hosting/telemetry-queue-comp
 
 ## Current scope
 
-This worker consumes telemetry only. The managed Cloudflare API and ingest services still publish to Cloudflare Queues; no production producer routing has switched to PostgreSQL. Uptime and notification jobs remain on the managed Cloudflare runtime. The Compose file is an infrastructure slice, not a complete self-hosted Jerico release. Docker build, Compose validation, and PostgreSQL/ClickHouse runtime checks are not yet confirmed.
+The self-hosted Compose stack runs the Node management API and ingestion service against PostgreSQL queue storage, and this worker consumes telemetry, uptime, and notification queues. The managed Cloudflare API/ingest/worker deployment remains unchanged. Public outbound requests from the Node worker use DNS resolution checks and a pinned socket lookup; private, loopback, link-local, reserved, and mixed public/private DNS results are rejected. Uptime redirects are revalidated individually and webhook redirects are rejected. The web dashboard and backup/restore workflow are still outside this Compose slice. Docker build, Compose validation, and PostgreSQL/ClickHouse runtime checks are not yet confirmed.
