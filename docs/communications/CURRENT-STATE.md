@@ -5,6 +5,10 @@
 **Main branch:** `main`  
 **Latest feature merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14`  
 **Latest main merge:** PR #68 — `fbdda443b48ba6563238c810c3454e4644649f14`  
+
+
+- **Worker queue validation:** branch `fix/worker-telemetry-message-validation` adds strict telemetry envelope/event validation using shared contracts and regression cases. Invalid poison messages are logged and acknowledged; ClickHouse write failures still retry. Draft PR not yet opened; checks not executed.
+
 **Current milestone:** Phase 5E — signed webhook notifications merged, with alert-evaluation concurrency and uptime-scheduler claim hardening merged; implementation is present, but manual/runtime validation and infrastructure provisioning remain release blockers.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
