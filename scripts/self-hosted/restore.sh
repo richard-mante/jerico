@@ -18,6 +18,18 @@ fi
 
 POSTGRES_FILE="$BACKUP_DIR/postgres-$STAMP.dump"
 CLICKHOUSE_FILE="$BACKUP_DIR/clickhouse-$STAMP.tar.gz"
+if [[ -f "$POSTGRES_FILE.age" && -f "$CLICKHOUSE_FILE.age" ]]; then
+  POSTGRES_FILE="$POSTGRES_FILE.age"
+  CLICKHOUSE_FILE="$CLICKHOUSE_FILE.age"
+  if [[ -z "${AGE_IDENTITY:-}" ]]; then
+    echo "AGE_IDENTITY must point to the private age identity used for this backup." >&2
+    exit 1
+  fi
+  if ! command -v age >/dev/null 2>&1; then
+    echo "The age command is required to decrypt this backup." >&2
+    exit 1
+  fi
+fi
 for file in "$POSTGRES_FILE" "$CLICKHOUSE_FILE" "$POSTGRES_FILE.sha256" "$CLICKHOUSE_FILE.sha256"; do
   if [[ ! -f "$file" ]]; then
     echo "Missing backup artifact: $file" >&2
@@ -26,9 +38,20 @@ for file in "$POSTGRES_FILE" "$CLICKHOUSE_FILE" "$POSTGRES_FILE.sha256" "$CLICKH
 done
 (
   cd "$BACKUP_DIR"
-  sha256sum -c "postgres-$STAMP.dump.sha256"
-  sha256sum -c "clickhouse-$STAMP.tar.gz.sha256"
+  sha256sum -c "$(basename "$POSTGRES_FILE").sha256"
+  sha256sum -c "$(basename "$CLICKHOUSE_FILE").sha256"
 )
+
+RESTORE_TMP=""
+if [[ "$POSTGRES_FILE" == *.age ]]; then
+  RESTORE_TMP="$(mktemp -d)"
+  chmod 700 "$RESTORE_TMP"
+  trap 'rm -rf "$RESTORE_TMP"' EXIT
+  age --decrypt --identity "$AGE_IDENTITY" --output "$RESTORE_TMP/postgres.dump" "$POSTGRES_FILE"
+  age --decrypt --identity "$AGE_IDENTITY" --output "$RESTORE_TMP/clickhouse.tar.gz" "$CLICKHOUSE_FILE"
+  POSTGRES_FILE="$RESTORE_TMP/postgres.dump"
+  CLICKHOUSE_FILE="$RESTORE_TMP/clickhouse.tar.gz"
+fi
 
 compose=(docker compose -f "$COMPOSE_FILE")
 
