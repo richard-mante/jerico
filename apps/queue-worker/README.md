@@ -1,6 +1,6 @@
 # Jerico self-hosted telemetry queue worker
 
-This Node.js service consumes telemetry envelopes from the PostgreSQL-backed queue and writes them to ClickHouse. It is the first self-hosted queue consumer; uptime probes and notification delivery remain on the managed Cloudflare runtime until their outbound-network security requirements are ported and reviewed.
+This Node.js service consumes telemetry, uptime-probe, and notification envelopes from PostgreSQL-backed queues. Telemetry is written to ClickHouse; uptime and notification handlers reuse the managed worker's business logic with a Node outbound transport that validates DNS results and pins each connection to a verified public IP.
 
 ## Requirements
 
@@ -29,6 +29,11 @@ Optional:
 - `HOST` (default `127.0.0.1`; set to `0.0.0.0` only inside a private container network)
 - `PORT` (default `8789`)
 - `QUEUE_ADMIN_TOKEN` (optional; at least 32 characters; enables authenticated dead-letter inspection and replay)
+- `API_URL` (required; private Compose uses `http://api:8787`)
+- `UPTIME_RESULTS_SECRET`, `NOTIFICATION_DELIVERY_SECRET`, and `WEBHOOK_ENCRYPTION_KEY` (required)
+- `PROBE_WORKER_HOST` (default `api`)
+- `ALLOW_INTERNAL_API_HTTP` (only set to `true` for the private Compose service `api:8787`)
+- `RESEND_API_KEY` and `EMAIL_FROM` (required for email notifications)
 
 Do not expose the health server publicly. It has no user authentication and should be reachable only by the local host or private container network.
 
