@@ -1,5 +1,5 @@
 import { isValidTelemetryMessage, writeToClickHouse } from "./telemetry";
-import type { ClickHouseEnv, TelemetryEvent, TelemetryMessage } from "./telemetry";
+import type { ClickHouseEnv, TelemetryMessage } from "./telemetry";
 export { escapeIdentifier, isValidTelemetryMessage, toRow, writeToClickHouse } from "./telemetry";
 export type { ClickHouseEnv, TelemetryEvent, TelemetryMessage } from "./telemetry";
 import { adaptCloudflareQueueBatch } from "@jerico/queue/cloudflare";
