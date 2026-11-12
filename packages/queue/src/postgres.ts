@@ -48,7 +48,11 @@ function boundedInteger(value: number, minimum: number, maximum: number, label: 
   return value;
 }
 
-function defaultRetryDelaySeconds(attempt: number): number {\n  return Math.min(5 * 2 ** Math.max(0, attempt - 1), 3_600);\n}\n\nfunction safeErrorCode(value: string): string {
+function defaultRetryDelaySeconds(attempt: number): number {
+  return Math.min(5 * 2 ** Math.max(0, attempt - 1), 3_600);
+}
+
+function safeErrorCode(value: string): string {
   return /^[a-z0-9_.-]{1,80}$/i.test(value) ? value : "handler_error";
 }
 
