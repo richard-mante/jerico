@@ -307,6 +307,21 @@ export const incidents = pgTable("incidents", {
 
 
 
+export const incidentActivity = pgTable("incident_activity", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  projectId: text("project_id").notNull(),
+  incidentId: text("incident_id").notNull(),
+  actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+  activityType: text("activity_type").notNull(),
+  body: text("body"),
+  createdAt: createdAt(),
+}, (t) => [
+  check("incident_activity_type_check", sql`${t.activityType} IN ('opened', 'acknowledged', 'resolved', 'note')`),
+  foreignKey({ name: "incident_activity_incident_same_project_fk", columns: [t.incidentId, t.organizationId, t.projectId], foreignColumns: [incidents.id, incidents.organizationId, incidents.projectId] }).onDelete("cascade"),
+  index("incident_activity_incident_created_idx").on(t.incidentId, t.createdAt),
+]);
+
 export const notificationChannels = pgTable("notification_channels", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
@@ -363,4 +378,4 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   index("notification_deliveries_enqueue_retry_idx").on(t.status, t.lastErrorCode, t.nextEnqueueAt),
   index("notification_deliveries_outbox_lease_idx").on(t.status, t.enqueuedAt, t.nextEnqueueAt),
 ]);
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, notificationChannels, notificationDeliveries };
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, incidentActivity, notificationChannels, notificationDeliveries };
