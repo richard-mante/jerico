@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; lastVerificationErrorCode: string | null; createdAt: string };
+type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean; lastVerificationErrorCode: string | null; createdAt: string };
 type Delivery = { id: string; incidentId: string; target: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -130,6 +130,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
                 <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnOpened} onChange={() => void updateChannel(channel, { notifyOnOpened: !channel.notifyOnOpened })} />Opened</label>
                 <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnAcknowledged} onChange={() => void updateChannel(channel, { notifyOnAcknowledged: !channel.notifyOnAcknowledged })} />Acknowledged</label>
                 <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnResolved} onChange={() => void updateChannel(channel, { notifyOnResolved: !channel.notifyOnResolved })} />Resolved</label>
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnReopened} onChange={() => void updateChannel(channel, { notifyOnReopened: !channel.notifyOnReopened })} />Reopened</label>
               </div>}</div>
             <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}{channel.verifiedAt && <button disabled={busy} onClick={() => void toggleChannel(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{channel.enabled ? "Pause" : "Enable"}</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
           </div>)}
