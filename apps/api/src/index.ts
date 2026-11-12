@@ -718,6 +718,7 @@ app.get("/api/v1/notification-channels", async (context) => withOrganization(con
     notifyOnOpened: notificationChannels.notifyOnOpened,
     notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged,
     notifyOnResolved: notificationChannels.notifyOnResolved,
+    notifyOnReopened: notificationChannels.notifyOnReopened,
     lastVerificationErrorCode: notificationChannels.lastVerificationErrorCode,
     createdAt: notificationChannels.createdAt,
   }).from(notificationChannels).where(eq(notificationChannels.organizationId, organizationId)).orderBy(desc(notificationChannels.createdAt));
@@ -1069,13 +1070,29 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/acknowledge", async 
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
-  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "acknowledged", body: null });
+  const activityId = crypto.randomUUID();
+  await database.insert(incidentActivity).values({ id: activityId, organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "acknowledged", body: null });
   await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
-  }, "incident.acknowledged");
+  }, "incident.acknowledged", activityId);
   return context.json({ data: updated });
 }));
 
+app.post("/api/v1/projects/:projectId/incidents/:incidentId/reopen", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
+  const now = new Date();
+  const [updated] = await database.update(incidents).set({ status: "open", resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null, updatedAt: now }).where(and(
+    eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "resolved"),
+  )).returning();
+  if (!updated) {
+    const [existing] = await database.select({ id: incidents.id, status: incidents.status }).from(incidents).where(and(eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId))).limit(1);
+    if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
+    return context.json({ error: { code: "NOT_REOPENABLE", message: "Only resolved incidents can be reopened." }, data: existing }, 409);
+  }
+  const activityId = crypto.randomUUID();
+  await database.insert(incidentActivity).values({ id: activityId, organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "reopened", body: "Incident reopened manually." });
+  await safelyQueueIncidentNotifications(database, context.env, { id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue }, "incident.reopened", activityId);
+  return context.json({ data: updated });
+}));
 app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (context) => withOrganization(context, async (database, organizationId, _role, userId) => {
   const now = new Date();
   const [updated] = await database.update(incidents).set({ status: "resolved", resolvedAt: now, updatedAt: now })
@@ -1086,10 +1103,11 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/resolve", async (con
     if (!existing) return context.json({ error: { code: "NOT_FOUND", message: "Incident not found in this project." } }, 404);
     return context.json({ data: existing });
   }
-  await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "resolved", body: "Resolved manually." });
+  const activityId = crypto.randomUUID();
+  await database.insert(incidentActivity).values({ id: activityId, organizationId, projectId: updated.projectId, incidentId: updated.id, actorId: userId, activityType: "resolved", body: "Resolved manually." });
   await safelyQueueIncidentNotifications(database, context.env, {
     id: updated.id, organizationId, projectId: updated.projectId, title: updated.title, triggerValue: updated.triggerValue,
-  }, "incident.resolved");
+  }, "incident.resolved", activityId);
   return context.json({ data: updated });
 }));
 
