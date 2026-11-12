@@ -293,6 +293,9 @@ app.post("/ingest/v1/events", async (context) => {
             if (!usage || usage.eventCount > limit) {
               throw new DailyQuotaExceeded(secondsUntilUtcMidnight());
             }
+            await transaction.update(projectIngestionKeys)
+              .set({ lastUsedAt: new Date() })
+              .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
             return { kind: "pending" as const, id: created.id };
           }
 
@@ -310,6 +313,9 @@ app.post("/ingest/v1/events", async (context) => {
           if (!existing) throw new Error("Idempotency record disappeared during reservation.");
           if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
           if (existing.expiresAt.getTime() <= Date.now()) return { kind: "expired" as const };
+          await transaction.update(projectIngestionKeys)
+            .set({ lastUsedAt: new Date() })
+            .where(and(eq(projectIngestionKeys.id, credential.id), isNull(projectIngestionKeys.revokedAt)));
           if (existing.status === "accepted") {
             return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
           }
