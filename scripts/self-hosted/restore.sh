@@ -44,6 +44,7 @@ until "${compose[@]}" exec -T clickhouse sh -c \
 "${compose[@]}" exec -T postgres createdb --maintenance-db=postgres -U jerico jerico
 "${compose[@]}" exec -T postgres pg_restore -U jerico -d jerico --no-owner --clean --if-exists < "$POSTGRES_FILE"
 
+"${compose[@]}" exec -T clickhouse sh -c 'mkdir -p /var/lib/clickhouse/backups && chown clickhouse:clickhouse /var/lib/clickhouse/backups'
 "${compose[@]}" exec -T clickhouse tar -C /var/lib/clickhouse/backups -xzf - < "$CLICKHOUSE_FILE"
 "${compose[@]}" exec -T clickhouse sh -c \
   'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "$1"' \
