@@ -16,6 +16,12 @@ type Incident = {
   id: string; alertRuleId: string; title: string; status: "open" | "acknowledged" | "resolved";
   triggerValue: number; startedAt: string; lastTriggeredAt: string; resolvedAt: string | null;
 };
+type NotificationDelivery = {
+  id: string; incidentId: string; channelId: string; target: string; eventType: string;
+  status: "queued" | "sent" | "failed"; attempts: number; enqueueAttempts: number;
+  providerMessageId: string | null; lastErrorCode: string | null; lastAttemptAt: string | null;
+  sentAt: string | null; createdAt: string;
+};
 const metricLabels: Record<Metric, string> = {
   error_count: "Error count",
   uptime_down: "Failed uptime checks",
@@ -32,6 +38,7 @@ export function ProjectAlertManager() {
   const organizationId = session?.session.activeOrganizationId ?? "";
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [name, setName] = useState("High error volume");
   const [metric, setMetric] = useState<Metric>("error_count");
   const [threshold, setThreshold] = useState("10");
@@ -58,12 +65,14 @@ export function ProjectAlertManager() {
   }
   async function refresh() {
     if (!organizationId || !projectId) return;
-    const [rulePayload, incidentPayload] = await Promise.all([
+    const [rulePayload, incidentPayload, deliveryPayload] = await Promise.all([
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/alert-rules`),
       request(`/api/v1/projects/${encodeURIComponent(projectId)}/incidents?limit=50`),
+      request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries?limit=50`),
     ]);
     setRules((rulePayload.data ?? []) as AlertRule[]);
     setIncidents((incidentPayload.data ?? []) as Incident[]);
+    setDeliveries((deliveryPayload.data ?? []) as NotificationDelivery[]);
   }
   useEffect(() => {
     if (!organizationId || !projectId) return;
@@ -121,6 +130,18 @@ export function ProjectAlertManager() {
     } finally { setBusy(false); }
   }
 
+
+  async function retryDelivery(delivery: NotificationDelivery) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/notification-deliveries/${encodeURIComponent(delivery.id)}/retry`, { method: "POST" });
+      setNotice("Notification retry queued. Delivery history will update when the worker processes it.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not retry notification delivery.");
+    } finally { setBusy(false); }
+  }
+
   if (isPending) return <main className="min-h-screen bg-[#090b10] p-8 text-sm text-[#929aaa]">Loading alert rules…</main>;
   if (!session) return <main className="min-h-screen bg-[#090b10] p-8 text-[#f5f7fb]"><Link href="/sign-in">Sign in to continue</Link></main>;
 
@@ -159,6 +180,17 @@ export function ProjectAlertManager() {
               </div>
             </section>
             <NotificationChannelManager projectId={projectId} organizationId={organizationId} />
+            <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+              <div className="flex items-center justify-between"><div><h2 className="font-semibold">Notification delivery history</h2><p className="mt-1 text-xs text-[#737b89]">Recent email and webhook attempts for this project</p></div><span className="text-xs text-[#929aaa]">{deliveries.length} recent</span></div>
+              <div className="mt-4 divide-y divide-white/10">
+                {deliveries.map((delivery) => <div key={delivery.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium">{delivery.eventType.replaceAll(".", " ")}</p><span className={`rounded-full px-2 py-1 text-[10px] ${delivery.status === "sent" ? "bg-[#d9f36a]/10 text-[#d9f36a]" : delivery.status === "failed" ? "bg-red-400/10 text-red-300" : "bg-blue-400/10 text-blue-300"}`}>{delivery.status}</span></div><p className="mt-1 truncate text-xs text-[#929aaa]">{delivery.target}</p><p className="mt-1 text-xs text-[#737b89]">{when(delivery.createdAt)} · {delivery.attempts} provider attempts{delivery.lastErrorCode ? ` · ${delivery.lastErrorCode}` : ""}</p></div>
+                  {delivery.status === "failed" && <button disabled={busy} onClick={() => void retryDelivery(delivery)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3] disabled:opacity-50">Retry delivery</button>}
+                </div>)}
+                {!deliveries.length && <p className="py-8 text-center text-sm text-[#737b89]">No notification deliveries yet. Verify an email or webhook channel to receive incident updates.</p>}
+              </div>
+            </section>
+
             <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
               <div className="flex items-center justify-between"><div><h2 className="font-semibold">Incidents</h2><p className="mt-1 text-xs text-[#737b89]">Active and recent incident history</p></div><span className="text-xs text-[#929aaa]">{incidents.filter((item) => item.status !== "resolved").length} active</span></div>
               <div className="mt-4 divide-y divide-white/10">
