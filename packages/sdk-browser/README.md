@@ -27,6 +27,7 @@ Call `identify(userId)` only when the application has a legitimate reason to ass
 ## Lifecycle
 
 - `flush()` explicitly sends buffered events.
+- Ingestion requests time out after 10 seconds by default; configure `requestTimeoutMs` (100–120,000 ms) for slower endpoints.
 - `close()` removes instrumentation listeners and flushes the remaining in-memory queue.
 - Buffered events are not persisted across a browser crash or forced page termination.
 
