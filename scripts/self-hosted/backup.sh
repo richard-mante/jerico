@@ -37,6 +37,8 @@ CLICKHOUSE_FILE="clickhouse-$STAMP.tar.gz"
 
 "${compose[@]}" exec -T postgres pg_dump -U jerico -d jerico -Fc > "$BACKUP_DIR/$POSTGRES_FILE"
 
+"${compose[@]}" exec -T clickhouse sh -c 'mkdir -p /var/lib/clickhouse/backups && chown clickhouse:clickhouse /var/lib/clickhouse/backups'
+
 "${compose[@]}" exec -T clickhouse sh -c \
   'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "$1"' \
   sh "BACKUP DATABASE jerico TO Disk('backups', '$STAMP')"
