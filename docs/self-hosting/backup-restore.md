@@ -12,12 +12,12 @@ bash scripts/self-hosted/backup.sh
 
 Artifacts are written to the repository-root `backups/` directory by default:
 
-- `postgres-<timestamp>.dump`: PostgreSQL custom-format dump.
-- `clickhouse-<timestamp>.tar.gz`: ClickHouse native database backup archive.
+- `postgres-<timestamp>.dump` and `clickhouse-<timestamp>.tar.gz`: plaintext PostgreSQL and ClickHouse archives when encryption is not configured.
+- The same archive names with an additional `.age` suffix when `AGE_RECIPIENT` is configured; only the encrypted artifacts are retained.
 - SHA-256 checksum files for both archives.
 - A JSON manifest with timestamp and restore command.
 
-You can choose another directory with `BACKUP_DIR=/secure/path`. Files are created with restrictive permissions. Backups contain credentials, configuration, and customer telemetry: encrypt them before off-site transfer, restrict access, and apply your own retention policy.
+You can choose another directory with `BACKUP_DIR=/secure/path`. Files are created with restrictive permissions. For client-side encryption at rest, install [age](https://age-encryption.org/) on the host and set `AGE_RECIPIENT` to the recipient public key before running the backup. The script encrypts both archives before calculating checksums and removes the plaintext copies. Keep the matching private identity outside the server and outside the backup directory. For an encrypted restore, set `AGE_IDENTITY=/secure/path/backup-identity.txt` when running the restore command. If `AGE_RECIPIENT` is unset, backups remain plaintext; protect the backup directory and encrypt before off-site transfer. Apply your own retention policy.
 
 The ClickHouse server is configured with a local backup disk at `/var/lib/clickhouse/backups`. The backup archive is also copied to the host backup directory, so the host artifact remains available independently of the container volume.
 
@@ -43,7 +43,8 @@ The restore script intentionally requires `CONFIRM_DESTRUCTIVE_RESTORE=YES`. Kee
 ## Recovery limitations
 
 - A backup is only as good as its off-site copy and restore drill. Schedule regular restore exercises on a separate host.
-- These scripts do not encrypt backups. Use encrypted disks or encrypt archives before uploading to object storage.
+- Encryption is optional and uses age when `AGE_RECIPIENT` is configured. Protect the private identity separately; losing it makes encrypted backups unrecoverable.
+- The scripts do not automatically prune old backups; configure an explicit retention policy for the backup directory.
 - The scripts do not automatically prune old backups; configure an explicit retention policy for the backup directory.
 - A full disaster recovery plan should also preserve the `.env` secrets and Caddy's `jerico-caddy-data` volume (ACME certificates/state). Store secrets separately and securely.
 - Docker, ClickHouse backup/restore, PostgreSQL restore, and full application recovery have not yet been executed in this repository environment. Treat the scripts as an implementation, not a verified recovery guarantee.
