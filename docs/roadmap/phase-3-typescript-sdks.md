@@ -52,7 +52,7 @@ These examples are documentation only; they have not yet been run in sample appl
 
 ## Request-level batch idempotency
 
-The SDK core now generates one UUID idempotency key per batch and reuses the exact key and request body when an explicit `flush()` retries a failed batch. Requests are bounded by the configurable `requestTimeoutMs` (10 seconds by default; 100–120,000 ms); an aborted/ambiguous batch retains the same key and body. SDK batches are byte-aware (80 KiB default, 96 KiB maximum) to stay within the ingestion request limit and provider queue envelope budget. This is safe only when paired with the ingestion service's `Idempotency-Key` implementation and migration. Automatic retries remain disabled; buffers remain memory-only.
+The SDK core now generates one UUID idempotency key per batch and reuses the exact key and request body when an explicit `flush()` retries a failed batch. Requests are bounded by the configurable `requestTimeoutMs` (10 seconds by default; 100–120,000 ms); an aborted/ambiguous batch retains the same key and body. SDK batches are byte-aware (80 KiB default, 96 KiB maximum) to stay within the ingestion request limit and provider queue envelope budget. Events that cannot fit individually are rejected before enqueue and reported through `onError`. This is safe only when paired with the ingestion service's `Idempotency-Key` implementation and migration. Automatic retries remain disabled; buffers remain memory-only.
 
 
 ## Core Web Vitals ratings
