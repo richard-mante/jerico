@@ -8,7 +8,7 @@ Shared TypeScript telemetry client used by the Jerico browser and Node SDKs.
 - Explicit `flush()` and graceful `close()` lifecycle methods.
 - Events, errors, logs, metrics, and spans.
 - Request-level idempotency keys reused with the exact batch payload after an ambiguous failure.
-- Configurable endpoint, queue/batch limits, flush interval, fetch implementation, and non-throwing error callback.
+- Configurable endpoint, queue/batch limits, flush interval, request timeout (10 seconds by default; 100–120,000 ms), fetch implementation, and non-throwing error callback.
 
 This package is an internal workspace dependency. It is not currently published to npm.
 
