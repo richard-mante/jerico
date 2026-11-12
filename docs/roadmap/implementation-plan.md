@@ -154,7 +154,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 
 
 ### Durable ingestion outbox review gate
-- [x] Persist idempotent envelope and quota reservation before contacting Cloudflare Queues (implementation on review branch; not merged).
+- [x] Persist idempotent envelope and quota reservation before contacting Cloudflare Queues (merged in PR #75).
 - [x] Recover pending rows from the existing 15-minute ingest Cron using row locks and `SKIP LOCKED`.
 - [x] Exclude pending rows from idempotency expiry cleanup.
 - [ ] Add PostgreSQL-backed failure-injection coverage for queue send failure and queue acceptance followed by DB commit failure.
