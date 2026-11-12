@@ -111,7 +111,28 @@ async function main(): Promise<void> {
   await queue.health();
   await maintainOutbox();
   server = serve({
-    fetch: (request) => ingestApp.fetch(request, bindings),
+    fetch: async (request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && (url.pathname === "/health" || url.pathname === "/ready")) {
+        try {
+          await pool.query("SELECT 1");
+          const queueHealth = await queue.health();
+          return Response.json({
+            status: queueHealth.status,
+            service: "jerico-ingest-node",
+            ready: true,
+            ...(url.pathname === "/ready" ? { queue: queueHealth } : {}),
+          });
+        } catch {
+          return Response.json({
+            status: "unavailable",
+            service: "jerico-ingest-node",
+            ready: false,
+          }, { status: 503 });
+        }
+      }
+      return ingestApp.fetch(request, bindings);
+    },
     hostname,
     port,
   }, (info) => {
