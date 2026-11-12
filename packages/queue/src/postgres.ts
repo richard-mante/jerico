@@ -48,7 +48,7 @@ function boundedInteger(value: number, minimum: number, maximum: number, label: 
   return value;
 }
 
-function safeErrorCode(value: string): string {
+function defaultRetryDelaySeconds(attempt: number): number {\n  return Math.min(5 * 2 ** Math.max(0, attempt - 1), 3_600);\n}\n\nfunction safeErrorCode(value: string): string {
   return /^[a-z0-9_.-]{1,80}$/i.test(value) ? value : "handler_error";
 }
 
@@ -74,7 +74,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
     this.pool = pool;
     this.queueName = queueName;
     this.maxAttempts = boundedInteger(options.maxAttempts ?? 5, 1, 100, "maxAttempts");
-    this.maxPayloadBytes = boundedInteger(options.maxPayloadBytes ?? 256 * 1024, 1024, 1024 * 1024, "maxPayloadBytes");
+    this.maxPayloadBytes = boundedInteger(options.maxPayloadBytes ?? 256 * 1024, 1024, 256 * 1024, "maxPayloadBytes");
   }
 
   async send(message: TMessage, options: QueueSendOptions = {}): Promise<void> {
@@ -176,7 +176,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
       body: row.payload,
       attempts: row.attempts,
       ack: () => this.ack(row.id, leaseToken),
-      retry: (options) => this.retry(row.id, leaseToken, row.attempts, row.max_attempts, options?.delaySeconds ?? 0, options?.errorCode),
+      retry: (options) => this.retry(row.id, leaseToken, row.attempts, row.max_attempts, options?.delaySeconds ?? defaultRetryDelaySeconds(row.attempts), options?.errorCode),
     }));
     return { queue: this.queueName, messages };
   }
