@@ -491,6 +491,23 @@ async function processNotificationBatch(batch: QueueBatch<NotificationMessage>, 
   }
 }
 
+export type SelfHostedQueueName =
+  | "jerico-uptime-probes"
+  | "jerico-notifications";
+
+export async function processSelfHostedQueueDelivery(
+  queueName: SelfHostedQueueName,
+  delivery: QueueDelivery<UptimeProbeMessage | NotificationMessage>,
+  env: WorkerEnv,
+): Promise<void> {
+  const batch = { queue: queueName, messages: [delivery] };
+  if (queueName === "jerico-uptime-probes") {
+    await processUptimeProbeBatch(batch as QueueBatch<UptimeProbeMessage>, env);
+    return;
+  }
+  await processNotificationBatch(batch as QueueBatch<NotificationMessage>, env);
+}
+
 export default {
   async queue(batch: MessageBatch<TelemetryMessage | UptimeProbeMessage | NotificationMessage>, env: WorkerEnv): Promise<void> {
     const queueBatch = adaptCloudflareQueueBatch(batch);
