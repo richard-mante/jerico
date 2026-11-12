@@ -84,7 +84,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       setError(cause instanceof Error ? cause.message : "Could not resend verification email.");
     } finally { setBusy(false); }
   }
-  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved">>) {
+  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved" | "notifyOnReopened">>) {
     setBusy(true); setError(""); setNotice("");
     try { await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, { method: "PATCH", body: JSON.stringify(settings) }); setNotice(settings.enabled !== undefined ? settings.enabled ? "Notification channel enabled." : "Notification channel paused." : "Notification preferences saved."); await refresh(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update notification channel."); } finally { setBusy(false); }
