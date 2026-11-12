@@ -176,3 +176,15 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - Prioritize functional product implementation and user-facing workflows.
 - Defer writing/running tests and all GitHub Actions/builds until the user explicitly asks to resume validation.
 - Keep `pnpm-lock.yaml` untouched.
+### Additional product functionality
+- [x] Edit alert rule configuration from the project dashboard (PR #85).
+- [x] Pause and re-enable verified notification channels (PR #86).
+- [x] Create and edit project environments, including transactional production designation changes (PR #87).
+- [ ] Incident ownership, activity timeline, and operator notes.
+- [ ] Per-event notification preferences and quiet-hour configuration.
+- [ ] Provider-neutral queue adapter and self-hosted runtime/deployment workflow.
+
+### Current execution direction
+- Prioritize functional product implementation and user-facing workflows.
+- Defer writing/running tests and all GitHub Actions/builds until the user explicitly asks to resume validation.
+- Keep `pnpm-lock.yaml` untouched.
