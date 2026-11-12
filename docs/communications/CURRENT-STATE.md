@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-12  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature merge:** PR #77 — outbox recovery observability (`f68b84f637df72354c740e07c558cf5c6f982c1c`)  
+**Latest feature merge:** PR #78 — outbox recovery observability (`f68b84f637df72354c740e07c558cf5c6f982c1c`)  
 **Latest main merge:** PR #77 — `f68b84f637df72354c740e07c558cf5c6f982c1c`  
 **Current milestone:** Phase 5E reliability hardening — PRs #70–#72 are merged. The ingest idempotency outbox is durable, credential usage timestamps include idempotent requests, OAuth-style secret assignments are redacted, and Worker telemetry queue envelopes are validated. Manual/runtime validation and infrastructure provisioning remain release blockers.
 
