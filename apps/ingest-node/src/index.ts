@@ -64,19 +64,22 @@ const bindings: Bindings = {
 const port = integerEnv("PORT", 8788, 1, 65_535);
 const hostname = process.env.HOST?.trim() || "127.0.0.1";
 let maintenanceRunning = false;
+let activeMaintenance: Promise<void> | null = null;
 let shuttingDown = false;
 
 async function maintainOutbox(): Promise<void> {
   if (maintenanceRunning || shuttingDown) return;
   maintenanceRunning = true;
-  try {
-    await runScheduledIngestMaintenance(bindings);
-  } catch (error) {
+  activeMaintenance = runScheduledIngestMaintenance(bindings).catch((error) => {
     console.error("Self-hosted ingestion outbox maintenance failed", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
+  });
+  try {
+    await activeMaintenance;
   } finally {
     maintenanceRunning = false;
+    activeMaintenance = null;
   }
 }
 
@@ -88,6 +91,7 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(maintenanceTimer);
+  if (activeMaintenance) await activeMaintenance;
   console.info("Stopping Jerico self-hosted ingestion API", { signal });
   if (server) {
     await new Promise<void>((resolve, reject) => {
