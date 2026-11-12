@@ -132,22 +132,24 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
             }).onConflictDoNothing().returning({ id: incidents.id });
             if (created) {
               opened += 1;
-              await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId: rule.organizationId, projectId: rule.projectId, incidentId: created.id, actorId: null, activityType: "opened", body: "Incident opened by alert evaluation." });
+              const activityId = crypto.randomUUID();
+              await database.insert(incidentActivity).values({ id: activityId, organizationId: rule.organizationId, projectId: rule.projectId, incidentId: created.id, actorId: null, activityType: "opened", body: "Incident opened by alert evaluation." });
               await safelyQueueIncidentNotifications(database, env, {
                 id: created.id, organizationId: rule.organizationId, projectId: rule.projectId,
                 title: rule.name, triggerValue: Math.round(value),
-              }, "incident.opened");
+              }, "incident.opened", activityId);
             }
           }
         } else if (!breached && active[0]) {
           await database.update(incidents).set({
             status: "resolved", resolvedAt: now, updatedAt: now,
           }).where(eq(incidents.id, active[0].id));
-          await database.insert(incidentActivity).values({ id: crypto.randomUUID(), organizationId: rule.organizationId, projectId: rule.projectId, incidentId: active[0].id, actorId: null, activityType: "resolved", body: "Automatically resolved after the signal returned below threshold." });
+          const activityId = crypto.randomUUID();
+          await database.insert(incidentActivity).values({ id: activityId, organizationId: rule.organizationId, projectId: rule.projectId, incidentId: active[0].id, actorId: null, activityType: "resolved", body: "Automatically resolved after the signal returned below threshold." });
           await safelyQueueIncidentNotifications(database, env, {
             id: active[0].id, organizationId: rule.organizationId, projectId: rule.projectId,
             title: rule.name, triggerValue: Math.round(value),
-          }, "incident.resolved");
+          }, "incident.resolved", activityId);
           resolved += 1;
         }
       } finally {
