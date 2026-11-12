@@ -1100,7 +1100,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/reopen", async (cont
     eq(incidents.alertRuleId, candidate.alertRuleId), or(eq(incidents.status, "open"), eq(incidents.status, "acknowledged")), ne(incidents.id, candidate.id),
   )).limit(1);
   if (active) return context.json({ error: { code: "ACTIVE_INCIDENT_EXISTS", message: "This alert rule already has an active incident. Resolve it before reopening this one." } }, 409);
-  const [updated] = await database.update(incidents).set({ status: "open", resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null, escalatedAt: null, escalationCount: 0, updatedAt: now }).where(and(
+  const [updated] = await database.update(incidents).set({ status: "open", startedAt: now, lastTriggeredAt: now, resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null, escalatedAt: null, escalationCount: 0, updatedAt: now }).where(and(
     eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "resolved"),
   )).returning();
   if (!updated) {
