@@ -916,3 +916,14 @@
 - Explicit limitation: API/ingest remain on Cloudflare and publish to Cloudflare Queues. The Compose slice does not yet receive live self-hosted telemetry from those producers and does not include the full web/API/auth, uptime, or notification runtime.
 - PR #116 merged as `572b5c4b21e165a0337c4ae9bbb6af961bcdc192`. PR #115 was closed as superseded because its worker code was already present on main; PR #116 was rebuilt from current main to avoid merging stale duplicate worker changes.
 - No tests, typecheck, lint, Docker build, Compose validation, migrations, or database runtime checks were run. No validation is claimed. `pnpm-lock.yaml` was not modified.
+
+
+## 2026-11-12 — Self-hosted API and safe worker runtime
+
+- Merged PR #118: added a standalone Node ingestion API that reuses the existing Hono ingestion routes and writes directly to the PostgreSQL telemetry queue. Added per-credential PostgreSQL fixed-window rate limits (migration 0023) and scheduled idempotency outbox recovery. Managed Cloudflare ingestion remains unchanged.
+- Merged PR #120: added a Node management API using existing Hono/Better Auth handlers; PostgreSQL uptime and notification publishers; scheduled alert evaluation, uptime scheduling, notification enqueue reconciliation, and daily retention; and Node queue consumers for telemetry, uptime probes, and notifications.
+- Added a DNS-pinned public fetcher for Node worker egress. It resolves all DNS records, rejects any non-public or mixed public/private result, pins the connection to a validated address, revalidates each uptime redirect, and rejects webhook redirects. The same pinned transport is used for webhook verification/delivery and Resend API calls.
+- Internal worker callbacks use shared secrets and may use HTTP only when explicitly enabled for the private Compose service name `api` on port 8787. Managed Cloudflare callbacks remain HTTPS-only.
+- Expanded Compose to include PostgreSQL, ClickHouse, Drizzle migrations, Node API, Node ingestion, and multi-queue worker. The web dashboard, backup/restore, TLS/reverse-proxy provisioning, and production operations remain open.
+- PR #120 merged as `ab876a7e9ac95c50287a1c5094a8addd381f9b79`. The stale PR #119 was closed and replaced with rebased PR #120.
+- No tests, typecheck, lint, build, Docker build, Compose validation, migration execution, PostgreSQL/ClickHouse runtime, or DNS/SSRF integration checks were run. No validation is claimed. `pnpm-lock.yaml` was not modified.
