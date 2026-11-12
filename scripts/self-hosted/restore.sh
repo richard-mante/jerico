@@ -68,6 +68,18 @@ if [[ -f "$POSTGRES_FILE.age" && -f "$CLICKHOUSE_FILE.age" ]]; then
   identity_mode="$(stat -c "%a" "$AGE_IDENTITY")"
   [[ "$identity_mode" == "600" || "$identity_mode" == "400" ]] || { echo "AGE_IDENTITY must have mode 0600 or 0400." >&2; exit 1; }
 fi
+MANIFEST_FILE="$BACKUP_DIR/manifest-$STAMP.json"
+[[ -f "$MANIFEST_FILE" ]] || { echo "Missing backup manifest: $MANIFEST_FILE" >&2; exit 1; }
+grep -Fq "\"createdAt\": \"$STAMP\"" "$MANIFEST_FILE" || { echo "Backup manifest timestamp does not match $STAMP." >&2; exit 1; }
+grep -Fq '"format": "Jerico self-hosted backup v1"' "$MANIFEST_FILE" || { echo "Unsupported or invalid backup manifest format." >&2; exit 1; }
+grep -Fq "\"postgres\": \"$(basename "$POSTGRES_FILE")\"" "$MANIFEST_FILE" || { echo "PostgreSQL archive does not match the backup manifest." >&2; exit 1; }
+grep -Fq "\"clickhouse\": \"$(basename "$CLICKHOUSE_FILE")\"" "$MANIFEST_FILE" || { echo "ClickHouse archive does not match the backup manifest." >&2; exit 1; }
+if [[ "$POSTGRES_FILE" == *.age ]]; then
+  grep -Fq '"encryption": "age"' "$MANIFEST_FILE" || { echo "Encrypted artifacts do not match the backup manifest." >&2; exit 1; }
+else
+  grep -Fq '"encryption": "none"' "$MANIFEST_FILE" || { echo "Plaintext artifacts do not match the backup manifest." >&2; exit 1; }
+fi
+
 for file in "$POSTGRES_FILE" "$CLICKHOUSE_FILE" "$POSTGRES_FILE.sha256" "$CLICKHOUSE_FILE.sha256"; do
   if [[ ! -f "$file" ]]; then
     echo "Missing backup artifact: $file" >&2
