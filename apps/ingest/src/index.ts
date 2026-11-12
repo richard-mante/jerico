@@ -260,6 +260,8 @@ app.post("/ingest/v1/events", async (context) => {
     };
 
     if (idempotencyKey && requestHash) {
+      // Commit the immutable envelope and quota reservation before attempting
+      // queue publication. A crash after this commit is recoverable by Cron.
       const reservation = await withCredentialDatabase(context.env, async (database) =>
         database.transaction(async (transaction) => {
           const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -274,9 +276,6 @@ app.post("/ingest/v1/events", async (context) => {
           }).onConflictDoNothing({
             target: [projectIngestionRequests.credentialId, projectIngestionRequests.idempotencyKey],
           }).returning({ id: projectIngestionRequests.id });
-
-          let requestRecordId: string;
-          let pendingEnvelope: QueueMessage;
 
           if (created) {
             const limit = dailyEventLimit(context.env.INGEST_DAILY_EVENT_LIMIT);
@@ -294,37 +293,27 @@ app.post("/ingest/v1/events", async (context) => {
             if (!usage || usage.eventCount > limit) {
               throw new DailyQuotaExceeded(secondsUntilUtcMidnight());
             }
-            requestRecordId = created.id;
-            pendingEnvelope = envelope;
-          } else {
-            const [existing] = await transaction.select({
-              id: projectIngestionRequests.id,
-              requestHash: projectIngestionRequests.requestHash,
-              envelope: projectIngestionRequests.envelope,
-              status: projectIngestionRequests.status,
-              expiresAt: projectIngestionRequests.expiresAt,
-            }).from(projectIngestionRequests).where(and(
-              eq(projectIngestionRequests.credentialId, credential.id),
-              eq(projectIngestionRequests.idempotencyKey, idempotencyKey),
-            )).limit(1).for("update");
-
-            if (!existing) throw new Error("Idempotency record disappeared during reservation.");
-            if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
-            if (existing.expiresAt.getTime() <= Date.now()) return { kind: "expired" as const };
-            if (existing.status === "accepted") {
-              return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
-            }
-            requestRecordId = existing.id;
-            pendingEnvelope = existing.envelope as QueueMessage;
+            return { kind: "pending" as const, id: created.id };
           }
 
-          // Keep the row lock and quota reservation transaction open until the
-          // queue accepts the batch. Concurrent retries then observe "accepted"
-          // instead of publishing the same pending envelope in parallel.
-          await queue.send(pendingEnvelope);
-          await transaction.update(projectIngestionRequests).set({ status: "accepted" })
-            .where(eq(projectIngestionRequests.id, requestRecordId));
-          return { kind: "published" as const, envelope: pendingEnvelope };
+          const [existing] = await transaction.select({
+            id: projectIngestionRequests.id,
+            requestHash: projectIngestionRequests.requestHash,
+            envelope: projectIngestionRequests.envelope,
+            status: projectIngestionRequests.status,
+            expiresAt: projectIngestionRequests.expiresAt,
+          }).from(projectIngestionRequests).where(and(
+            eq(projectIngestionRequests.credentialId, credential.id),
+            eq(projectIngestionRequests.idempotencyKey, idempotencyKey),
+          )).limit(1).for("update");
+
+          if (!existing) throw new Error("Idempotency record disappeared during reservation.");
+          if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
+          if (existing.expiresAt.getTime() <= Date.now()) return { kind: "expired" as const };
+          if (existing.status === "accepted") {
+            return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
+          }
+          return { kind: "pending" as const, id: existing.id };
         }),
       );
 
@@ -337,7 +326,9 @@ app.post("/ingest/v1/events", async (context) => {
       if (reservation.kind === "accepted") {
         return context.json({ data: { accepted: reservation.envelope.events.length, requestId, idempotent: true } }, 202);
       }
-      return context.json({ data: { accepted: reservation.envelope.events.length, requestId, idempotent: true } }, 202);
+
+      const published = await publishPendingIdempotencyRequest(context.env, reservation.id);
+      return context.json({ data: { accepted: published.events.length, requestId, idempotent: true } }, 202);
     }
 
     await reserveDailyQuota(context.env, credential.projectId, usageDate, events.length);
@@ -379,10 +370,62 @@ app.onError((error, context) => {
   return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed.", requestId: context.get("requestId") } }, 500);
 });
 
+async function publishPendingIdempotencyRequest(env: Bindings, requestRecordId: string): Promise<QueueMessage> {
+  if (!env.TELEMETRY_QUEUE) throw new Error("Telemetry queue is not configured.");
+  return withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
+    const [record] = await transaction.select({
+      id: projectIngestionRequests.id,
+      envelope: projectIngestionRequests.envelope,
+      status: projectIngestionRequests.status,
+    }).from(projectIngestionRequests)
+      .where(eq(projectIngestionRequests.id, requestRecordId))
+      .limit(1)
+      .for("update");
+
+    if (!record) throw new Error("Pending telemetry outbox record was not found.");
+    const envelope = record.envelope as QueueMessage;
+    if (record.status === "accepted") return envelope;
+
+    // The immutable envelope is already committed. If Queue accepts this send
+    // but the status transaction rolls back, a retry republishes the same IDs
+    // and timestamps, allowing ClickHouse's existing replacement key to dedupe.
+    await env.TELEMETRY_QUEUE.send(envelope);
+    await transaction.update(projectIngestionRequests).set({ status: "accepted" })
+      .where(eq(projectIngestionRequests.id, record.id));
+    return envelope;
+  }));
+}
+
+async function recoverPendingIdempotencyRequests(env: Bindings): Promise<void> {
+  if (!env.TELEMETRY_QUEUE) throw new Error("Telemetry queue is not configured.");
+  await withCredentialDatabase(env, async (database) => database.transaction(async (transaction) => {
+    const pending = await transaction.select({
+      id: projectIngestionRequests.id,
+      envelope: projectIngestionRequests.envelope,
+    }).from(projectIngestionRequests)
+      .where(eq(projectIngestionRequests.status, "pending"))
+      .orderBy(projectIngestionRequests.createdAt)
+      .limit(100)
+      .for("update", { skipLocked: true });
+
+    for (const record of pending) {
+      const envelope = record.envelope as QueueMessage;
+      await env.TELEMETRY_QUEUE!.send(envelope);
+      await transaction.update(projectIngestionRequests).set({ status: "accepted" })
+        .where(eq(projectIngestionRequests.id, record.id));
+    }
+  }));
+}
+
 async function purgeExpiredIdempotencyRequests(env: Bindings): Promise<void> {
   await withCredentialDatabase(env, async (database) => {
+    // Pending rows are durable outbox work and must never be deleted merely
+    // because their idempotency retention window elapsed before publication.
     await database.delete(projectIngestionRequests)
-      .where(lt(projectIngestionRequests.expiresAt, new Date()));
+      .where(and(
+        eq(projectIngestionRequests.status, "accepted"),
+        lt(projectIngestionRequests.expiresAt, new Date()),
+      ));
   });
 }
 
@@ -390,6 +433,11 @@ export default {
   fetch: (request: Request, env: Bindings, executionContext: ExecutionContext) =>
     app.fetch(request, env, executionContext),
   scheduled: (_controller: ScheduledController, env: Bindings, executionContext: ExecutionContext) => {
-    executionContext.waitUntil(purgeExpiredIdempotencyRequests(env));
+    executionContext.waitUntil((async () => {
+      await recoverPendingIdempotencyRequests(env);
+      await purgeExpiredIdempotencyRequests(env);
+    })().catch((error) => {
+      console.error("Telemetry idempotency outbox reconciliation failed", { error });
+    }));
   },
 };
