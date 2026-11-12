@@ -90,6 +90,11 @@ if [[ -n "$(read_env AGE_RECIPIENT)" ]]; then
   fi
 fi
 
+for optional_key in AGE_RECIPIENT AGE_IDENTITY BACKUP_RETENTION_DAYS RCLONE_REMOTE RCLONE_CONFIG; do
+  optional_count="$(grep -cE "^${optional_key}=" "$ENV_FILE" || true)"
+  (( optional_count <= 1 )) || fail "$optional_key must appear no more than once in .env."
+done
+
 remote_target="$(read_env RCLONE_REMOTE)"
 if [[ -n "$remote_target" ]]; then
   require_single_value RCLONE_REMOTE
