@@ -167,3 +167,12 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Conditional failed-row claim, fresh enqueue token, verified-channel/incident checks, and queue failure recovery (PR #80).
 - [x] Project Alerts & Incidents screen shows delivery history and offers retry for failed deliveries (PR #81).
 - [ ] Add per-event channel preferences, quiet hours, and escalation policies where they fit the product's initial release.
+
+### Manual uptime operation
+- [x] Owner/admin-only one-off check endpoint with active-check fencing and queue failure rollback (PR #83).
+- [x] Add Check now control to the uptime monitor dashboard, with queue-configuration awareness (PR #83).
+
+### Current execution direction
+- Prioritize functional product implementation and user-facing workflows.
+- Defer writing/running tests and all GitHub Actions/builds until the user explicitly asks to resume validation.
+- Keep `pnpm-lock.yaml` untouched.
