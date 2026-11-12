@@ -1,3 +1,4 @@
+import type { QueuePublisher } from "@jerico/queue";
 import { Client } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { schema } from "@jerico/database/schema";
@@ -14,8 +15,8 @@ export type ApiBindings = {
   GOOGLE_CLIENT_SECRET?: string;
   HYPERDRIVE?: { connectionString: string };
   UPTIME_RESULTS_SECRET?: string;
-  UPTIME_PROBES?: { send(message: unknown): Promise<void> };
-  NOTIFICATIONS?: { send(message: unknown): Promise<void> };
+  UPTIME_PROBES?: QueuePublisher<unknown>;
+  NOTIFICATIONS?: QueuePublisher<unknown>;
   NOTIFICATION_DELIVERY_SECRET?: string;
   WEBHOOK_ENCRYPTION_KEY?: string;
 };

@@ -1,3 +1,4 @@
+import type { QueuePublisher } from "@jerico/queue";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
@@ -25,13 +26,12 @@ type QueueMessage = {
   acceptedAt: string;
   events: Array<TelemetryEvent & { eventId: string }>;
 };
-type QueueBinding = { send(message: QueueMessage): Promise<void> };
 type RateLimitBinding = { limit(options: { key: string }): Promise<{ success: boolean }> };
 type Bindings = {
   APP_ENV?: string;
   DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
-  TELEMETRY_QUEUE?: QueueBinding;
+  TELEMETRY_QUEUE?: QueuePublisher<QueueMessage>;
   INGEST_RATE_LIMITER?: RateLimitBinding;
   INGEST_DAILY_EVENT_LIMIT?: string;
 };
