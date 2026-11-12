@@ -170,6 +170,17 @@ export function ProjectUptimeManager() {
     }
   }
 
+  async function checkNow(monitor: UptimeMonitor) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request(`/api/v1/projects/${encodeURIComponent(projectId)}/uptime-monitors/${encodeURIComponent(monitor.id)}/check`, { method: "POST" });
+      setHistory((current) => { const next = { ...current }; delete next[monitor.id]; return next; });
+      setNotice(`A one-off check for ${monitor.name} has been queued. Open its history shortly to see the result.`);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not queue an uptime check.");
+    } finally { setBusy(false); }
+  }
   async function deleteMonitor(monitor: UptimeMonitor) {
     if (!window.confirm(`Delete the monitor "${monitor.name}" and its stored check history?`)) return;
     setBusy(true);
@@ -242,7 +253,7 @@ export function ProjectUptimeManager() {
           {monitors.length ? <div className="mt-4 space-y-3">{monitors.map((monitor) => <article key={monitor.id} className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold">{monitor.name}</h3><span className="rounded-full border border-white/10 px-2 py-1 text-[9px] uppercase tracking-wider text-[#a8afbd]">{monitor.enabled ? "Enabled" : "Paused"}</span><span className="rounded-full border border-amber-300/20 px-2 py-1 text-[9px] uppercase tracking-wider text-amber-100">{monitor.lastCheckedAt ? (monitor.lastStatus ?? "Unknown") : checksEnabled ? "Waiting for first check" : "Not checked yet"}</span></div><p className="mt-2 break-all font-mono text-xs text-[#929aaa]">{monitor.method} · {monitor.url}</p><p className="mt-2 text-[10px] text-[#667181]">Every {monitor.intervalSeconds}s · {monitor.timeoutMs}ms timeout · expected HTTP {monitor.expectedStatusCode}</p></div>
-              <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => void toggleHistory(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">History</button><button type="button" disabled={busy} onClick={() => beginEdit(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">Edit</button><button type="button" disabled={busy} onClick={() => void toggleMonitor(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">{monitor.enabled ? "Pause" : "Enable"}</button><button type="button" disabled={busy} onClick={() => void deleteMonitor(monitor)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 hover:bg-red-400/5 disabled:opacity-50">Delete</button></div>
+              <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !checksEnabled} onClick={() => void checkNow(monitor)} title={checksEnabled ? "Queue a one-off uptime check" : "Uptime probe queue is not configured"} className="rounded-lg border border-[#d9f36a]/25 px-3 py-2 text-xs text-[#d9f36a] disabled:opacity-40">Check now</button><button type="button" disabled={busy} onClick={() => void toggleHistory(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">History</button><button type="button" disabled={busy} onClick={() => beginEdit(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">Edit</button><button type="button" disabled={busy} onClick={() => void toggleMonitor(monitor)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#a8afbd] hover:bg-white/5 disabled:opacity-50">{monitor.enabled ? "Pause" : "Enable"}</button><button type="button" disabled={busy} onClick={() => void deleteMonitor(monitor)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 hover:bg-red-400/5 disabled:opacity-50">Delete</button></div>
             </div>
             {editingMonitor === monitor.id && <form onSubmit={saveEdit} className="mt-4 grid gap-3 border-t border-white/[0.07] pt-4 md:grid-cols-2">
               <label className="space-y-1 text-xs text-[#a8afbd]">Name<input required minLength={2} maxLength={80} value={editName} onChange={(event) => setEditName(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#0c1018] px-3 py-2 text-sm text-white" /></label>
