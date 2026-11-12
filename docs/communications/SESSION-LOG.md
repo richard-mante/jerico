@@ -946,3 +946,12 @@
 - Updated backup/restore guide and `.env.example` with `AGE_RECIPIENT` and `AGE_IDENTITY` usage. The private identity must be kept outside the host/backup set.
 - No lockfile changes. No Compose parse, shell syntax, backup, restore, age encryption, migration, Docker build, tests, typecheck, lint, or runtime checks were run. Do not treat the implementation as validated.
 - Next: add a self-hosted deployment preflight and resource-sizing guidance, then complete a clean Linux install and actual encrypted/plaintext restore drills when validation is resumed.
+
+
+### 2026-11-12 — Deployment preflight and sizing baseline (PR #130 merged)
+
+- Added `scripts/self-hosted/preflight.sh`: verifies Docker Engine/Compose v2, `.env` presence and restrictive permissions, required secret values and formats, Compose interpolation/configuration, public DNS resolution, TCP 80/443 listener conflicts, and host CPU/RAM/free-disk estimates.
+- Supports `--skip-dns` during propagation but warns that ACME cannot issue certificates until DNS resolves. It never sources `.env` and does not start or modify services.
+- Added conservative starting sizing guidance (2 vCPU/4 GiB/30 GiB evaluation; 4 vCPU/8 GiB/50 GiB small production) with explicit note that this is not measured capacity guidance.
+- PR #130 merged as `edfda14d2974256fa56997a985fb095e73342c32`. Updated issue #107 with PRs #127–#130 and remaining release gates.
+- No shell syntax, Compose parse, Docker build, migration, restore, tests, typecheck, lint, or runtime checks were run. `pnpm-lock.yaml` remains untouched.

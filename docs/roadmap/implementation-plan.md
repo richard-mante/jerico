@@ -144,7 +144,8 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Add optional age encryption for backup archives and private-key-based restore (PR #128; encrypted restore drill still required).
 - [x] Correct Compose dashboard/API dependency syntax (PR #127; full Compose validation still required).
 - [x] Configure Caddy automatic HTTPS and document DNS/ACME/firewall setup (PR #123; not verified).
-- [ ] Add resource sizing and production retention/operations guidance.
+- [x] Add baseline resource-sizing guidance and a deployment preflight (PR #130; host capacity is not benchmarked).
+- [ ] Define production resource sizing from measured ingest/query workloads and set backup retention/off-site storage policy.
 - [ ] Fresh-install validation on a clean Linux server (deferred until implementation is complete).
 
 **Acceptance:** A developer can self-host Jerico and monitor an instrumented application without our hosted infrastructure.
