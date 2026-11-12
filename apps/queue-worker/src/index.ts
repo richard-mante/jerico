@@ -2,12 +2,20 @@ import { createServer } from "node:http";
 import { Pool } from "pg";
 import { PostgresQueueAdapter, type PostgresPoolLike } from "@jerico/queue/postgres";
 import { PollingQueueConsumer } from "@jerico/queue/consumer";
+import type { QueueDelivery, QueueHealth } from "@jerico/queue";
+import {
+  processSelfHostedQueueDelivery,
+  type NotificationMessage,
+  type UptimeProbeMessage,
+  type WorkerEnv,
+} from "@jerico/worker";
 import {
   isValidTelemetryMessage,
   writeToClickHouse,
   type TelemetryMessage,
   type ClickHouseEnv,
 } from "@jerico/worker/telemetry";
+import { fetchPublicPinned } from "./public-fetch";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -25,6 +33,15 @@ function integerEnv(name: string, fallback: number, minimum: number, maximum: nu
 }
 
 const databaseUrl = required("DATABASE_URL");
+const maxAttempts = integerEnv("QUEUE_MAX_ATTEMPTS", 5, 1, 100);
+const pool = new Pool({
+  connectionString: databaseUrl,
+  max: integerEnv("DATABASE_POOL_MAX", 12, 1, 50),
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
+});
+const poolPort = pool as unknown as PostgresPoolLike;
+
 const clickhouseEnv: ClickHouseEnv = {
   CLICKHOUSE_URL: required("CLICKHOUSE_URL"),
   CLICKHOUSE_DATABASE: process.env.CLICKHOUSE_DATABASE ?? "jerico",
@@ -33,7 +50,6 @@ const clickhouseEnv: ClickHouseEnv = {
   CLICKHOUSE_PASSWORD: process.env.CLICKHOUSE_PASSWORD,
   CLICKHOUSE_TOKEN: process.env.CLICKHOUSE_TOKEN,
 };
-const maxAttempts = integerEnv("QUEUE_MAX_ATTEMPTS", 5, 1, 100);
 const workerEnv: WorkerEnv = {
   ...clickhouseEnv,
   API_URL: required("API_URL"),
@@ -46,35 +62,27 @@ const workerEnv: WorkerEnv = {
   ALLOW_INTERNAL_API_HTTP: process.env.ALLOW_INTERNAL_API_HTTP,
   PUBLIC_FETCHER: fetchPublicPinned,
 };
+
+const telemetryQueue = new PostgresQueueAdapter<TelemetryMessage>(
+  poolPort,
+  process.env.TELEMETRY_QUEUE_NAME ?? "jerico-telemetry",
+  { maxAttempts },
+);
 const uptimeQueue = new PostgresQueueAdapter<UptimeProbeMessage>(
-  pool as unknown as PostgresPoolLike,
+  poolPort,
   process.env.UPTIME_QUEUE_NAME ?? "jerico-uptime-probes",
   { maxAttempts },
 );
 const notificationQueue = new PostgresQueueAdapter<NotificationMessage>(
-  pool as unknown as PostgresPoolLike,
+  poolPort,
   process.env.NOTIFICATION_QUEUE_NAME ?? "jerico-notifications",
   { maxAttempts },
 );
-const queueByName = new Map<string, PostgresQueueAdapter<unknown>>([
+const queues = new Map<string, PostgresQueueAdapter<unknown>>([
   [telemetryQueue.queueName, telemetryQueue as unknown as PostgresQueueAdapter<unknown>],
   [uptimeQueue.queueName, uptimeQueue as unknown as PostgresQueueAdapter<unknown>],
   [notificationQueue.queueName, notificationQueue as unknown as PostgresQueueAdapter<unknown>],
 ]);
-const port = integerEnv("PORT", 8789, 1, 65_535);
-const host = process.env.HOST?.trim() || "127.0.0.1";
-const pool = new Pool({
-  connectionString: databaseUrl,
-  max: integerEnv("DATABASE_POOL_MAX", 8, 1, 50),
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,
-});
-
-const telemetryQueue = new PostgresQueueAdapter<TelemetryMessage>(
-  pool as unknown as PostgresPoolLike,
-  process.env.TELEMETRY_QUEUE_NAME ?? "jerico-telemetry",
-  { maxAttempts: integerEnv("QUEUE_MAX_ATTEMPTS", 5, 1, 100) },
-);
 
 const batchSize = integerEnv("QUEUE_BATCH_SIZE", 20, 1, 100);
 const visibilityTimeout = integerEnv("QUEUE_VISIBILITY_TIMEOUT_SECONDS", 60, 1, 3_600);
@@ -90,13 +98,23 @@ const consumers = [
     await writeToClickHouse(clickhouseEnv, [delivery.body]);
   }, consumerOptions),
   new PollingQueueConsumer(uptimeQueue, (delivery) =>
-    processSelfHostedQueueDelivery("jerico-uptime-probes", delivery as QueueDelivery<UptimeProbeMessage | NotificationMessage>, workerEnv), consumerOptions),
+    processSelfHostedQueueDelivery(
+      "jerico-uptime-probes",
+      delivery as QueueDelivery<UptimeProbeMessage | NotificationMessage>,
+      workerEnv,
+    ), consumerOptions),
   new PollingQueueConsumer(notificationQueue, (delivery) =>
-    processSelfHostedQueueDelivery("jerico-notifications", delivery as QueueDelivery<UptimeProbeMessage | NotificationMessage>, workerEnv), consumerOptions),
+    processSelfHostedQueueDelivery(
+      "jerico-notifications",
+      delivery as QueueDelivery<UptimeProbeMessage | NotificationMessage>,
+      workerEnv,
+    ), consumerOptions),
 ];
 
-let shuttingDown = false;
+const port = integerEnv("PORT", 8789, 1, 65_535);
+const host = process.env.HOST?.trim() || "127.0.0.1";
 const queueAdminToken = process.env.QUEUE_ADMIN_TOKEN;
+let shuttingDown = false;
 
 function constantTimeEqual(left: string, right: string): boolean {
   const a = new TextEncoder().encode(left);
@@ -119,7 +137,7 @@ const server = createServer(async (request, response) => {
   if (request.method === "GET" && (url.pathname === "/health" || url.pathname === "/ready")) {
     try {
       await pool.query("SELECT 1");
-      const queueStatuses = await Promise.all([...queueByName.entries()].map(async ([name, queue]) => ({
+      const queueStatuses = await Promise.all([...queues.entries()].map(async ([name, queue]) => ({
         name,
         ...(await queue.health()),
       })));
@@ -156,8 +174,8 @@ const server = createServer(async (request, response) => {
   }
 
   const queueName = url.searchParams.get("queue") ?? telemetryQueue.queueName;
-  const selectedQueue = queueByName.get(queueName);
-  if (!selectedQueue) {
+  const queue = queues.get(queueName);
+  if (!queue) {
     respond(response, 400, { error: "invalid_queue" });
     return;
   }
@@ -170,27 +188,27 @@ const server = createServer(async (request, response) => {
         respond(response, 400, { error: "invalid_limit", message: "Limit must be between 1 and 100." });
         return;
       }
-      respond(response, 200, { data: await selectedQueue.listDeadLetters(limit) });
+      respond(response, 200, { data: await queue.listDeadLetters(limit), queue: queueName });
       return;
     }
 
     const replayMatch = url.pathname.match(/^\/dead-letters\/([^/]+)\/replay$/);
     if (request.method === "POST" && replayMatch) {
-      const replayed = await selectedQueue.replayDeadLetter(decodeURIComponent(replayMatch[1]!));
+      const replayed = await queue.replayDeadLetter(decodeURIComponent(replayMatch[1]!));
       respond(response, replayed ? 202 : 409, replayed
-        ? { data: { replayed: true } }
+        ? { data: { replayed: true }, queue: queueName }
         : { error: "not_replayable", message: "The dead-letter message is missing, already replayed, or conflicts with an active deduplication key." });
       return;
     }
 
     const detailMatch = url.pathname.match(/^\/dead-letters\/([^/]+)$/);
     if (request.method === "GET" && detailMatch) {
-      const message = await selectedQueue.getDeadLetter(decodeURIComponent(detailMatch[1]!));
+      const message = await queue.getDeadLetter(decodeURIComponent(detailMatch[1]!));
       if (!message) {
         respond(response, 404, { error: "not_found" });
         return;
       }
-      respond(response, 200, { data: message });
+      respond(response, 200, { data: message, queue: queueName });
       return;
     }
     respond(response, 404, { error: "not_found" });
@@ -205,7 +223,7 @@ const server = createServer(async (request, response) => {
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.info("Stopping Jerico self-hosted telemetry worker", { signal });
+  console.info("Stopping Jerico self-hosted queue workers", { signal });
   if (server.listening) {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
@@ -217,10 +235,10 @@ async function shutdown(signal: string): Promise<void> {
 
 async function main(): Promise<void> {
   await pool.query("SELECT 1");
-  await Promise.all([...queueByName.values()].map((queue) => queue.health()));
+  await Promise.all([...queues.values()].map((queue) => queue.health()));
   await Promise.all(consumers.map((consumer) => consumer.start()));
   server.listen(port, host, () => {
-    console.info("Jerico self-hosted queue workers are ready", { host, port, queues: [...queueByName.keys()] });
+    console.info("Jerico self-hosted queue workers are ready", { host, port, queues: [...queues.keys()] });
   });
 }
 
