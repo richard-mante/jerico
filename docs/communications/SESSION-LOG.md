@@ -1036,3 +1036,9 @@
 - PR #165 defines a 120,000-byte shared queue payload ceiling and applies it to the PostgreSQL adapter, leaving headroom under Cloudflare Queues' 128 KB message cap. The managed ingestion endpoint already limits raw request bodies to 96 KiB.
 - PR #166 adds SDK `maxBatchBytes` (80 KiB default, 96 KiB maximum), measures serialized request size, and rejects individually oversized events through the non-throwing error callback.
 - PR #166 merged as `554be19bd8f7174f4aabf9e4901477819dbe1c13`. No builds, typecheck, tests, queue sends, or runtime validation were run.
+
+
+### 2026-11-12 — Queue and SDK handover refresh
+
+- Merged PR #167 (`3cc4d08482de553b1bde53e7d08953019d9fa5f2`): refreshed the current-state handover, queue payload/SDK batching roadmap, and Phase 3 SDK notes through PR #166.
+- Current implementation remains unvalidated: no tests, typecheck, build, queue sends, ClickHouse SQL, Compose parse, Docker, Linux/systemd, or backup/restore runtime checks were run.
