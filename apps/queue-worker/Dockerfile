@@ -1,9 +1,10 @@
 FROM node:22-bookworm-slim
 
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable && mkdir -p /app && chown node:node /app
 
-COPY . .
+COPY --chown=node:node . .
+USER node
 RUN pnpm install --no-frozen-lockfile
 
 ENV NODE_ENV=production
