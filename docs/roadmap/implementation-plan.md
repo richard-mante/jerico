@@ -76,6 +76,8 @@ All of the above describes merged implementation, **not verified runtime behavio
 - [ ] Configure storage-provider lifecycle/versioning and retention policy; the scripts never delete remote objects.
 - [x] Add daily terminal queue cleanup for completed and dead-lettered rows with configurable retention (PR #152).
 - [x] Add configurable self-hosted ClickHouse log/event TTL with an idempotent policy application job (PRs #160–#161).
+- [x] Enforce provider-neutral queue payload size below the managed Cloudflare 128 KB per-message limit (PR #165).
+- [x] Make SDK batches byte-aware so payloads stay within the ingestion request limit (PR #166).
 - [x] Quarantine invalid telemetry envelopes rather than acknowledging/discarding them (PR #154; provider DLQ routing still needs runtime verification).
 - [ ] Verify graceful shutdown, restart recovery, queue leases, dead-letter replay, and service health behavior.
 - [x] Add bounded Docker JSON log rotation to prevent unbounded container log growth (PR #156).
