@@ -22,6 +22,7 @@
     "@jerico/queue": "workspace:*"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./telemetry": "./src/telemetry.ts"
   }
 }
