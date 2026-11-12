@@ -26,6 +26,22 @@ until [ "$(clickhouse-client --host "$host" --user "$user" --password "$password
   sleep 2
 done
 
+clickhouse-client --host "$host" --user "$user" --password "$password" --query "CREATE TABLE IF NOT EXISTS jerico.retention_policy (policy_name LowCardinality(String), log_days UInt16, event_days UInt16, applied_at DateTime64(3, 'UTC')) ENGINE = ReplacingMergeTree(applied_at) ORDER BY policy_name"
+current_policy="$(clickhouse-client --host "$host" --user "$user" --password "$password" --query "SELECT concat(toString(log_days), char(9), toString(event_days)) FROM jerico.retention_policy WHERE policy_name = 'telemetry_events' ORDER BY applied_at DESC LIMIT 1 FORMAT TSVRaw")"
+expected_policy="$(printf '%s\t%s' "$log_days" "$event_days")"
+if [ "$current_policy" = "$expected_policy" ]; then
+  echo "ClickHouse telemetry retention policy is already current (logs=$log_days days, events=$event_days days)."
+  exit 0
+fi
+
+if [ -z "$current_policy" ] && [ "$log_days" -eq 7 ] && [ "$event_days" -eq 30 ]; then
+  # The checked-in table DDL already creates this exact default TTL. Record it
+  # without issuing MODIFY TTL and forcing a needless first-boot rewrite.
+  clickhouse-client --host "$host" --user "$user" --password "$password" --query "INSERT INTO jerico.retention_policy (policy_name, log_days, event_days, applied_at) VALUES ('telemetry_events', 7, 30, now64(3))"
+  echo "Existing ClickHouse DDL already matches the default telemetry retention policy."
+  exit 0
+fi
+
 if [ "$log_days" -eq 0 ] && [ "$event_days" -eq 0 ]; then
   query="ALTER TABLE jerico.telemetry_events REMOVE TTL"
 elif [ "$log_days" -gt 0 ] && [ "$event_days" -gt 0 ]; then
@@ -37,4 +53,5 @@ else
 fi
 
 clickhouse-client --host "$host" --user "$user" --password "$password" --query "$query"
+clickhouse-client --host "$host" --user "$user" --password "$password" --query "INSERT INTO jerico.retention_policy (policy_name, log_days, event_days, applied_at) VALUES ('telemetry_events', $log_days, $event_days, now64(3))"
 echo "Applied ClickHouse telemetry retention policy (logs=$log_days days, other events=$event_days days)."
