@@ -190,7 +190,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
       `UPDATE queue_messages
        SET status = 'completed', lease_token = NULL, lease_expires_at = NULL,
            completed_at = now(), updated_at = now()
-       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3`,
+       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3 AND lease_expires_at > now()`,
       [messageId, this.queueName, leaseToken],
     );
     if (result.rowCount !== 1) throw new StaleQueueLeaseError();
@@ -214,7 +214,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
            last_error_code = $6,
            completed_at = CASE WHEN $4 = 'dead_lettered' THEN now() ELSE NULL END,
            updated_at = now()
-       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3`,
+       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3 AND lease_expires_at > now()`,
       [messageId, this.queueName, leaseToken, terminal ? "dead_lettered" : "available", delaySeconds, safeErrorCode(errorCode)],
     );
     if (result.rowCount !== 1) throw new StaleQueueLeaseError();
@@ -225,7 +225,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
       `UPDATE queue_messages
        SET status = 'dead_lettered', lease_token = NULL, lease_expires_at = NULL,
            last_error_code = $4, completed_at = now(), updated_at = now()
-       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3`,
+       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3 AND lease_expires_at > now()`,
       [messageId, this.queueName, leaseToken, safeErrorCode(errorCode)],
     );
     if (result.rowCount !== 1) throw new StaleQueueLeaseError();
@@ -236,7 +236,7 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
     const result = await this.pool.query(
       `UPDATE queue_messages
        SET lease_expires_at = now() + ($4 * interval '1 second'), updated_at = now()
-       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3`,
+       WHERE id = $1 AND queue_name = $2 AND status = 'leased' AND lease_token = $3 AND lease_expires_at > now()`,
       [messageId, this.queueName, leaseToken, visibilityTimeoutSeconds],
     );
     if (result.rowCount !== 1) throw new StaleQueueLeaseError();

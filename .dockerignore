@@ -1,0 +1,9 @@
+.git
+.github
+**/node_modules
+**/.wrangler
+**/dist
+**/.turbo
+.env
+.env.*
+!.env.example
