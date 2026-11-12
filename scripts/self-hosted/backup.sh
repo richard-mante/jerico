@@ -19,6 +19,8 @@ read_dotenv() {
 
 if [[ ! "${AGE_RECIPIENT+x}" && -f "$ROOT/.env" ]]; then AGE_RECIPIENT="$(read_dotenv AGE_RECIPIENT)"; fi
 if [[ ! "${BACKUP_RETENTION_DAYS+x}" && -f "$ROOT/.env" ]]; then BACKUP_RETENTION_DAYS="$(read_dotenv BACKUP_RETENTION_DAYS)"; fi
+if [[ ! "${RCLONE_REMOTE+x}" && -f "$ROOT/.env" ]]; then RCLONE_REMOTE="$(read_dotenv RCLONE_REMOTE)"; fi
+if [[ ! "${RCLONE_CONFIG+x}" && -f "$ROOT/.env" ]]; then RCLONE_CONFIG="$(read_dotenv RCLONE_CONFIG)"; fi
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-0}"
 if [[ ! "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( RETENTION_DAYS > 3650 )); then
   echo "BACKUP_RETENTION_DAYS must be 0 (disabled) or an integer from 1 to 3650." >&2
@@ -34,6 +36,16 @@ umask 077
 if [[ -n "${AGE_RECIPIENT:-}" ]] && ! command -v age >/dev/null 2>&1; then
   echo "AGE_RECIPIENT is set but the age command is not installed." >&2
   exit 1
+fi
+if [[ -n "${RCLONE_REMOTE:-}" ]]; then
+  [[ -n "${AGE_RECIPIENT:-}" ]] || { echo "Off-site backups require AGE_RECIPIENT so remote archives are encrypted." >&2; exit 1; }
+  command -v rclone >/dev/null 2>&1 || { echo "RCLONE_REMOTE is set but rclone is not installed." >&2; exit 1; }
+  if [[ -n "${RCLONE_CONFIG:-}" ]]; then
+    [[ -f "$RCLONE_CONFIG" && ! -L "$RCLONE_CONFIG" ]] || { echo "RCLONE_CONFIG must point to a regular config file." >&2; exit 1; }
+    config_mode="$(stat -c "%a" "$RCLONE_CONFIG")"
+    [[ "$config_mode" == "600" || "$config_mode" == "400" ]] || { echo "RCLONE_CONFIG must have mode 0600 or 0400." >&2; exit 1; }
+    export RCLONE_CONFIG
+  fi
 fi
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
@@ -117,6 +129,18 @@ if (( RETENTION_DAYS > 0 )); then
         "$BACKUP_DIR/clickhouse-$old_stamp.tar.gz.age.sha256"
     fi
   done < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'manifest-????????T??????Z.json' -mtime "+$RETENTION_DAYS" -print0)
+fi
+
+if [[ -n "${RCLONE_REMOTE:-}" ]]; then
+  remote_files=("$POSTGRES_FILE" "$POSTGRES_FILE.sha256" "$CLICKHOUSE_FILE" "$CLICKHOUSE_FILE.sha256" "manifest-$STAMP.json")
+  for file in "${remote_files[@]}"; do
+    rclone copyto --immutable "$BACKUP_DIR/$file" "$RCLONE_REMOTE/$file"
+  done
+  rclone check "$BACKUP_DIR" "$RCLONE_REMOTE" --one-way --download \
+    --include "manifest-$STAMP.json" \
+    --include "$POSTGRES_FILE" --include "$POSTGRES_FILE.sha256" \
+    --include "$CLICKHOUSE_FILE" --include "$CLICKHOUSE_FILE.sha256"
+  echo "Encrypted off-site backup verified at $RCLONE_REMOTE."
 fi
 
 echo "Backup completed: $BACKUP_DIR/manifest-$STAMP.json"

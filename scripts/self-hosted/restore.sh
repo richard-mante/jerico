@@ -18,6 +18,8 @@ read_dotenv() {
 }
 
 if [[ ! "${AGE_IDENTITY+x}" && -f "$ROOT/.env" ]]; then AGE_IDENTITY="$(read_dotenv AGE_IDENTITY)"; fi
+if [[ ! "${RCLONE_REMOTE+x}" && -f "$ROOT/.env" ]]; then RCLONE_REMOTE="$(read_dotenv RCLONE_REMOTE)"; fi
+if [[ ! "${RCLONE_CONFIG+x}" && -f "$ROOT/.env" ]]; then RCLONE_CONFIG="$(read_dotenv RCLONE_CONFIG)"; fi
 
 if [[ ! "$STAMP" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
   echo "Usage: CONFIRM_DESTRUCTIVE_RESTORE=YES bash scripts/self-hosted/restore.sh YYYYMMDDTHHMMSSZ" >&2
@@ -31,6 +33,24 @@ fi
 
 POSTGRES_FILE="$BACKUP_DIR/postgres-$STAMP.dump"
 CLICKHOUSE_FILE="$BACKUP_DIR/clickhouse-$STAMP.tar.gz"
+
+if [[ -n "${RCLONE_REMOTE:-}" ]]; then
+  if [[ ! -f "$BACKUP_DIR/manifest-$STAMP.json" || ( ! -f "$POSTGRES_FILE" && ! -f "$POSTGRES_FILE.age" ) || ( ! -f "$POSTGRES_FILE.sha256" && ! -f "$POSTGRES_FILE.age.sha256" ) || ( ! -f "$CLICKHOUSE_FILE" && ! -f "$CLICKHOUSE_FILE.age" ) || ( ! -f "$CLICKHOUSE_FILE.sha256" && ! -f "$CLICKHOUSE_FILE.age.sha256" ) ]]; then
+    command -v rclone >/dev/null 2>&1 || { echo "RCLONE_REMOTE is set but rclone is not installed." >&2; exit 1; }
+    if [[ -n "${RCLONE_CONFIG:-}" ]]; then
+      [[ -f "$RCLONE_CONFIG" && ! -L "$RCLONE_CONFIG" ]] || { echo "RCLONE_CONFIG must point to a regular config file." >&2; exit 1; }
+      config_mode="$(stat -c "%a" "$RCLONE_CONFIG")"
+      [[ "$config_mode" == "600" || "$config_mode" == "400" ]] || { echo "RCLONE_CONFIG must have mode 0600 or 0400." >&2; exit 1; }
+      export RCLONE_CONFIG
+    fi
+    mkdir -p "$BACKUP_DIR"
+    chmod 700 "$BACKUP_DIR"
+    rclone copy "$RCLONE_REMOTE" "$BACKUP_DIR" \
+      --include "manifest-$STAMP.json" \
+      --include "postgres-$STAMP.dump*" \
+      --include "clickhouse-$STAMP.tar.gz*"
+  fi
+fi
 if [[ -f "$POSTGRES_FILE.age" && -f "$CLICKHOUSE_FILE.age" ]]; then
   POSTGRES_FILE="$POSTGRES_FILE.age"
   CLICKHOUSE_FILE="$CLICKHOUSE_FILE.age"
