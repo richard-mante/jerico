@@ -1,11 +1,11 @@
-import type {
-  QueueBatch,
-  QueueDelivery,
-  QueueHealth,
-  QueuePublisher,
-  QueueSendOptions,
+import {
+  MAX_QUEUE_MESSAGE_BYTES,
+  type QueueBatch,
+  type QueueDelivery,
+  type QueueHealth,
+  type QueuePublisher,
+  type QueueSendOptions,
 } from "./index";
-import { MAX_QUEUE_MESSAGE_BYTES } from "./index";
 
 type QueryResult<Row> = { rows: Row[]; rowCount: number | null };
 type PostgresClientLike = {
