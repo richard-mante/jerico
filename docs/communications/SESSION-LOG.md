@@ -972,3 +972,10 @@
 - Kept all three SDK packages `private: true`; no npm publish workflow, credentials, or licensing assumptions were added. Publication remains gated on actual builds, integration/sample validation, and licensing/release policy.
 - Merged PR #137 (`f42299783c5a6536a9d7541627cd6983d6391bb5`): added React/Vite route-aware page view example and Astro `astro:page-load` integration example; updated Phase 3 SDK docs.
 - No build, typecheck, test, sample application, or ingestion integration was run. No lockfile changes.
+
+
+### 2026-11-12 — Self-hosted environment bootstrap and official Web Vitals
+
+- Merged PR #139 (`0b461d0ecfc9d3070a98e5aab55fd9dd6c712cd6`): added `scripts/self-hosted/init-env.sh`, which refuses to overwrite an existing `.env`, generates unique URL-safe database passwords and high-entropy auth/callback/queue secrets, creates a 32-byte base64url webhook key, and writes `.env` with mode 0600. Optional `--with-age-backups` generates an age identity under the user's config directory, outside the repository, and configures the recipient/path in `.env`.
+- Merged PR #140 (`6f85af2b1da55f9a1115d013a5ddb34d396ee250`): browser SDK now uses Google's `web-vitals` package APIs for LCP, CLS, INP, FCP, and TTFB, forwarding official ratings and metric identity/context while retaining the Jerico public-key metric allowlist. Added `web-vitals` 6.2.3 as a package dependency; `pnpm-lock.yaml` was not touched.
+- No shell syntax, environment bootstrap, age key generation, SDK build, typecheck, browser validation, or sample-app checks were run. No validation is claimed.
