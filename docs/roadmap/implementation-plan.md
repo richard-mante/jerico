@@ -248,6 +248,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Provider-neutral queue contracts and PostgreSQL adapter (PRs #108 and #110); full self-hosted producer/runtime integration remains open.
 - [x] Add compiled ESM/declaration package output for SDK core/browser/Node (PR #136; not built/validated).
 - [x] Add React/Vite and Astro SDK integration guides (PR #137; sample apps not executed).
+- [x] Add bounded SDK ingestion request timeout with stable idempotent retry state (PR #142; runtime behavior unvalidated).
 - [ ] Validate SDK builds/integrations, decide licensing, and implement a controlled npm release workflow.
 
 ### Execution direction
@@ -286,6 +287,7 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [x] Add optional age backup encryption (PR #128; configure an off-host private identity and test restore).
 - [x] Add opt-in local manifest-backed backup retention (PR #132; default disabled).
 - [x] Run application containers as non-root and drop unnecessary capabilities (PRs #133–#134; runtime compatibility pending).
-- [ ] Define encrypted off-site storage and retention policy.
+- [x] Add optional encrypted off-site backup upload/restore through rclone (PR #144; remote restore not exercised).
+- [ ] Configure storage-provider lifecycle/versioning policy and perform an off-host restore drill.
 - [ ] Complete security review, measured resource sizing, monitoring, and production hardening.
 - [ ] Run typecheck, lint, build, Docker/Compose validation, migration, DNS/SSRF, and live database checks before release.

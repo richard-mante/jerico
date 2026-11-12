@@ -979,3 +979,13 @@
 - Merged PR #139 (`0b461d0ecfc9d3070a98e5aab55fd9dd6c712cd6`): added `scripts/self-hosted/init-env.sh`, which refuses to overwrite an existing `.env`, generates unique URL-safe database passwords and high-entropy auth/callback/queue secrets, creates a 32-byte base64url webhook key, and writes `.env` with mode 0600. Optional `--with-age-backups` generates an age identity under the user's config directory, outside the repository, and configures the recipient/path in `.env`.
 - Merged PR #140 (`6f85af2b1da55f9a1115d013a5ddb34d396ee250`): browser SDK now uses Google's `web-vitals` package APIs for LCP, CLS, INP, FCP, and TTFB, forwarding official ratings and metric identity/context while retaining the Jerico public-key metric allowlist. Added `web-vitals` 6.2.3 as a package dependency; `pnpm-lock.yaml` was not touched.
 - No shell syntax, environment bootstrap, age key generation, SDK build, typecheck, browser validation, or sample-app checks were run. No validation is claimed.
+
+
+### 2026-11-12 — Encrypted off-site backup transport (PR #144 merged)
+
+- Added optional rclone remote support through `RCLONE_REMOTE` and optional protected `RCLONE_CONFIG` path.
+- Backup refuses off-site upload without `AGE_RECIPIENT`, encrypts artifacts before transfer, uploads archives/checksums/manifest to immutable remote paths, and runs a download-based remote comparison before reporting success.
+- Restore downloads the selected timestamp and any missing manifest/archive/checksum artifacts from the configured remote, then verifies checksums and uses the existing age decrypt path.
+- Preflight requires rclone and age when off-site backup is configured, and validates optional rclone config file type and permissions. `.env.example` and backup/restore docs updated.
+- Remote objects are never deleted by the script; storage-provider lifecycle/versioning is an operator responsibility. A real remote upload/download and off-host restore drill remain outstanding.
+- PR #144 merged as `b47b9c6bf5b1add4a15d8b0336281a36c48366bf`. No shell syntax, rclone, age, restore, Compose, Docker, test, typecheck, or runtime validation was run.
