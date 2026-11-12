@@ -37,7 +37,7 @@ type EmailNotificationMessage = { schemaVersion: 1; type: "notification.email"; 
 type WebhookVerificationMessage = { schemaVersion: 1; type: "notification.webhook.verify"; channelId: string; url: string; challenge: string };
 type WebhookNotificationMessage = {
   schemaVersion: 1; type: "notification.webhook"; deliveryId: string; enqueueToken?: string; url: string;
-  secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved";
+  secretCiphertext: string; secretIv: string; eventType: "incident.opened" | "incident.acknowledged" | "incident.resolved" | "incident.reopened";
   incidentId: string; projectId: string; title: string; triggerValue: number; occurredAt: string;
 };
 type NotificationMessage = EmailNotificationMessage | WebhookVerificationMessage | WebhookNotificationMessage;
@@ -286,7 +286,7 @@ export function isValidNotificationMessage(value: unknown, blockedHost?: string)
       && typeof message.url === "string" && isSafeWebhookUrl(message.url, blockedHost)
       && typeof message.secretCiphertext === "string" && message.secretCiphertext.length >= 32 && message.secretCiphertext.length <= 512
       && typeof message.secretIv === "string" && message.secretIv.length >= 12 && message.secretIv.length <= 64
-      && ["incident.opened", "incident.acknowledged", "incident.resolved"].includes(String(message.eventType))
+      && ["incident.opened", "incident.acknowledged", "incident.resolved", "incident.reopened"].includes(String(message.eventType))
       && typeof message.incidentId === "string" && message.incidentId.length <= 128
       && typeof message.projectId === "string" && message.projectId.length <= 128
       && typeof message.title === "string" && message.title.length >= 1 && message.title.length <= 200

@@ -134,6 +134,13 @@
       "when": 1794503000000,
       "tag": "0018_alert_rule_snoozing",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794504000000,
+      "tag": "0019_incident_reopen_events",
+      "breakpoints": true
     }
   ]
 }
