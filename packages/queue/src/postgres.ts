@@ -5,6 +5,7 @@ import type {
   QueuePublisher,
   QueueSendOptions,
 } from "./index";
+import { MAX_QUEUE_MESSAGE_BYTES } from "./index";
 
 type QueryResult<Row> = { rows: Row[]; rowCount: number | null };
 type PostgresClientLike = {
@@ -78,15 +79,15 @@ export class PostgresQueueAdapter<TMessage>
     this.pool = pool;
     this.queueName = queueName;
     this.maxAttempts = boundedInteger(options.maxAttempts ?? 5, 1, 100, "maxAttempts");
-    this.maxPayloadBytes = boundedInteger(options.maxPayloadBytes ?? 256 * 1024, 1024, 256 * 1024, "maxPayloadBytes");
+    this.maxPayloadBytes = boundedInteger(options.maxPayloadBytes ?? MAX_QUEUE_MESSAGE_BYTES, 1024, MAX_QUEUE_MESSAGE_BYTES, "maxPayloadBytes");
   }
 
   async send(message: TMessage, options: QueueSendOptions = {}): Promise<void> {
     const serialized = JSON.stringify(message);
     if (!serialized) throw new TypeError("Queue message must be JSON serializable.");
     const payloadBytes = new TextEncoder().encode(serialized).byteLength;
-    if (payloadBytes > this.maxPayloadBytes || payloadBytes > 256 * 1024) {
-      throw new RangeError("Queue message exceeds the 256 KiB payload limit.");
+    if (payloadBytes > this.maxPayloadBytes || payloadBytes > MAX_QUEUE_MESSAGE_BYTES) {
+      throw new RangeError("Queue message exceeds the 120 KB provider-neutral payload limit.");
     }
     const delaySeconds = boundedInteger(options.delaySeconds ?? 0, 0, 86_400, "delaySeconds");
     const deduplicationKey = options.deduplicationKey ?? null;
