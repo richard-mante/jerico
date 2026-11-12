@@ -39,6 +39,11 @@ services:
       context: .
       dockerfile: apps/queue-worker/Dockerfile
     restart: "no"
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     command: ["pnpm", "db:migrate"]
     environment:
       DATABASE_URL: postgresql://jerico:${POSTGRES_PASSWORD}@postgres:5432/jerico
@@ -53,6 +58,11 @@ services:
       args:
         NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?Set API_DOMAIN in .env}
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
@@ -76,6 +86,11 @@ services:
       dockerfile: apps/queue-worker/Dockerfile
     command: ["pnpm", "--filter", "@jerico/api-node", "start"]
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -119,6 +134,11 @@ services:
       dockerfile: apps/queue-worker/Dockerfile
     command: ["pnpm", "--filter", "@jerico/ingest-node", "start"]
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -148,6 +168,11 @@ services:
       context: .
       dockerfile: apps/queue-worker/Dockerfile
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
