@@ -260,6 +260,7 @@ export const alertRules = pgTable("alert_rules", {
   windowSeconds: integer("window_seconds").notNull().default(300),
   consecutiveBreaches: integer("consecutive_breaches").notNull().default(1),
   enabled: boolean("enabled").notNull().default(true),
+  silencedUntil: timestamp("silenced_until", { withTimezone: true }),
   consecutiveCount: integer("consecutive_count").notNull().default(0),
   lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
   evaluationLeaseToken: text("evaluation_lease_token"),
