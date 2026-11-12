@@ -719,6 +719,7 @@ app.get("/api/v1/notification-channels", async (context) => withOrganization(con
     notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged,
     notifyOnResolved: notificationChannels.notifyOnResolved,
     notifyOnReopened: notificationChannels.notifyOnReopened,
+    notifyOnEscalated: notificationChannels.notifyOnEscalated,
     quietHoursEnabled: notificationChannels.quietHoursEnabled,
     quietHoursStart: notificationChannels.quietHoursStart,
     quietHoursEnd: notificationChannels.quietHoursEnd,
@@ -913,7 +914,7 @@ app.patch("/api/v1/notification-channels/:channelId", async (context) => withOrg
   const quietStart = parsed.data.quietHoursStart ?? channel.quietHoursStart;
   const quietEnd = parsed.data.quietHoursEnd ?? channel.quietHoursEnd;
   if ((parsed.data.quietHoursEnabled ?? channel.quietHoursEnabled) && quietStart === quietEnd) return context.json({ error: { code: "INVALID_QUIET_HOURS", message: "Quiet hours start and end times must be different." } }, 400);
-  const [updated] = await database.update(notificationChannels).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId))).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled, notifyOnOpened: notificationChannels.notifyOnOpened, notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged, notifyOnResolved: notificationChannels.notifyOnResolved, notifyOnReopened: notificationChannels.notifyOnReopened, quietHoursEnabled: notificationChannels.quietHoursEnabled, quietHoursStart: notificationChannels.quietHoursStart, quietHoursEnd: notificationChannels.quietHoursEnd, timezone: notificationChannels.timezone });
+  const [updated] = await database.update(notificationChannels).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId))).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled, notifyOnOpened: notificationChannels.notifyOnOpened, notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged, notifyOnResolved: notificationChannels.notifyOnResolved, notifyOnReopened: notificationChannels.notifyOnReopened, notifyOnEscalated: notificationChannels.notifyOnEscalated, quietHoursEnabled: notificationChannels.quietHoursEnabled, quietHoursStart: notificationChannels.quietHoursStart, quietHoursEnd: notificationChannels.quietHoursEnd, timezone: notificationChannels.timezone });
   return context.json({ data: updated });
 }));
 app.delete("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
@@ -1099,7 +1100,7 @@ app.post("/api/v1/projects/:projectId/incidents/:incidentId/reopen", async (cont
     eq(incidents.alertRuleId, candidate.alertRuleId), or(eq(incidents.status, "open"), eq(incidents.status, "acknowledged")), ne(incidents.id, candidate.id),
   )).limit(1);
   if (active) return context.json({ error: { code: "ACTIVE_INCIDENT_EXISTS", message: "This alert rule already has an active incident. Resolve it before reopening this one." } }, 409);
-  const [updated] = await database.update(incidents).set({ status: "open", resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null, updatedAt: now }).where(and(
+  const [updated] = await database.update(incidents).set({ status: "open", startedAt: now, lastTriggeredAt: now, resolvedAt: null, acknowledgedAt: null, acknowledgedBy: null, escalatedAt: null, escalationCount: 0, updatedAt: now }).where(and(
     eq(incidents.id, context.req.param("incidentId")), eq(incidents.projectId, context.req.param("projectId")), eq(incidents.organizationId, organizationId), eq(incidents.status, "resolved"),
   )).returning();
   if (!updated) {

@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean; quietHoursEnabled: boolean; quietHoursStart: string; quietHoursEnd: string; timezone: string; lastVerificationErrorCode: string | null; createdAt: string };
+type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; notifyOnReopened: boolean; notifyOnEscalated: boolean; quietHoursEnabled: boolean; quietHoursStart: string; quietHoursEnd: string; timezone: string; lastVerificationErrorCode: string | null; createdAt: string };
 type Delivery = { id: string; incidentId: string; target: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -84,7 +84,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       setError(cause instanceof Error ? cause.message : "Could not resend verification email.");
     } finally { setBusy(false); }
   }
-  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved" | "notifyOnReopened" | "quietHoursEnabled" | "quietHoursStart" | "quietHoursEnd" | "timezone">>) {
+  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved" | "notifyOnReopened" | "notifyOnEscalated" | "quietHoursEnabled" | "quietHoursStart" | "quietHoursEnd" | "timezone">>) {
     setBusy(true); setError(""); setNotice("");
     try { await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, { method: "PATCH", body: JSON.stringify(settings) }); setNotice(settings.enabled !== undefined ? settings.enabled ? "Notification channel enabled." : "Notification channel paused." : "Notification preferences saved."); await refresh(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update notification channel."); } finally { setBusy(false); }
@@ -131,6 +131,7 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
                 <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnAcknowledged} onChange={() => void updateChannel(channel, { notifyOnAcknowledged: !channel.notifyOnAcknowledged })} />Acknowledged</label>
                 <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnResolved} onChange={() => void updateChannel(channel, { notifyOnResolved: !channel.notifyOnResolved })} />Resolved</label>
                 <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnReopened} onChange={() => void updateChannel(channel, { notifyOnReopened: !channel.notifyOnReopened })} />Reopened</label>
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnEscalated} onChange={() => void updateChannel(channel, { notifyOnEscalated: !channel.notifyOnEscalated })} />Escalated</label>
                 <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-3">
                   <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.quietHoursEnabled} onChange={() => void updateChannel(channel, { quietHoursEnabled: !channel.quietHoursEnabled })} />Quiet hours</label>
                   <label className="flex items-center gap-2 text-[11px] text-[#929aaa]">From <input type="time" disabled={busy || !channel.quietHoursEnabled} defaultValue={channel.quietHoursStart} onBlur={(event) => { if (event.target.value && event.target.value !== channel.quietHoursStart) void updateChannel(channel, { quietHoursStart: event.target.value }); }} className="rounded-md border border-white/10 bg-[#0c1018] px-2 py-1 text-xs text-white" /></label>

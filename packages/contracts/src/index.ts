@@ -114,6 +114,7 @@ export const createAlertRuleSchema = z.object({
   threshold: z.number().int().min(1).max(1_000_000),
   windowSeconds: z.number().int().min(60).max(86400).default(300),
   consecutiveBreaches: z.number().int().min(1).max(10).default(1),
+  escalationDelayMinutes: z.union([z.literal(0), z.literal(5), z.literal(15), z.literal(30), z.literal(60)]).default(0),
   enabled: z.boolean().default(true),
 }).strict();
 export const updateAlertRuleSchema = createAlertRuleSchema.partial().strict()
@@ -125,7 +126,7 @@ export type UpdateAlertRule = z.infer<typeof updateAlertRuleSchema>;
 export const createNotificationChannelSchema = z.object({
   email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
 }).strict();
-export const updateNotificationChannelSchema = z.object({ enabled: z.boolean().optional(), notifyOnOpened: z.boolean().optional(), notifyOnAcknowledged: z.boolean().optional(), notifyOnResolved: z.boolean().optional(), notifyOnReopened: z.boolean().optional(), quietHoursEnabled: z.boolean().optional(), quietHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), quietHoursEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), timezone: z.string().trim().min(1).max(64).optional() }).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one notification channel setting.");
+export const updateNotificationChannelSchema = z.object({ enabled: z.boolean().optional(), notifyOnOpened: z.boolean().optional(), notifyOnAcknowledged: z.boolean().optional(), notifyOnResolved: z.boolean().optional(), notifyOnReopened: z.boolean().optional(), notifyOnEscalated: z.boolean().optional(), quietHoursEnabled: z.boolean().optional(), quietHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), quietHoursEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), timezone: z.string().trim().min(1).max(64).optional() }).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one notification channel setting.");
 export const verifyNotificationChannelSchema = z.object({
   token: z.string().min(32).max(128),
 }).strict();

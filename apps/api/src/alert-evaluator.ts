@@ -1,6 +1,6 @@
-import { and, count, desc, eq, gte, isNull, lt, lte, or } from "drizzle-orm";
-import { alertRules, incidents, uptimeCheckResults } from "@jerico/database/schema";
-import { withDatabase, type ApiBindings } from "./database";
+import { and, asc, count, desc, eq, gte, gt, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { alertRules, incidents, incidentActivity, uptimeCheckResults } from "@jerico/database/schema";
+import { withDatabase, type ApiBindings, type JericoDatabase } from "./database";
 import { queryTelemetryErrorCount, type TelemetryQueryBindings } from "./telemetry-query";
 import { safelyQueueIncidentNotifications } from "./notification-delivery";
 
@@ -25,8 +25,34 @@ export function isBreaching(value: number, comparison: string, threshold: number
   return comparison === "gt" ? value > threshold : value >= threshold;
 }
 
-export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()): Promise<{ evaluated: number; opened: number; resolved: number }> {
+async function escalateUnacknowledgedIncidents(database: JericoDatabase, env: AlertEnvironment, now: Date): Promise<number> {
+  const candidates = await database.select({
+    id: incidents.id, organizationId: incidents.organizationId, projectId: incidents.projectId,
+    title: incidents.title, triggerValue: incidents.triggerValue, startedAt: incidents.startedAt,
+    escalationDelayMinutes: alertRules.escalationDelayMinutes,
+  }).from(incidents).innerJoin(alertRules, and(
+    eq(incidents.alertRuleId, alertRules.id), eq(incidents.organizationId, alertRules.organizationId), eq(incidents.projectId, alertRules.projectId),
+  )).where(and(
+    eq(incidents.status, "open"), isNull(incidents.escalatedAt), gt(alertRules.escalationDelayMinutes, 0),
+    eq(alertRules.enabled, true), or(isNull(alertRules.silencedUntil), lte(alertRules.silencedUntil, now)),
+  )).orderBy(asc(incidents.startedAt)).limit(200);
+  let escalated = 0;
+  for (const incident of candidates) {
+    const escalationAt = new Date(incident.startedAt.getTime() + incident.escalationDelayMinutes * 60_000);
+    if (escalationAt.getTime() > now.getTime()) continue;
+    const [claimed] = await database.update(incidents).set({ escalatedAt: now, escalationCount: sql`${incidents.escalationCount} + 1`, updatedAt: now })
+      .where(and(eq(incidents.id, incident.id), eq(incidents.status, "open"), isNull(incidents.escalatedAt))).returning({ id: incidents.id });
+    if (!claimed) continue;
+    const activityId = crypto.randomUUID();
+    await database.insert(incidentActivity).values({ id: activityId, organizationId: incident.organizationId, projectId: incident.projectId, incidentId: incident.id, actorId: null, activityType: "escalated", body: `Incident was not acknowledged within ${incident.escalationDelayMinutes} minutes.` });
+    await safelyQueueIncidentNotifications(database, env, incident, "incident.escalated", activityId);
+    escalated += 1;
+  }
+  return escalated;
+}
+export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()): Promise<{ evaluated: number; opened: number; resolved: number; escalated: number }> {
   return withDatabase(env, async (database) => {
+    const escalated = await escalateUnacknowledgedIncidents(database, env, now);
     // Discover IDs only; mutable state comes from the atomic claim result.
     const candidates = await database.select({ id: alertRules.id }).from(alertRules)
       .where(and(eq(alertRules.enabled, true), or(isNull(alertRules.silencedUntil), lte(alertRules.silencedUntil, now))));
@@ -172,6 +198,6 @@ export async function evaluateAlertRules(env: AlertEnvironment, now = new Date()
         }
       }
     }
-    return { evaluated, opened, resolved };
+    return { evaluated, opened, resolved, escalated };
   });
 }
