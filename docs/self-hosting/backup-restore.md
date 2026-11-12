@@ -44,7 +44,7 @@ The restore script intentionally requires `CONFIRM_DESTRUCTIVE_RESTORE=YES`. Kee
 
 - A backup is only as good as its off-site copy and restore drill. Schedule regular restore exercises on a separate host.
 - Encryption is optional and uses age when `AGE_RECIPIENT` is configured. Protect the private identity separately; losing it makes encrypted backups unrecoverable.
-- The scripts do not automatically prune old backups; configure an explicit retention policy for the backup directory.
+- Local backup pruning is opt-in through `BACKUP_RETENTION_DAYS` (default `0`, disabled). Set a positive value from 1 to 3650 to remove older manifest-backed archives and their checksums after a new backup completes. This is local retention only; it does not replace an off-site copy.
 - The scripts do not automatically prune old backups; configure an explicit retention policy for the backup directory.
 - A full disaster recovery plan should also preserve the `.env` secrets and Caddy's `jerico-caddy-data` volume (ACME certificates/state). Store secrets separately and securely.
 - Docker, ClickHouse backup/restore, PostgreSQL restore, and full application recovery have not yet been executed in this repository environment. Treat the scripts as an implementation, not a verified recovery guarantee.
