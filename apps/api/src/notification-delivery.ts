@@ -17,6 +17,12 @@ const ENQUEUE_RETRY_BASE_MS = 60_000;
 const ENQUEUE_RETRY_MAX_MS = 60 * 60_000;
 export const NOTIFICATION_ENQUEUE_LEASE_MS = 2 * 60_000;
 
+function isEventEnabled(channel: { notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean }, eventType: IncidentNotificationEvent): boolean {
+  if (eventType === "incident.opened") return channel.notifyOnOpened;
+  if (eventType === "incident.acknowledged") return channel.notifyOnAcknowledged;
+  return channel.notifyOnResolved;
+}
+
 export function notificationEnqueueLeaseExpiresAt(now: Date): Date {
   return new Date(now.getTime() + NOTIFICATION_ENQUEUE_LEASE_MS);
 }
@@ -102,9 +108,7 @@ export async function queueIncidentNotifications(
     eq(notificationChannels.enabled, true),
     isNotNull(notificationChannels.verifiedAt),
   ));
-  const eligibleChannels = channels.filter((channel) => eventType === "incident.opened"
-    ? channel.notifyOnOpened
-    : eventType === "incident.acknowledged" ? channel.notifyOnAcknowledged : channel.notifyOnResolved);
+  const eligibleChannels = channels.filter((channel) => isEventEnabled(channel, eventType));
 
   for (const channel of eligibleChannels) {
     const enqueueStartedAt = new Date();
@@ -222,6 +226,18 @@ export async function retryFailedNotificationEnqueues(
       eq(incidents.projectId, delivery.projectId),
     )).limit(1);
 
+    if (channel && incident && !isEventEnabled(channel, delivery.eventType as IncidentNotificationEvent)) {
+      await database.update(notificationDeliveries).set({
+        status: "failed", lastErrorCode: "channel_preference_disabled", nextEnqueueAt: null, updatedAt: now,
+      }).where(and(
+        eq(notificationDeliveries.id, delivery.id),
+        eq(notificationDeliveries.status, delivery.status),
+        eq(notificationDeliveries.enqueueAttempts, delivery.enqueueAttempts),
+        eq(notificationDeliveries.attempts, delivery.attempts),
+      ));
+      continue;
+    }
+
     if (!channel || !incident) {
       await database.update(notificationDeliveries).set({
         status: "failed",
@@ -329,7 +345,7 @@ export async function safelyQueueIncidentNotifications(
     });
   }
 }
-export type ManualNotificationRetryResult = "queued" | "not_found" | "not_retryable" | "channel_unavailable" | "queue_unavailable";
+export type ManualNotificationRetryResult = "queued" | "not_found" | "not_retryable" | "channel_unavailable" | "channel_preference_disabled" | "queue_unavailable";
 
 export async function retryNotificationDelivery(
   database: JericoDatabase,
@@ -351,6 +367,7 @@ export async function retryNotificationDelivery(
     isNotNull(notificationChannels.verifiedAt),
   )).limit(1);
   if (!channel) return "channel_unavailable";
+  if (!isEventEnabled(channel, delivery.eventType as IncidentNotificationEvent)) return "channel_preference_disabled";
   const [incident] = await database.select().from(incidents).where(and(
     eq(incidents.id, delivery.incidentId),
     eq(incidents.organizationId, input.organizationId),
