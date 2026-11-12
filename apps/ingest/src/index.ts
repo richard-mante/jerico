@@ -303,7 +303,7 @@ app.post("/ingest/v1/events", async (context) => {
           }).from(projectIngestionRequests).where(and(
             eq(projectIngestionRequests.credentialId, credential.id),
             eq(projectIngestionRequests.idempotencyKey, idempotencyKey),
-          )).limit(1);
+          )).limit(1).for("update");
 
           if (!existing) throw new Error("Idempotency record disappeared during reservation.");
           if (existing.requestHash !== requestHash) return { kind: "conflict" as const };
@@ -311,11 +311,14 @@ app.post("/ingest/v1/events", async (context) => {
           if (existing.status === "accepted") {
             return { kind: "accepted" as const, envelope: existing.envelope as QueueMessage };
           }
-          return {
-            kind: "pending" as const,
-            id: existing.id,
-            envelope: existing.envelope as QueueMessage,
-          };
+          const pendingEnvelope = created ? envelope : existing.envelope as QueueMessage;
+          // Keep the row lock and quota reservation transaction open until the
+          // queue accepts the batch. Concurrent retries then observe "accepted"
+          // instead of publishing the same pending envelope in parallel.
+          await queue.send(pendingEnvelope);
+          await transaction.update(projectIngestionRequests).set({ status: "accepted" })
+            .where(eq(projectIngestionRequests.id, created?.id ?? existing.id));
+          return { kind: "published" as const, envelope: pendingEnvelope };
         }),
       );
 
@@ -328,14 +331,6 @@ app.post("/ingest/v1/events", async (context) => {
       if (reservation.kind === "accepted") {
         return context.json({ data: { accepted: reservation.envelope.events.length, requestId, idempotent: true } }, 202);
       }
-
-      // Pending records are re-published on retry. Stable event IDs ensure an
-      // ambiguous queue-send outcome does not create distinct logical events.
-      await queue.send(reservation.envelope);
-      await withCredentialDatabase(context.env, async (database) => {
-        await database.update(projectIngestionRequests).set({ status: "accepted" })
-          .where(eq(projectIngestionRequests.id, reservation.id));
-      });
       return context.json({ data: { accepted: reservation.envelope.events.length, requestId, idempotent: true } }, 202);
     }
 
