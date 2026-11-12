@@ -6,6 +6,19 @@ COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/compose.self-hosted.yaml}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"
 STAMP="${1:-}"
 
+read_dotenv() {
+  local key="$1"
+  local value=""
+  if [[ -f "$ROOT/.env" ]]; then
+    value="$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ROOT/.env")"
+  fi
+  if [[ "$value" == \"*\" ]]; then value="${value:1:-1}"; fi
+  if [[ "$value" == \'*\' ]]; then value="${value:1:-1}"; fi
+  printf '%s' "$value"
+}
+
+if [[ ! "${AGE_IDENTITY+x}" && -f "$ROOT/.env" ]]; then AGE_IDENTITY="$(read_dotenv AGE_IDENTITY)"; fi
+
 if [[ ! "$STAMP" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
   echo "Usage: CONFIRM_DESTRUCTIVE_RESTORE=YES bash scripts/self-hosted/restore.sh YYYYMMDDTHHMMSSZ" >&2
   exit 2
