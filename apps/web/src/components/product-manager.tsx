@@ -17,7 +17,7 @@ export function ProductManager() {
   function edit(product: Product) { setEditingId(product.id); setName(product.name); setSlug(product.slug); setDescription(product.description ?? ""); setWebsiteUrl(product.websiteUrl ?? ""); }
   function reset() { setEditingId(null); setName(""); setSlug(""); setDescription(""); setWebsiteUrl(""); }
   async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setError(""); setNotice("");
-    try { const path = editingId ? `/api/v1/products/${encodeURIComponent(editingId)}` : "/api/v1/products"; await request(path, { method: editingId ? "PATCH" : "POST", body: JSON.stringify({ name: name.trim(), slug: slugify(slug || name), description: description.trim() || null, websiteUrl: websiteUrl.trim() || null }) }); setNotice(editingId ? "Product updated." : "Product created."); reset(); await refresh(); }
+    try { const path = editingId ? `/api/v1/products/${encodeURIComponent(editingId)}` : "/api/v1/products"; const body = { name: name.trim(), slug: slugify(slug || name), ...(editingId ? { description: description.trim() || null, websiteUrl: websiteUrl.trim() || null } : { ...(description.trim() ? { description: description.trim() } : {}), ...(websiteUrl.trim() ? { websiteUrl: websiteUrl.trim() } : {}) }) }; await request(path, { method: editingId ? "PATCH" : "POST", body: JSON.stringify(body) }); setNotice(editingId ? "Product updated." : "Product created."); reset(); await refresh(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save product."); } finally { setBusy(false); }
   }
   async function toggleArchive(product: Product) { const status = product.status === "active" ? "archived" : "active"; setBusy(true); setError(""); setNotice("");
