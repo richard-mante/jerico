@@ -6,6 +6,8 @@ COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/compose.self-hosted.yaml}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"
 STAMP="${BACKUP_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 
+[[ ! -L "$ROOT/.env" ]] || { echo ".env must not be a symbolic link." >&2; exit 1; }
+
 read_dotenv() {
   local key="$1"
   local value=""
