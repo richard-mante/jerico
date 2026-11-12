@@ -148,6 +148,13 @@
       "when": 1794505000000,
       "tag": "0020_notification_quiet_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794506000000,
+      "tag": "0021_incident_escalation",
+      "breakpoints": true
     }
   ]
 }
