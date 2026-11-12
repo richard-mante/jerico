@@ -337,15 +337,22 @@ export class PostgresQueueAdapter<TMessage extends Record<string, unknown>>
   }
 
   async replayDeadLetter(messageId: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `UPDATE queue_messages
-       SET status = 'available', attempts = 0, available_at = now(),
-           lease_token = NULL, lease_expires_at = NULL, last_error_code = NULL,
-           completed_at = NULL, updated_at = now()
-       WHERE id = $1 AND queue_name = $2 AND status = 'dead_lettered'`,
-      [messageId, this.queueName],
-    );
-    return result.rowCount === 1;
+    try {
+      const result = await this.pool.query(
+        `UPDATE queue_messages
+         SET status = 'available', attempts = 0, available_at = now(),
+             lease_token = NULL, lease_expires_at = NULL, last_error_code = NULL,
+             completed_at = NULL, updated_at = now()
+         WHERE id = $1 AND queue_name = $2 AND status = 'dead_lettered'`,
+        [messageId, this.queueName],
+      );
+      return result.rowCount === 1;
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async prune(retentionDays = 7, now = new Date()): Promise<number> {
