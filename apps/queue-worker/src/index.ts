@@ -87,6 +87,7 @@ const queues = new Map<string, PostgresQueueAdapter<unknown>>([
 const batchSize = integerEnv("QUEUE_BATCH_SIZE", 20, 1, 100);
 const visibilityTimeout = integerEnv("QUEUE_VISIBILITY_TIMEOUT_SECONDS", 60, 1, 3_600);
 const pollInterval = integerEnv("QUEUE_POLL_INTERVAL_MS", 1_000, 100, 30_000);
+const queueRetentionDays = integerEnv("QUEUE_RETENTION_DAYS", 7, 1, 365);
 const consumerOptions = { batchSize, visibilityTimeoutSeconds: visibilityTimeout, pollIntervalMs: pollInterval };
 const consumers = [
   new PollingQueueConsumer(telemetryQueue, async (delivery) => {
@@ -115,6 +116,7 @@ const port = integerEnv("PORT", 8789, 1, 65_535);
 const host = process.env.HOST?.trim() || "127.0.0.1";
 const queueAdminToken = process.env.QUEUE_ADMIN_TOKEN;
 let shuttingDown = false;
+let retentionTimer: ReturnType<typeof setInterval> | undefined;
 
 function constantTimeEqual(left: string, right: string): boolean {
   const a = new TextEncoder().encode(left);
@@ -220,9 +222,24 @@ const server = createServer(async (request, response) => {
   }
 });
 
+async function pruneTerminalQueueMessages(): Promise<void> {
+  const results = await Promise.all([...queues.entries()].map(async ([name, queue]) => ({
+    queue: name,
+    deleted: await queue.prune(queueRetentionDays),
+  })));
+  const changed = results.filter((result) => result.deleted > 0);
+  if (changed.length > 0) {
+    console.info("Pruned terminal queue messages", {
+      retentionDays: queueRetentionDays,
+      queues: changed,
+    });
+  }
+}
+
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  if (retentionTimer) clearInterval(retentionTimer);
   console.info("Stopping Jerico self-hosted queue workers", { signal });
   if (server.listening) {
     await new Promise<void>((resolve, reject) => {
@@ -236,6 +253,15 @@ async function shutdown(signal: string): Promise<void> {
 async function main(): Promise<void> {
   await pool.query("SELECT 1");
   await Promise.all([...queues.values()].map((queue) => queue.health()));
+  await pruneTerminalQueueMessages();
+  retentionTimer = setInterval(() => {
+    void pruneTerminalQueueMessages().catch((error) => {
+      console.error("Queue retention cleanup failed", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    });
+  }, 24 * 60 * 60 * 1_000);
+  retentionTimer.unref?.();
   await Promise.all(consumers.map((consumer) => consumer.start()));
   server.listen(port, host, () => {
     console.info("Jerico self-hosted queue workers are ready", { host, port, queues: [...queues.keys()] });

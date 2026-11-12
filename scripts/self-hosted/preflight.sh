@@ -72,6 +72,12 @@ for key in POSTGRES_PASSWORD CLICKHOUSE_PASSWORD; do
   value="$(read_env "$key")"
   [[ "$value" =~ ^[A-Za-z0-9]{32,}$ ]] || fail "$key must use at least 32 URL-safe alphanumeric characters for the Compose DATABASE_URL."
 done
+queue_retention_days="$(read_env QUEUE_RETENTION_DAYS)"
+if [[ -n "$queue_retention_days" ]]; then
+  require_single_value QUEUE_RETENTION_DAYS
+  [[ "$queue_retention_days" =~ ^[0-9]+$ ]] && (( queue_retention_days >= 1 && queue_retention_days <= 365 )) || fail "QUEUE_RETENTION_DAYS must be an integer between 1 and 365."
+fi
+
 for key in APP_DOMAIN API_DOMAIN INGEST_DOMAIN ACME_EMAIL; do
   require_value "$key"
 done
