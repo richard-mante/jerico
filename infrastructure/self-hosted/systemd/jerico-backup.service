@@ -5,6 +5,7 @@ After=docker.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=0
 User=jerico
 Group=jerico
 SupplementaryGroups=docker
