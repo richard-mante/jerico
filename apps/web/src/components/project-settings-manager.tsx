@@ -22,7 +22,7 @@ export function ProjectSettingsManager() {
   useEffect(() => { if (organizationId && projectId) void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load project settings.")); }, [organizationId, projectId]);
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
-    try { const updated = await request(`/api/v1/projects/${encodeURIComponent(projectId)}`, { method: "PATCH", body: JSON.stringify({ name: name.trim(), slug: slugify(slug || name), platform, framework: framework.trim() || undefined }) }) as Project; setProject(updated); setNotice("Project settings saved."); }
+    try { const updated = await request(`/api/v1/projects/${encodeURIComponent(projectId)}`, { method: "PATCH", body: JSON.stringify({ name: name.trim(), slug: slugify(slug || name), platform, framework: framework.trim() || null }) }) as Project; setProject(updated); setNotice("Project settings saved."); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save project settings."); } finally { setBusy(false); }
   }
   async function toggleArchive() {
