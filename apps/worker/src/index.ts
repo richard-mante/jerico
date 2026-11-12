@@ -267,7 +267,7 @@ async function processNotification(message: EmailNotificationMessage, env: Worke
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await (env.PUBLIC_FETCHER ?? fetch)("https://api.resend.com/emails", {
       method: "POST",
       redirect: "error",
       signal: controller.signal,
