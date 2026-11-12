@@ -31,9 +31,9 @@ The preflight warns below 4 vCPU, 8 GiB RAM, and 50 GiB free space. It does not 
 ## Start
 
 1. Create DNS A records for `APP_DOMAIN`, `API_DOMAIN`, and `INGEST_DOMAIN` pointing to the server. Configure AAAA records only if IPv6 is correctly routed to the server.
-2. Copy `infrastructure/self-hosted/.env.example` to the repository root as `.env`.
-3. Set the three domains, a valid `ACME_EMAIL`, and replace every example secret with a unique, long, URL-safe random value. Keep `.env` private and out of version control.
-4. Open inbound TCP ports 80 and 443 (plus UDP 443 for HTTP/3) in the firewall, then start the stack:
+2. Generate a private environment file with unique secrets: `bash scripts/self-hosted/init-env.sh`. To also generate an age identity outside the repository and enable encrypted backups, use `bash scripts/self-hosted/init-env.sh --with-age-backups`.
+3. Edit `APP_DOMAIN`, `API_DOMAIN`, `INGEST_DOMAIN`, and `ACME_EMAIL` in `.env`. The bootstrap script creates `.env` with mode `0600`; keep it private and out of version control. When age backups are enabled, preserve the generated private identity separately and off-host.
+4. Run `bash scripts/self-hosted/preflight.sh` and resolve errors/warnings. Open inbound TCP ports 80 and 443 (plus UDP 443 for HTTP/3) in the firewall, then start the stack:
 
 ```sh
 docker compose -f compose.self-hosted.yaml up --build -d
