@@ -58,6 +58,18 @@ When `QUEUE_ADMIN_TOKEN` is configured, the private health server also exposes:
 
 Send `Authorization: Bearer <QUEUE_ADMIN_TOKEN>` with each request. Payload inspection may expose customer telemetry; keep this service on localhost/private networking and protect the token as a secret. Replay is allowed only for messages still in the dead-letter state; active deduplication conflicts are rejected.
 
+## Compose infrastructure slice
+
+A PostgreSQL + ClickHouse + migration + telemetry-worker Compose stack is available at the repository root:
+
+```sh
+cp infrastructure/self-hosted/.env.example .env
+# Replace all example secrets before starting.
+docker compose -f compose.self-hosted.yaml up --build -d
+```
+
+See [the self-hosted Compose guide](../../docs/self-hosting/telemetry-queue-compose.md) for the exact scope and operational caveats.
+
 ## Current scope
 
-This worker consumes telemetry only. It does not yet consume uptime or notification jobs or switch production Cloudflare routing. Do not treat the self-hosted deployment as complete until those handlers, Docker Compose, and PostgreSQL/ClickHouse runtime validation are finished.
+This worker consumes telemetry only. The managed Cloudflare API and ingest services still publish to Cloudflare Queues; no production producer routing has switched to PostgreSQL. Uptime and notification jobs remain on the managed Cloudflare runtime. The Compose file is an infrastructure slice, not a complete self-hosted Jerico release. Docker build, Compose validation, and PostgreSQL/ClickHouse runtime checks are not yet confirmed.
