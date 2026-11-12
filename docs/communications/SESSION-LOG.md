@@ -735,3 +735,20 @@
 - Add a PostgreSQL-backed concurrency regression test proving simultaneous identical retries produce one queue publication.
 - Validate transaction/queue failure behavior and lock duration against the deployed PostgreSQL/Hyperdrive and Cloudflare Queue runtime.
 - Continue the broader ingestion reliability review: quota boundary behavior, non-idempotent reservation/refund, expired-key cleanup, and queue consumer deduplication.
+
+
+## 2026-11-12 — reliability continuation: PRs #70–#72 and ClickHouse identity review
+
+- Confirmed `main` is at `b0ca6d15a6616d4f10836a75212253573407b7d3`; PRs #70 (OAuth-style secret assignment redaction), #71 (serialize idempotent queue publication), and #72 (validate telemetry queue envelopes) are merged.
+- Re-read the Worker queue consumer, Worker Wrangler configuration, ingest idempotency path, ClickHouse DDL, and all major telemetry read paths.
+- Confirmed the ClickHouse table uses `ReplacingMergeTree PARTITION BY toYYYYMM(timestamp) ORDER BY (organization_id, project_id, environment_id, timestamp, event_type, event_id)`. The API's `FINAL` clauses only collapse rows that share the ReplacingMergeTree sorting identity within a partition; they do not solve a retry whose same event ID is assigned a different fallback timestamp, especially across month partitions.
+- The ambiguity comes from the PostgreSQL/Cloudflare Queue boundary: queue publication occurs while the idempotency reservation transaction is open. If queue acceptance succeeds but the DB transaction fails to commit, a client retry can create a new envelope with a new `acceptedAt`, while deterministic event IDs remain unchanged. PR #71 prevents concurrent same-key pending publications but does not make the external queue send and PostgreSQL commit atomic.
+- Also confirmed telemetry invalid-envelope handling currently acknowledges and discards the message; exhausted valid telemetry messages route to `jerico-telemetry-dlq`, but `apps/worker/wrangler.jsonc` does not configure a telemetry DLQ consumer. The roadmap and handover now state this explicitly.
+- No schema mutation was made: changing the table partition/order key without accounting for TTL, query filters, cursor ordering, aggregations, existing data, and cross-month identity would be unsafe.
+- No test, typecheck, lint, build, PostgreSQL, or ClickHouse runtime validation was run. `pnpm-lock.yaml` was not touched.
+
+### Next
+- Design the durable outbox/idempotency state transition that preserves the original accepted envelope across queue publication ambiguity, or an equivalent identity-based ClickHouse deduplication strategy with measured query cost and correct retention semantics.
+- Add a PostgreSQL-backed concurrency/failure-injection test for simultaneous retries, queue-accepted/DB-commit-failed ambiguity, and stable fallback timestamps.
+- Decide and document a telemetry poison-message policy: quarantine invalid envelopes with bounded payload retention/redaction before ack, and provide a DLQ inspection/replay or explicit operator runbook.
+- Continue with disposable PostgreSQL and ClickHouse integration validation when a runnable environment is available.
