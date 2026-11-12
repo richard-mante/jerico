@@ -14,6 +14,20 @@ This Compose file runs the initial self-hosted web dashboard, management API, in
 
 The web dashboard, API, ingestion service, and queue worker bind to container networking internally and publish only to host loopback by default. Caddy is the only public-facing service and terminates HTTPS for the three configured domains. The queue worker includes health/readiness endpoints and token-protected dead-letter inspection/replay across all three queues. Internal worker callbacks use a shared secret and an explicitly enabled HTTP exception restricted to the private Compose service name `api` and port 8787; this exception must not be enabled outside this private network.
 
+## Host preflight and sizing
+
+Before starting the stack, run `bash scripts/self-hosted/preflight.sh` from the repository root.
+
+The script checks Docker Engine and Compose v2, required `.env` values and secret formats, Compose interpolation/configuration, DNS resolution for all three public domains, and whether TCP ports 80/443 already have listeners. It also reports host CPU, memory, and free-disk estimates. DNS can be skipped temporarily during propagation with `--skip-dns`; Caddy still cannot issue certificates until DNS points to this server.
+
+Treat the following as conservative starting guidance, not measured capacity guarantees:
+
+- Development or very small evaluation: 2 vCPU, 4 GiB RAM, and 30 GiB free SSD.
+- Small production installation: 4 vCPU, 8 GiB RAM, and 50 GiB free SSD.
+- Larger telemetry volume: size ClickHouse storage, memory, and CPU from observed ingest rate, retention, query concurrency, and backup growth; do not infer capacity from the minimums above.
+
+The preflight warns below 4 vCPU, 8 GiB RAM, and 50 GiB free space. It does not benchmark the host, validate DNS ownership, test firewall reachability, or certify production capacity.
+
 ## Start
 
 1. Create DNS A records for `APP_DOMAIN`, `API_DOMAIN`, and `INGEST_DOMAIN` pointing to the server. Configure AAAA records only if IPv6 is correctly routed to the server.
