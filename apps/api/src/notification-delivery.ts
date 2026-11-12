@@ -349,7 +349,7 @@ export async function safelyQueueIncidentNotifications(
     });
   }
 }
-export type ManualNotificationRetryResult = "queued" | "not_found" | "not_retryable" | "channel_unavailable" | "channel_preference_disabled" | "queue_unavailable";
+export type ManualNotificationRetryResult = "queued" | "scheduled" | "not_found" | "not_retryable" | "channel_unavailable" | "channel_preference_disabled" | "queue_unavailable";
 
 export async function retryNotificationDelivery(
   database: JericoDatabase,
