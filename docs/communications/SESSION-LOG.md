@@ -839,3 +839,15 @@
 - Continue functional implementation: incident workflow improvements, notification configuration controls, and self-hosted queue/runtime support.
 - Do not spend time writing tests or triggering builds until the user asks to resume validation.
 - Keep `pnpm-lock.yaml` untouched.
+### 2026-11-12 — alert rule editing, notification channel controls, and environment management (PRs #85–#87)
+
+- PR #85 adds dashboard editing for existing alert rules. It reuses the current form and PATCH API to update the rule name, metric, comparison, threshold, evaluation window, and consecutive breach count while preserving enabled/paused state.
+- PR #86 adds an owner/admin-only notification channel PATCH endpoint and dashboard Pause/Enable controls. Unverified channels cannot be enabled; paused channels remain configured but are excluded from new incident notification delivery.
+- PR #87 adds environment update validation, a project-scoped owner/admin PATCH endpoint, a dedicated project Environments page, and dashboard navigation. It supports renaming, slug changes, and moving the production designation transactionally while preserving environment IDs and existing ingestion-key relationships. Destructive environment deletion is intentionally not exposed because keys and related data cascade from environment deletion.
+- All three PRs were squash-merged to `main`: #85 `a3e9c2393ca38126a4e3a469ed6b45a5ed7bd5a5`, #86 `2badb5092ab3db6e3cc1fc796dff9f4ce4d12b5c`, and #87 `744f27985217c3c4de02a07e32f1b6b05af62851`.
+- No tests or builds were run. No GitHub Actions/builds were requested.
+
+### Next
+- Continue implementing the incident workflow and notification preferences without starting test/build work.
+- Review project lifecycle and ingestion-key operations, then move into the provider-neutral queue and self-hosted runtime.
+- Keep `pnpm-lock.yaml` untouched.
