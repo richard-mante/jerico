@@ -18,6 +18,8 @@ export interface QueuePublisher<TMessage> {
   sendBatch?(messages: readonly TMessage[]): Promise<void>;
 }
 
+export const MAX_QUEUE_MESSAGE_BYTES = 120_000;
+
 export type QueueRetryOptions = {
   delaySeconds?: number;
   errorCode?: string;
