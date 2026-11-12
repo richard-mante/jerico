@@ -394,6 +394,16 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   index("notification_deliveries_enqueue_retry_idx").on(t.status, t.lastErrorCode, t.nextEnqueueAt),
   index("notification_deliveries_outbox_lease_idx").on(t.status, t.enqueuedAt, t.nextEnqueueAt),
 ]);
+export const ingestRateLimits = pgTable("ingest_rate_limits", {
+  credentialId: text("credential_id").primaryKey().references(() => projectIngestionKeys.id, { onDelete: "cascade" }),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+  requestCount: integer("request_count").notNull().default(0),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("ingest_rate_limits_request_count_check", sql`${t.requestCount} >= 0`),
+  index("ingest_rate_limits_window_idx").on(t.windowStartedAt),
+]);
+
 export const queueMessages = pgTable("queue_messages", {
   id: text("id").primaryKey(),
   queueName: text("queue_name").notNull(),
@@ -420,4 +430,4 @@ export const queueMessages = pgTable("queue_messages", {
   index("queue_messages_dead_letter_idx").on(t.queueName, t.completedAt).where(sql`${t.status} = 'dead_lettered'`),
 ]);
 
-export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, incidentActivity, notificationChannels, notificationDeliveries, queueMessages };
+export const schema = { user, session, account, verification, organization, member, invitation, products, projects, environments, projectIngestionKeys, projectIngestionUsage, projectIngestionRequests, projectErrorGroupStates, uptimeMonitors, uptimeCheckResults, alertRules, incidents, incidentActivity, notificationChannels, notificationDeliveries, queueMessages, ingestRateLimits };
