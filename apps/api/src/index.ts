@@ -814,6 +814,22 @@ app.post("/api/v1/notification-channels/verify", async (context) => {
   return context.json({ data: { verified: true } });
 });
 
+app.patch("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
+  if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
+  const body = await context.req.json().catch(() => null) as { enabled?: unknown } | null;
+  if (!body || typeof body.enabled !== "boolean") return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide an enabled boolean." } }, 400);
+  const [channel] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt })
+    .from(notificationChannels).where(and(
+      eq(notificationChannels.id, context.req.param("channelId")),
+      eq(notificationChannels.organizationId, organizationId),
+    )).limit(1);
+  if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
+  if (body.enabled && !channel.verifiedAt) return context.json({ error: { code: "CHANNEL_NOT_VERIFIED", message: "Verify this channel before enabling it." } }, 409);
+  const [updated] = await database.update(notificationChannels).set({ enabled: body.enabled, updatedAt: new Date() }).where(and(
+    eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId),
+  )).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled });
+  return context.json({ data: updated });
+}));
 app.delete("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
   const channelId = context.req.param("channelId");
