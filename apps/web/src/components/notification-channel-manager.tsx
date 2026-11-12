@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; lastVerificationErrorCode: string | null; createdAt: string };
+type Channel = { id: string; type: "email" | "webhook"; target: string; verifiedAt: string | null; enabled: boolean; notifyOnOpened: boolean; notifyOnAcknowledged: boolean; notifyOnResolved: boolean; lastVerificationErrorCode: string | null; createdAt: string };
 type Delivery = { id: string; incidentId: string; target: string; eventType: string; status: "queued" | "sent" | "failed"; attempts: number; lastErrorCode: string | null; lastAttemptAt: string | null; sentAt: string | null; createdAt: string };
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -84,18 +84,13 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
       setError(cause instanceof Error ? cause.message : "Could not resend verification email.");
     } finally { setBusy(false); }
   }
-  async function toggleChannel(channel: Channel) {
+  async function updateChannel(channel: Channel, settings: Partial<Pick<Channel, "enabled" | "notifyOnOpened" | "notifyOnAcknowledged" | "notifyOnResolved">>) {
     setBusy(true); setError(""); setNotice("");
-    try {
-      await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, {
-        method: "PATCH", body: JSON.stringify({ enabled: !channel.enabled }),
-      });
-      setNotice(channel.enabled ? "Notification channel paused. No new incident notifications will be sent to it." : "Notification channel enabled.");
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not update notification channel.");
-    } finally { setBusy(false); }
+    try { await request(`/api/v1/notification-channels/${encodeURIComponent(channel.id)}`, { method: "PATCH", body: JSON.stringify(settings) }); setNotice(settings.enabled !== undefined ? settings.enabled ? "Notification channel enabled." : "Notification channel paused." : "Notification preferences saved."); await refresh(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update notification channel."); } finally { setBusy(false); }
   }
+  async function toggleChannel(channel: Channel) { return updateChannel(channel, { enabled: !channel.enabled }); }
+
   async function remove(channel: Channel) {
     if (!window.confirm(`Remove ${channel.target} from incident notifications?`)) return;
     setBusy(true); setError(""); setNotice("");
@@ -130,7 +125,12 @@ export function NotificationChannelManager({ projectId, organizationId }: { proj
         </div>}
         <div className="mt-4 divide-y divide-white/10">
           {channels.map((channel) => <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div><p className="text-sm">{channel.type === "webhook" ? "Webhook" : "Email"} · {channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}{channel.verifiedAt ? channel.enabled ? " · Active" : " · Paused" : ""}{channel.lastVerificationErrorCode ? " · " + channel.lastVerificationErrorCode : ""}</p></div>
+            <div className="min-w-0 flex-1"><p className="text-sm">{channel.type === "webhook" ? "Webhook" : "Email"} · {channel.target}</p><p className="mt-1 text-xs text-[#737b89]">{channel.verifiedAt ? "Verified" : "Verification pending"}{channel.verifiedAt ? channel.enabled ? " · Active" : " · Paused" : ""}{channel.lastVerificationErrorCode ? " · " + channel.lastVerificationErrorCode : ""}</p>
+              {channel.verifiedAt && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnOpened} onChange={() => void updateChannel(channel, { notifyOnOpened: !channel.notifyOnOpened })} />Opened</label>
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnAcknowledged} onChange={() => void updateChannel(channel, { notifyOnAcknowledged: !channel.notifyOnAcknowledged })} />Acknowledged</label>
+                <label className="flex items-center gap-2 text-[11px] text-[#929aaa]"><input type="checkbox" disabled={busy} checked={channel.notifyOnResolved} onChange={() => void updateChannel(channel, { notifyOnResolved: !channel.notifyOnResolved })} />Resolved</label>
+              </div>}</div>
             <div className="flex gap-2">{!channel.verifiedAt && <button disabled={busy} onClick={() => void resend(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">Resend</button>}{channel.verifiedAt && <button disabled={busy} onClick={() => void toggleChannel(channel)} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-[#c2c8d3]">{channel.enabled ? "Pause" : "Enable"}</button>}<button disabled={busy} onClick={() => void remove(channel)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Remove</button></div>
           </div>)}
           {!channels.length && <p className="py-5 text-sm text-[#737b89]">No notification channels configured.</p>}

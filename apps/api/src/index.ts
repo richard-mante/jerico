@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   createNotificationChannelSchema,
+  updateNotificationChannelSchema,
   createWebhookNotificationChannelSchema,
   webhookVerificationResultSchema,
   verifyNotificationChannelSchema,
@@ -676,6 +677,9 @@ app.get("/api/v1/notification-channels", async (context) => withOrganization(con
     target: notificationChannels.target,
     verifiedAt: notificationChannels.verifiedAt,
     enabled: notificationChannels.enabled,
+    notifyOnOpened: notificationChannels.notifyOnOpened,
+    notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged,
+    notifyOnResolved: notificationChannels.notifyOnResolved,
     lastVerificationErrorCode: notificationChannels.lastVerificationErrorCode,
     createdAt: notificationChannels.createdAt,
   }).from(notificationChannels).where(eq(notificationChannels.organizationId, organizationId)).orderBy(desc(notificationChannels.createdAt));
@@ -854,18 +858,12 @@ app.post("/api/v1/notification-channels/verify", async (context) => {
 
 app.patch("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
   if (!canManageOrganizationResources(role)) return context.json({ error: { code: "FORBIDDEN", message: "Only organization owners and admins can manage notification channels." } }, 403);
-  const body = await context.req.json().catch(() => null) as { enabled?: unknown } | null;
-  if (!body || typeof body.enabled !== "boolean") return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide an enabled boolean." } }, 400);
-  const [channel] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt })
-    .from(notificationChannels).where(and(
-      eq(notificationChannels.id, context.req.param("channelId")),
-      eq(notificationChannels.organizationId, organizationId),
-    )).limit(1);
+  const parsed = updateNotificationChannelSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json({ error: { code: "VALIDATION_ERROR", message: "Provide at least one valid notification channel setting.", details: parsed.error.flatten() } }, 400);
+  const [channel] = await database.select({ id: notificationChannels.id, verifiedAt: notificationChannels.verifiedAt }).from(notificationChannels).where(and(eq(notificationChannels.id, context.req.param("channelId")), eq(notificationChannels.organizationId, organizationId))).limit(1);
   if (!channel) return context.json({ error: { code: "NOT_FOUND", message: "Notification channel not found." } }, 404);
-  if (body.enabled && !channel.verifiedAt) return context.json({ error: { code: "CHANNEL_NOT_VERIFIED", message: "Verify this channel before enabling it." } }, 409);
-  const [updated] = await database.update(notificationChannels).set({ enabled: body.enabled, updatedAt: new Date() }).where(and(
-    eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId),
-  )).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled });
+  if (parsed.data.enabled === true && !channel.verifiedAt) return context.json({ error: { code: "CHANNEL_NOT_VERIFIED", message: "Verify this channel before enabling it." } }, 409);
+  const [updated] = await database.update(notificationChannels).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(notificationChannels.id, channel.id), eq(notificationChannels.organizationId, organizationId))).returning({ id: notificationChannels.id, enabled: notificationChannels.enabled, notifyOnOpened: notificationChannels.notifyOnOpened, notifyOnAcknowledged: notificationChannels.notifyOnAcknowledged, notifyOnResolved: notificationChannels.notifyOnResolved });
   return context.json({ data: updated });
 }));
 app.delete("/api/v1/notification-channels/:channelId", async (context) => withOrganization(context, async (database, organizationId, role) => {
@@ -1077,6 +1075,7 @@ app.post("/api/v1/projects/:projectId/notification-deliveries/:deliveryId/retry"
   if (result === "not_found") return context.json({ error: { code: "NOT_FOUND", message: "Notification delivery was not found in this project." } }, 404);
   if (result === "not_retryable") return context.json({ error: { code: "NOT_RETRYABLE", message: "Only failed notification deliveries can be retried." } }, 409);
   if (result === "channel_unavailable") return context.json({ error: { code: "CHANNEL_UNAVAILABLE", message: "The notification channel is missing, disabled, unverified, or misconfigured." } }, 409);
+  if (result === "channel_preference_disabled") return context.json({ error: { code: "CHANNEL_PREFERENCE_DISABLED", message: "This channel is not configured to receive this incident event." } }, 409);
   if (result === "queue_unavailable") return context.json({ error: { code: "QUEUE_UNAVAILABLE", message: "The notification could not be queued. Automatic recovery will retry when possible." } }, 503);
   return context.json({ data: { deliveryId: context.req.param("deliveryId"), status: "queued" } }, 202);
 }));
