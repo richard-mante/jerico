@@ -1042,3 +1042,8 @@
 
 - Merged PR #167 (`3cc4d08482de553b1bde53e7d08953019d9fa5f2`): refreshed the current-state handover, queue payload/SDK batching roadmap, and Phase 3 SDK notes through PR #166.
 - Current implementation remains unvalidated: no tests, typecheck, build, queue sends, ClickHouse SQL, Compose parse, Docker, Linux/systemd, or backup/restore runtime checks were run.
+
+
+### 2026-11-12 — Handover merge-label cleanup
+
+- PR #168 merged a documentation-only refresh. The current-state header now distinguishes the latest feature/code merge from subsequent documentation-only merges, avoiding a stale “latest main merge” label after each handover update.
