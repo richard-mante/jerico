@@ -146,6 +146,7 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 - [x] Configure Caddy automatic HTTPS and document DNS/ACME/firewall setup (PR #123; not verified).
 - [x] Add baseline resource-sizing guidance and a deployment preflight (PR #130; host capacity is not benchmarked).
 - [ ] Define production resource sizing from measured ingest/query workloads and set backup retention/off-site storage policy.
+- [x] Add first-run `.env` secret bootstrap with optional age identity generation (PR #139; setup not executed).
 - [ ] Fresh-install validation on a clean Linux server (deferred until implementation is complete).
 
 **Acceptance:** A developer can self-host Jerico and monitor an instrumented application without our hosted infrastructure.
