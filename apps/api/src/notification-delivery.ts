@@ -266,10 +266,12 @@ export async function retryFailedNotificationEnqueues(
       continue;
     }
 
-    const scheduledAt = nextNotificationDeliveryAt(channel, now);
-    if (scheduledAt.getTime() > now.getTime()) {
+    if (!channel || !incident) {
       await database.update(notificationDeliveries).set({
-        status: "queued", lastErrorCode: null, nextEnqueueAt: scheduledAt, activeEnqueueToken: null, updatedAt: now,
+        status: "failed",
+        lastErrorCode: "channel_unavailable",
+        nextEnqueueAt: null,
+        updatedAt: now,
       }).where(and(
         eq(notificationDeliveries.id, delivery.id),
         eq(notificationDeliveries.status, delivery.status),
@@ -279,12 +281,10 @@ export async function retryFailedNotificationEnqueues(
       continue;
     }
 
-    if (!channel || !incident) {
+    const scheduledAt = nextNotificationDeliveryAt(channel, now);
+    if (scheduledAt.getTime() > now.getTime()) {
       await database.update(notificationDeliveries).set({
-        status: "failed",
-        lastErrorCode: "channel_unavailable",
-        nextEnqueueAt: null,
-        updatedAt: now,
+        status: "queued", lastErrorCode: null, nextEnqueueAt: scheduledAt, activeEnqueueToken: null, updatedAt: now,
       }).where(and(
         eq(notificationDeliveries.id, delivery.id),
         eq(notificationDeliveries.status, delivery.status),
