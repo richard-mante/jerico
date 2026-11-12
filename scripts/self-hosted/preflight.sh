@@ -17,7 +17,7 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; }
 info() { echo "OK: $*"; }
 
-for command_name in docker getent awk df ss stat; do
+for command_name in docker getent awk df ss; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Required command '$command_name' is not installed."
 done
 
@@ -56,6 +56,12 @@ for key in POSTGRES_PASSWORD CLICKHOUSE_PASSWORD QUEUE_ADMIN_TOKEN BETTER_AUTH_S
   require_secret "$key" 32
 done
 require_secret WEBHOOK_ENCRYPTION_KEY 43
+webhook_key="$(read_env WEBHOOK_ENCRYPTION_KEY)"
+[[ "$webhook_key" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail "WEBHOOK_ENCRYPTION_KEY must be an unpadded base64url encoding of exactly 32 bytes."
+for key in POSTGRES_PASSWORD CLICKHOUSE_PASSWORD; do
+  value="$(read_env "$key")"
+  [[ "$value" =~ ^[A-Za-z0-9]{32,}$ ]] || fail "$key must use at least 32 URL-safe alphanumeric characters for the Compose DATABASE_URL."
+done
 for key in APP_DOMAIN API_DOMAIN INGEST_DOMAIN ACME_EMAIL; do
   require_value "$key"
 done
@@ -66,6 +72,9 @@ fi
 
 docker compose -f "$COMPOSE_FILE" config --quiet || fail "Compose configuration is invalid or required environment values are missing."
 info "Required secrets and Compose configuration are valid."
+if [[ -z "$(read_env AGE_RECIPIENT)" ]]; then
+  warn "AGE_RECIPIENT is not configured; generated backups will be plaintext."
+fi
 
 if [[ "$SKIP_DNS" -eq 0 ]]; then
   for key in APP_DOMAIN API_DOMAIN INGEST_DOMAIN; do
