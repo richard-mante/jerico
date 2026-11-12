@@ -23,6 +23,29 @@ describe("telemetry redaction", () => {
     expect(result.name).not.toContain("eyJabcdefgh");
   });
 
+  it("redacts OAuth token and secret assignments in event names and messages", () => {
+    const assignments = [
+      "access_token=access-value",
+      "refresh-token=refresh-value",
+      "idToken=id-value",
+      "clientSecret=client-value",
+    ];
+    const result = redactTelemetryEvent({
+      type: "event",
+      name: `auth.${assignments.join(".")}`,
+      message: `OAuth credentials: ${assignments.join(", ")}`,
+    });
+
+    for (const value of ["access-value", "refresh-value", "id-value", "client-value"]) {
+      expect(result.name).not.toContain(value);
+      expect(result.message).not.toContain(value);
+    }
+    expect(result.name).toContain("access_token=[REDACTED]");
+    expect(result.name).toContain("refresh-token=[REDACTED]");
+    expect(result.name).toContain("idToken=[REDACTED]");
+    expect(result.name).toContain("clientSecret=[REDACTED]");
+  });
+
   it("redacts sensitive attribute keys and common secret patterns", () => {
     const result = redactTelemetryEvent({
       type: "error",

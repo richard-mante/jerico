@@ -720,3 +720,14 @@
 
 ### Next
 - Continue ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Manual runtime validation remains the release gate.
+
+
+## 2026-11-12 — OAuth-style telemetry secret redaction
+
+- Continued from the next item after PR #68 and addressed open issue #69.
+- Extended telemetry text assignment redaction to access_token, refresh_token, id_token, and client_secret, including snake_case, kebab-case, and camelCase spellings. Added regression coverage for event names and message text while retaining static event names.
+- Opened [PR #70](https://github.com/richard-mante/jerico/pull/70) from `fix/oauth-secret-redaction`.
+- Tests, typecheck, lint, build, and deployed Worker/ClickHouse validation were not executed. Manual runtime validation remains outstanding.
+
+### Next
+- Review and merge PR #70 after review; continue the ingestion idempotency/quota concurrency review and deployed Worker egress/queue retention checks. Workspace validation and the user's manual runtime validation remain release gates.
