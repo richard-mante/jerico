@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildUptimeDeadLetterResult, escapeIdentifier, isValidNotificationMessage, toRow, writeToClickHouse } from "./index";
+import { buildUptimeDeadLetterResult, escapeIdentifier, isValidNotificationMessage, isValidTelemetryMessage, toRow, writeToClickHouse } from "./index";
 
 const message = {
   schemaVersion: 1 as const,
@@ -149,5 +149,35 @@ describe("notification queue contract", () => {
       schemaVersion: 1, type: "notification.email", deliveryId: "550e8400-e29b-41d4-a716-446655440000",
       to: "not-an-email", subject: "Incident opened", text: "An incident needs attention.",
     })).toBe(false);
+  });
+});
+
+describe("telemetry queue message validation", () => {
+  const validMessage = {
+    schemaVersion: 1,
+    requestId: "req_123",
+    credentialId: "key_123",
+    organizationId: "org_123",
+    projectId: "project_123",
+    environmentId: "env_123",
+    acceptedAt: "2026-11-03T09:00:00.000Z",
+    events: [{ eventId: "evt_123", type: "event", name: "signup" }],
+  };
+
+  it("accepts a valid bounded telemetry envelope", () => {
+    expect(isValidTelemetryMessage(validMessage)).toBe(true);
+  });
+
+  it.each([
+    ["unsupported schema version", { ...validMessage, schemaVersion: 2 }],
+    ["missing tenant identity", { ...validMessage, organizationId: "" }],
+    ["invalid accepted timestamp", { ...validMessage, acceptedAt: "not-a-date" }],
+    ["empty event list", { ...validMessage, events: [] }],
+    ["oversized event list", { ...validMessage, events: Array.from({ length: 101 }, (_, index) => ({ eventId: String(index), type: "event", name: "signup" })) }],
+    ["missing stable event ID", { ...validMessage, events: [{ type: "event", name: "signup" }] }],
+    ["invalid event payload", { ...validMessage, events: [{ eventId: "evt_123", type: "unknown", name: "signup" }] }],
+    ["unexpected event properties", { ...validMessage, events: [{ eventId: "evt_123", type: "event", name: "signup", unexpected: true }] }],
+  ])("rejects %s", (_label, candidate) => {
+    expect(isValidTelemetryMessage(candidate)).toBe(false);
   });
 });
