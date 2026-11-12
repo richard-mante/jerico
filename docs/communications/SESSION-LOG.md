@@ -927,3 +927,13 @@
 - Expanded Compose to include PostgreSQL, ClickHouse, Drizzle migrations, Node API, Node ingestion, and multi-queue worker. The web dashboard, backup/restore, TLS/reverse-proxy provisioning, and production operations remain open.
 - PR #120 merged as `ab876a7e9ac95c50287a1c5094a8addd381f9b79`. The stale PR #119 was closed and replaced with rebased PR #120.
 - No tests, typecheck, lint, build, Docker build, Compose validation, migration execution, PostgreSQL/ClickHouse runtime, or DNS/SSRF integration checks were run. No validation is claimed. `pnpm-lock.yaml` was not modified.
+
+
+## 2026-11-12 — Self-hosted web, TLS, and backup/restore
+
+- Merged PR #122: added Next.js standalone output, monorepo tracing, a multi-stage web Dockerfile, and a Compose web dashboard service. `NEXT_PUBLIC_API_URL` is derived from `API_DOMAIN` at build time.
+- Merged PR #123: added Caddy routes for `APP_DOMAIN`, `API_DOMAIN`, and `INGEST_DOMAIN`, automatic HTTPS, persistent Caddy data/config volumes, and loopback-only app ports. Operators must configure DNS, ACME email, and firewall ports 80/443 (UDP 443 optional for HTTP/3).
+- Merged PR #124: added ClickHouse local backup disk config, a PostgreSQL custom-format backup, native ClickHouse backup archive, SHA-256 checksums, JSON manifest, and destructive restore script guarded by explicit confirmation. The scripts stop writers during backup/restore; API/ingest shutdown now drains scheduled maintenance before closing pools.
+- Backups are not encrypted by the scripts and are not automatically pruned. Encrypt before off-site transfer, configure retention, and preserve the Caddy data volume separately. The restore workflow has not been exercised.
+- PR #124 merged as `e7228b16ec28bfd1bed1c4938b12b8e6746fe7ee`.
+- No tests, typecheck, lint, build, Docker build, Compose validation, migrations, restore drill, or live database runtime checks were run. No validation is claimed. `pnpm-lock.yaml` was not modified.

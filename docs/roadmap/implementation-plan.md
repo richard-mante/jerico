@@ -135,10 +135,14 @@ See the [Phase 5 uptime plan](phase-5-uptime.md).
 
 ## Phase 6 — Self-hosted release
 - [x] Compose for Node API, ingestion, telemetry/uptime/notification workers, PostgreSQL, ClickHouse, and migrations (PR #116, expanded by #118 and #120; no runtime validation).
-- [ ] Add the web dashboard, TLS/reverse proxy, backup/restore, and production operational configuration to the self-hosted deployment.
+- [x] Add the Next.js web dashboard container and Compose service (PR #122; build/runtime validation pending).
+- [x] Add Caddy automatic HTTPS for dashboard/API/ingestion domains with persistent certificate storage (PR #123; certificate provisioning not verified).
+- [x] Add PostgreSQL and ClickHouse backup/restore scripts with checksums and destructive restore confirmation (PR #124; restore drill pending).
+- [ ] Complete clean Linux install, restore drill, backup encryption/off-site retention, resource sizing, and production operational hardening.
 - [x] Persistent PostgreSQL/ClickHouse volumes, service health checks, secret templates, and Drizzle migration execution are configured in the initial Compose slice (runtime validation pending).
-- [ ] Backup/restore test and upgrade instructions.
-- [ ] External TLS/reverse proxy guide, resource sizing, and production retention/operations guidance.
+- [x] Implement backup/restore scripts and operator guide (PR #124; a real restore test is still required).
+- [x] Configure Caddy automatic HTTPS and document DNS/ACME/firewall setup (PR #123; not verified).
+- [ ] Add resource sizing and production retention/operations guidance.
 - [ ] Fresh-install validation on a clean Linux server (deferred until implementation is complete).
 
 **Acceptance:** A developer can self-host Jerico and monitor an instrumented application without our hosted infrastructure.
@@ -263,3 +267,15 @@ Track work through Backlog, Ready, In Progress, In Review, Blocked, and Done. Ev
 - [ ] Add the web dashboard and external TLS/reverse-proxy deployment configuration.
 - [ ] Add automated backup/restore and fresh-install validation.
 - [ ] Run typecheck, lint, builds, migrations, Docker/Compose validation, SSRF integration checks, and PostgreSQL/ClickHouse runtime verification before production release.
+
+
+### 2026-11-12 — Self-hosted release components
+
+- [x] Node management API, Better Auth, Node ingestion API, and PostgreSQL-backed telemetry/uptime/notification consumers (PRs #118 and #120).
+- [x] Next.js web dashboard standalone image and Compose service (PR #122; build validation pending).
+- [x] Caddy automatic HTTPS reverse proxy for app/API/ingestion domains (PR #123; certificate validation pending).
+- [x] PostgreSQL custom-format and ClickHouse native backup/restore scripts, checksums, and explicit destructive restore confirmation (PR #124; restore drill pending).
+- [ ] Validate a clean Linux installation and perform a full restore exercise.
+- [ ] Add backup encryption/off-site storage and define retention policy.
+- [ ] Complete security review, resource sizing, monitoring, and production hardening.
+- [ ] Run typecheck, lint, build, Docker/Compose validation, migration, DNS/SSRF, and live database checks before release.
