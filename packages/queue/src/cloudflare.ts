@@ -26,7 +26,7 @@ export function adaptCloudflareQueueBatch<TMessage>(
     body: message.body,
     attempts: message.attempts,
     ack: () => message.ack(),
-    retry: (options) => message.retry(options),
+    retry: (options) => message.retry(options ? { delaySeconds: options.delaySeconds } : undefined),
   }));
 
   return { queue: batch.queue, messages };
