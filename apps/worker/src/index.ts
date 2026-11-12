@@ -4,7 +4,7 @@ import type { QueueBatch, QueueDelivery } from "@jerico/queue";
 import { probeEndpoint } from "./uptime-probe";
 import { deliverWebhook, isSafeWebhookUrl } from "./webhook-delivery";
 
-type TelemetryEvent = {
+export type TelemetryEvent = {
   eventId?: string;
   type: "event" | "error" | "log" | "metric" | "span";
   name: string;
@@ -13,7 +13,7 @@ type TelemetryEvent = {
   value?: number;
   attributes?: Record<string, string | number | boolean | null>;
 };
-type TelemetryMessage = {
+export type TelemetryMessage = {
   schemaVersion: 1;
   requestId: string;
   credentialId: string;
@@ -51,7 +51,7 @@ type ClickHouseEnv = {
   CLICKHOUSE_PASSWORD?: string;
   CLICKHOUSE_TOKEN?: string;
 };
-type WorkerEnv = ClickHouseEnv & {
+export type WorkerEnv = ClickHouseEnv & {
   API_URL?: string;
   UPTIME_RESULTS_SECRET?: string;
   PROBE_WORKER_HOST?: string;
