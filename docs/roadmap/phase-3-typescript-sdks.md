@@ -46,7 +46,7 @@ These examples are documentation only; they have not yet been run in sample appl
 3. Add request-level idempotency to the ingestion API before automatic SDK retries.
 4. Add browser route navigation instrumentation and validate Core Web Vitals against the official `web-vitals` implementation across supported browsers.
 5. Add richer Node instrumentation and framework adapters.
-6. Add Astro/React examples and execute all sample apps.
+6. Add Astro/React examples (documentation added in PR #137; sample apps still need execution).
 7. Add OpenTelemetry-compatible export/ingestion and package build/release workflows.
 
 
