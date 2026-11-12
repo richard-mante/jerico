@@ -35,7 +35,7 @@ POSTGRES_FILE="$BACKUP_DIR/postgres-$STAMP.dump"
 CLICKHOUSE_FILE="$BACKUP_DIR/clickhouse-$STAMP.tar.gz"
 
 if [[ -n "${RCLONE_REMOTE:-}" ]]; then
-  if [[ ! -f "$BACKUP_DIR/manifest-$STAMP.json" || ( ! -f "$POSTGRES_FILE" && ! -f "$POSTGRES_FILE.age" ) || ( ! -f "$CLICKHOUSE_FILE" && ! -f "$CLICKHOUSE_FILE.age" ) ]]; then
+  if [[ ! -f "$BACKUP_DIR/manifest-$STAMP.json" || ( ! -f "$POSTGRES_FILE" && ! -f "$POSTGRES_FILE.age" ) || ( ! -f "$POSTGRES_FILE.sha256" && ! -f "$POSTGRES_FILE.age.sha256" ) || ( ! -f "$CLICKHOUSE_FILE" && ! -f "$CLICKHOUSE_FILE.age" ) || ( ! -f "$CLICKHOUSE_FILE.sha256" && ! -f "$CLICKHOUSE_FILE.age.sha256" ) ]]; then
     command -v rclone >/dev/null 2>&1 || { echo "RCLONE_REMOTE is set but rclone is not installed." >&2; exit 1; }
     if [[ -n "${RCLONE_CONFIG:-}" ]]; then
       [[ -f "$RCLONE_CONFIG" && ! -L "$RCLONE_CONFIG" ]] || { echo "RCLONE_CONFIG must point to a regular config file." >&2; exit 1; }
