@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-13  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
-**Latest feature/code merge:** PR #166 — byte-aware SDK batching (`554be19bd8f7174f4aabf9e4901477819dbe1c13`)  
+**Latest feature/code merge:** PR #170 — OpenTelemetry HTTP/JSON ingestion (`06a67b94196286324c5a77aeb48689993a109f25`)  
 **Current milestone:** The self-hosted Compose stack includes the Next.js dashboard, Node management/ingestion APIs, PostgreSQL, ClickHouse, telemetry/uptime/notification workers, and Caddy HTTPS. Backup/restore covers PostgreSQL and ClickHouse with checksums, destructive-restore confirmation, optional age encryption, opt-in local retention, and optional rclone encrypted off-site upload/verification/restore. Environment bootstrap/preflight, non-root/reduced-capability application containers, manifest-verified restores, optional daily systemd backups, daily terminal queue retention, invalid-message quarantine, configurable/idempotent ClickHouse TTL, bounded container logs, Caddy response/body limits, provider-neutral queue payload sizing, byte-aware SDK batching, and a security disclosure policy are implemented. Remaining gates: clean Linux install, local and off-host restore drills, storage-provider lifecycle policy, measured resource sizing, SDK validation/publication, private-reporting repository configuration, and runtime/security verification.
 
 > Read this file first, then the decision log, session log, architecture, and roadmap. This handover is a summary, not a substitute for inspecting the current code and PRs.
@@ -12,9 +12,9 @@
 
 Jerico is an extensible, open-source Founder Operating System. Jerico Observability is the first independently useful product. It must support managed cloud and self-hosted deployments, monitor Jerico itself, and allow external developers to instrument and monitor their applications. Founder OS financial intelligence and business analysis are later phases.
 
-## Latest in-progress feature branch — OpenTelemetry HTTP/JSON ingestion
+## Latest merged feature — OpenTelemetry HTTP/JSON ingestion
 
-Branch `feature/otlp-http-ingestion` adds OTLP JSON endpoints for logs, traces, and metrics (`/v1/logs`, `/v1/traces`, `/v1/metrics`). It converts resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, and histogram count/sum into the existing Jerico telemetry event model, then delegates to the existing credential/quota/idempotency/outbox/queue pipeline. See [the OTLP ingestion guide](../guides/otlp-http-ingestion.md). This is an initial JSON adapter, not full OTLP compatibility: protobuf/gRPC, exemplars, histogram buckets, temporality conversion, and per-record partial rejection are not implemented. It has not been built or runtime-validated and is not merged into `main` yet.
+Branch `feature/otlp-http-ingestion` adds OTLP JSON endpoints for logs, traces, and metrics (`/v1/logs`, `/v1/traces`, `/v1/metrics`). It converts resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, and histogram count/sum into the existing Jerico telemetry event model, then delegates to the existing credential/quota/idempotency/outbox/queue pipeline. See [the OTLP ingestion guide](../guides/otlp-http-ingestion.md). This is an initial JSON adapter, not full OTLP compatibility: protobuf/gRPC, exemplars, histogram buckets, temporality conversion, and per-record partial rejection are not implemented. It is merged into `main`, but has not been built or runtime-validated.
 
 ## Confirmed architecture
 
