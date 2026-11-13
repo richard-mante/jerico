@@ -63,6 +63,12 @@ function boundedJson(value: unknown, maxLength = 2048): string | undefined {
   }
 }
 
+function finiteNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
 function resourceGroups(payload: unknown, signal: "logs" | "traces" | "metrics"): Array<{ resource: JsonObject; scope: JsonObject; data: JsonObject }> {
   const root = object(payload);
   const groups = root.resourceLogs ?? root.resourceSpans ?? root.resourceMetrics;
@@ -167,25 +173,25 @@ export function convertOtlp(signal: "logs" | "traces" | "metrics", payload: unkn
             ...(kind === "exponential_histogram" && boundedJson(point.positive) ? { "otel.positive_buckets": boundedJson(point.positive)! } : {}),
             ...(kind === "exponential_histogram" && boundedJson(point.negative) ? { "otel.negative_buckets": boundedJson(point.negative)! } : {}),
             ...(kind === "exponential_histogram" && typeof point.scale === "number" ? { "otel.scale": point.scale } : {}),
-            ...(kind === "exponential_histogram" && point.zeroCount !== undefined ? { "otel.zero_count": Number(point.zeroCount) } : {}),
-            ...(typeof point.min === "number" ? { "otel.min": point.min } : {}),
-            ...(typeof point.max === "number" ? { "otel.max": point.max } : {}),
+            ...(kind === "exponential_histogram" && finiteNumber(point.zeroCount) !== undefined ? { "otel.zero_count": finiteNumber(point.zeroCount)! } : {}),
+            ...(finiteNumber(point.min) !== undefined ? { "otel.min": finiteNumber(point.min)! } : {}),
+            ...(finiteNumber(point.max) !== undefined ? { "otel.max": finiteNumber(point.max)! } : {}),
           });
           const time = timestamp(point.timeUnixNano ?? point.startTimeUnixNano);
-          const number = point.asDouble !== undefined ? Number(point.asDouble) : Number(point.asInt);
-          if (Number.isFinite(number)) {
+          const number = finiteNumber(point.asDouble ?? point.asInt);
+          if (number !== undefined) {
             events.push({ type: "metric", name, value: number, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
           } else if (kind.includes("histogram") || kind === "summary") {
-            const count = Number(point.count);
-            const sum = Number(point.sum);
-            if (Number.isFinite(count)) events.push({ type: "metric", name: name + ".count", value: count, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
-            if (Number.isFinite(sum)) events.push({ type: "metric", name: name + ".sum", value: sum, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
+            const count = finiteNumber(point.count);
+            const sum = finiteNumber(point.sum);
+            if (count !== undefined) events.push({ type: "metric", name: name + ".count", value: count, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
+            if (sum !== undefined) events.push({ type: "metric", name: name + ".sum", value: sum, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
             if (kind === "summary" && Array.isArray(point.quantileValues)) {
               for (const item of point.quantileValues) {
                 const quantile = object(item);
-                const value = Number(quantile.value);
-                const rank = Number(quantile.quantile);
-                if (!Number.isFinite(value) || !Number.isFinite(rank)) continue;
+                const value = finiteNumber(quantile.value);
+                const rank = finiteNumber(quantile.quantile);
+                if (value === undefined || rank === undefined) continue;
                 events.push({
                   type: "metric",
                   name: name + ".quantile",
