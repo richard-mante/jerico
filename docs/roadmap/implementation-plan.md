@@ -25,7 +25,7 @@ Implementation has progressed substantially, but **Jerico is not production-vali
 
 ## Recently implemented — OpenTelemetry HTTP/JSON ingestion
 
-Branch `feature/otlp-http-ingestion` adds `/v1/logs`, `/v1/traces`, and `/v1/metrics` OTLP JSON adapters. Resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, histogram count/sum and bucket metadata, summary quantiles, and bounded span events/links are normalized into the existing telemetry event pipeline. The adapter delegates to the established credential, project-state, quota, redaction, idempotency-outbox, and queue path. See [the implementation guide](../guides/otlp-http-ingestion.md). This is an initial OTLP JSON slice only; protobuf/gRPC, exemplars, histogram bucket expansion, temporality conversion, and record-level partial rejection remain future work. The implementation has not been built or runtime-validated.
+PR #170 adds `/v1/logs`, `/v1/traces`, and `/v1/metrics` OTLP JSON adapters. Resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, histogram count/sum and bucket metadata, summary quantiles, and bounded span events/links are normalized into the existing telemetry event pipeline. The adapter delegates to the established credential, project-state, quota, redaction, idempotency-outbox, and queue path. See [the implementation guide](../guides/otlp-http-ingestion.md), including a Collector exporter example. This is an initial OTLP JSON slice only; protobuf/gRPC, exemplars, histogram bucket expansion, temporality conversion, and record-level partial rejection remain future work. The implementation has not been built or runtime-validated.
 
 ## Completed implementation
 
