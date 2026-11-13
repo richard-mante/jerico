@@ -1047,3 +1047,12 @@
 ### 2026-11-12 — Handover merge-label cleanup
 
 - PR #168 merged a documentation-only refresh. The current-state header now distinguishes the latest feature/code merge from subsequent documentation-only merges, avoiding a stale “latest main merge” label after each handover update.
+
+### 2026-11-13 — OpenTelemetry HTTP/JSON ingestion (PRs #170 and #171)
+
+- Merged PR #170 (`06a67b94196286324c5a77aeb48689993a109f25`): added OTLP HTTP/JSON endpoints at `/v1/logs`, `/v1/traces`, and `/v1/metrics`. Normalized resource/scope attributes, log severity, trace/span identifiers and duration, gauge/sum values, and histogram count/sum into the existing Jerico telemetry event model.
+- OTLP requests are forwarded through the existing ingestion path, preserving bearer credential checks, project state, rate limiting, daily quotas, redaction, idempotency outbox, queue publication, and ClickHouse processing. Added CORS handling for `/v1/*`.
+- Merged PR #171 (`a2daaca47d4f6ce2f210732c10b0dba64f58c2d2`): retained bounded span event/link data, histogram and exponential-histogram bucket metadata, sum temporality/monotonicity, and Summary count/sum/quantile points. Numeric values are filtered to finite numbers before they enter telemetry events.
+- Added `docs/guides/otlp-http-ingestion.md` and updated the roadmap/current-state handover.
+- Scope remains OTLP HTTP/JSON only. Protobuf/gRPC, exemplars, individual bucket expansion, and per-record partial rejection are not implemented. This is not full OpenTelemetry Collector compatibility.
+- No tests, builds, typechecks, migrations, Docker checks, or runtime validation were run, per the user's implementation-first instruction. `pnpm-lock.yaml` was not touched. The two existing validation issues (#73 and #107) remain open.
