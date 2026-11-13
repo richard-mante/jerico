@@ -14,7 +14,7 @@ Jerico is an extensible, open-source Founder Operating System. Jerico Observabil
 
 ## Latest merged feature — OpenTelemetry HTTP/JSON ingestion
 
-Branch `feature/otlp-http-ingestion` adds OTLP JSON endpoints for logs, traces, and metrics (`/v1/logs`, `/v1/traces`, `/v1/metrics`). It converts resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, histogram count/sum and bounded bucket metadata, summary quantiles, and bounded span events/links into the existing Jerico telemetry event model, then delegates to the existing credential/quota/idempotency/outbox/queue pipeline. See [the OTLP ingestion guide](../guides/otlp-http-ingestion.md). This is an initial JSON adapter, not full OTLP compatibility: protobuf/gRPC, exemplars, histogram buckets, temporality conversion, and per-record partial rejection are not implemented. It is merged into `main`, but has not been built or runtime-validated.
+PR #170 adds OTLP JSON endpoints for logs, traces, and metrics (`/v1/logs`, `/v1/traces`, `/v1/metrics`). It converts resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, histogram count/sum and bounded bucket metadata, summary quantiles, and bounded span events/links into the existing Jerico telemetry event model, then delegates to the existing credential/quota/idempotency/outbox/queue pipeline. See [the OTLP ingestion guide](../guides/otlp-http-ingestion.md), including a Collector `otlp_http` JSON exporter example. This is an initial JSON adapter, not full OTLP compatibility: protobuf/gRPC, exemplars, histogram buckets, temporality conversion, and per-record partial rejection are not implemented. It is merged into `main`, but has not been built or runtime-validated.
 
 ## Confirmed architecture
 
