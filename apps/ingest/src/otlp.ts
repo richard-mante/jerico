@@ -83,6 +83,9 @@ function commonAttributes(resource: JsonObject, scope: JsonObject, signal: strin
 }
 
 export function convertOtlp(signal: "logs" | "traces" | "metrics", payload: unknown): TelemetryEvent[] {
+  const root = object(payload);
+  const rootKey = signal === "logs" ? "resourceLogs" : signal === "traces" ? "resourceSpans" : "resourceMetrics";
+  if (!Array.isArray(root[rootKey])) throw new Error("The OTLP payload is missing its " + rootKey + " array.");
   const groups = resourceGroups(payload, signal);
   const events: TelemetryEvent[] = [];
   for (const group of groups) {
