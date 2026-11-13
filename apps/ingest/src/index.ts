@@ -12,6 +12,7 @@ import { DailyQuotaExceeded, dailyEventLimit, secondsUntilUtcMidnight, utcUsageD
 import { createStableEventId, hashTelemetryRequest, isValidIdempotencyKey } from "./idempotency";
 import { isAllowedPublicMetric } from "./public-metrics";
 import { hasFutureTimestampBeyondSkew, MAX_FUTURE_EVENT_SKEW_MS } from "./timestamps";
+import { convertOtlp } from "./otlp";
 
 const MAX_BODY_BYTES = 96 * 1024;
 const MAX_BATCH_EVENTS = 100;
@@ -142,6 +143,51 @@ async function releaseDailyQuota(
       eq(projectIngestionUsage.projectId, projectId),
       eq(projectIngestionUsage.usageDate, usageDate),
     ));
+  });
+}
+
+for (const signal of ["logs", "traces", "metrics"] as const) {
+  app.post(`/v1/${signal}`, async (context) => {
+    const contentType = context.req.header("content-type")?.split(";")[0]?.trim().toLowerCase();
+    if (contentType !== "application/json") {
+      return context.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "OTLP HTTP/JSON exports require application/json.", requestId: context.get("requestId") } }, 415);
+    }
+    const contentLength = Number(context.req.header("content-length") ?? 0);
+    if (contentLength > MAX_BODY_BYTES) {
+      return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The OTLP request body exceeds 96 KiB.", requestId: context.get("requestId") } }, 413);
+    }
+    const bodyText = await readBoundedBody(context.req.raw, MAX_BODY_BYTES);
+    if (bodyText === null) {
+      return context.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The OTLP request body exceeds 96 KiB.", requestId: context.get("requestId") } }, 413);
+    }
+    let payload: unknown;
+    try {
+      payload = JSON.parse(bodyText);
+    } catch {
+      return context.json({ error: { code: "INVALID_JSON", message: "The OTLP request body must be valid JSON.", requestId: context.get("requestId") } }, 400);
+    }
+    let events: TelemetryEvent[];
+    try {
+      events = convertOtlp(signal, payload);
+    } catch (error) {
+      return context.json({ error: { code: "INVALID_OTLP", message: error instanceof Error ? error.message : "The OTLP payload is invalid.", requestId: context.get("requestId") } }, 400);
+    }
+    if (events.length === 0) return context.json({ partialSuccess: { rejectedLogRecords: 0, rejectedSpans: 0, rejectedDataPoints: 0, errorMessage: "" } });
+    const headers = new Headers({
+      "content-type": "application/json",
+      authorization: context.req.header("authorization") ?? "",
+      "x-request-id": context.get("requestId"),
+    });
+    const idempotencyKey = context.req.header("idempotency-key");
+    if (idempotencyKey) headers.set("idempotency-key", idempotencyKey);
+    const forwarded = new Request(new URL("/ingest/v1/events", context.req.url), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ events }),
+    });
+    const accepted = await app.fetch(forwarded, context.env);
+    if (!accepted.ok) return accepted;
+    return context.json({ partialSuccess: { rejectedLogRecords: 0, rejectedSpans: 0, rejectedDataPoints: 0, errorMessage: "" } });
   });
 }
 
