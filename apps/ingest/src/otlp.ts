@@ -58,13 +58,19 @@ function resourceGroups(payload: unknown, signal: "logs" | "traces" | "metrics")
   const root = object(payload);
   const groups = root.resourceLogs ?? root.resourceSpans ?? root.resourceMetrics;
   if (!Array.isArray(groups)) return [];
-  return groups.map((group) => {
+  const nestedKey = signal === "logs" ? "scopeLogs" : signal === "traces" ? "scopeSpans" : "scopeMetrics";
+  return groups.flatMap((group) => {
     const item = object(group);
-    return {
-      resource: object(item.resource),
-      scope: object(item.scope ?? item.instrumentationScope),
-      data: object(item[signal === "logs" ? "scopeLogs" : signal === "traces" ? "scopeSpans" : "scopeMetrics"]),
-    };
+    const nested = item[nestedKey];
+    if (!Array.isArray(nested)) return [];
+    return nested.map((entry) => {
+      const scopeGroup = object(entry);
+      return {
+        resource: object(item.resource),
+        scope: object(scopeGroup.scope ?? item.scope ?? item.instrumentationScope),
+        data: scopeGroup,
+      };
+    });
   });
 }
 
