@@ -29,8 +29,8 @@ The request body is the corresponding OTLP JSON export request (`resourceLogs`, 
 
 - Resource and instrumentation-scope attributes are retained with `resource.` and `scope.` prefixes.
 - Log records become Jerico `log` events. Severity is normalized to `debug`, `info`, `warn`, `error`, or `fatal`; trace/span IDs and severity metadata are retained as attributes.
-- Spans become Jerico `span` events. Start time becomes the event timestamp, duration becomes milliseconds, and trace/span/parent IDs, kind, status, and span attributes are retained.
-- Gauge and sum data points become `metric` events. Histogram and exponential-histogram points currently emit count and sum metrics when those values are present.
+- Spans become Jerico `span` events. Start time becomes the event timestamp, duration becomes milliseconds, and trace/span/parent IDs, kind, status, span attributes, plus bounded serialized span events and links are retained.
+- Gauge and sum data points become `metric` events, with aggregation temporality and monotonicity retained. Histogram and exponential-histogram points emit count and sum metrics while retaining bounded bucket metadata; summary points emit count, sum, and quantile metrics.
 - OTLP nanosecond timestamps are converted to ISO-8601 timestamps. Attribute values are normalized to Jerico's scalar attribute model; arrays and key/value lists are serialized as bounded JSON strings.
 
 ## Limits and credential scope
@@ -41,4 +41,4 @@ The request body is the corresponding OTLP JSON export request (`resourceLogs`, 
 - An optional `Idempotency-Key` is forwarded to the durable ingestion outbox. Exporters should use a stable key for retries of the same serialized batch.
 - Requests without an idempotency key use the existing at-least-once queue behavior; configure exporter retries accordingly.
 
-The adapter currently accepts OTLP HTTP/JSON only. It does not yet implement OTLP protobuf, OTLP/gRPC, exemplars, histogram bucket expansion, temporality conversion, or partial rejection of individual records. Do not interpret the presence of these endpoints as full OpenTelemetry Collector compatibility or production validation.
+The adapter currently accepts OTLP HTTP/JSON only. It does not yet implement OTLP protobuf, OTLP/gRPC, exemplars, histogram bucket expansion into individual bucket metrics, or partial rejection of individual records. Do not interpret the presence of these endpoints as full OpenTelemetry Collector compatibility or production validation.

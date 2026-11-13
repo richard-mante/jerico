@@ -54,6 +54,21 @@ function mergeAttributes(...values: Record<string, string | number | boolean | n
   return Object.assign({}, ...values);
 }
 
+function boundedJson(value: unknown, maxLength = 2048): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  try {
+    return JSON.stringify(value).slice(0, maxLength);
+  } catch {
+    return undefined;
+  }
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
 function resourceGroups(payload: unknown, signal: "logs" | "traces" | "metrics"): Array<{ resource: JsonObject; scope: JsonObject; data: JsonObject }> {
   const root = object(payload);
   const groups = root.resourceLogs ?? root.resourceSpans ?? root.resourceMetrics;
@@ -131,6 +146,8 @@ export function convertOtlp(signal: "logs" | "traces" | "metrics", payload: unkn
             ...(typeof span.kind === "number" ? { "otel.span_kind": span.kind } : {}),
             ...(typeof status.code === "number" ? { "otel.status_code": status.code } : {}),
             ...(typeof status.message === "string" ? { "otel.status_message": status.message.slice(0, 512) } : {}),
+            ...(boundedJson(span.events) ? { "otel.span_events": boundedJson(span.events)! } : {}),
+            ...(boundedJson(span.links) ? { "otel.span_links": boundedJson(span.links)! } : {}),
           }),
         });
       }
@@ -140,8 +157,8 @@ export function convertOtlp(signal: "logs" | "traces" | "metrics", payload: unkn
         const name = typeof metric.name === "string" ? metric.name.slice(0, 120) : "otel.metric";
         const description = typeof metric.description === "string" ? metric.description.slice(0, 512) : undefined;
         const unit = typeof metric.unit === "string" ? metric.unit.slice(0, 64) : undefined;
-        const data = object(metric.gauge ?? metric.sum ?? metric.histogram ?? metric.exponentialHistogram);
-        const kind = metric.gauge ? "gauge" : metric.sum ? "sum" : metric.histogram ? "histogram" : metric.exponentialHistogram ? "exponential_histogram" : "unknown";
+        const data = object(metric.gauge ?? metric.sum ?? metric.histogram ?? metric.exponentialHistogram ?? metric.summary);
+        const kind = metric.gauge ? "gauge" : metric.sum ? "sum" : metric.histogram ? "histogram" : metric.exponentialHistogram ? "exponential_histogram" : metric.summary ? "summary" : "unknown";
         const points = Array.isArray(data.dataPoints) ? data.dataPoints : [];
         for (const rawPoint of points) {
           const point = object(rawPoint);
@@ -149,16 +166,41 @@ export function convertOtlp(signal: "logs" | "traces" | "metrics", payload: unkn
             "otel.metric_kind": kind,
             ...(description ? { "otel.description": description } : {}),
             ...(unit ? { "otel.unit": unit } : {}),
+            ...(typeof data.aggregationTemporality === "number" ? { "otel.aggregation_temporality": data.aggregationTemporality } : {}),
+            ...(typeof data.isMonotonic === "boolean" ? { "otel.monotonic": data.isMonotonic } : {}),
+            ...(kind === "histogram" && boundedJson(point.bucketCounts) ? { "otel.bucket_counts": boundedJson(point.bucketCounts)! } : {}),
+            ...(kind === "histogram" && boundedJson(point.explicitBounds) ? { "otel.explicit_bounds": boundedJson(point.explicitBounds)! } : {}),
+            ...(kind === "exponential_histogram" && boundedJson(point.positive) ? { "otel.positive_buckets": boundedJson(point.positive)! } : {}),
+            ...(kind === "exponential_histogram" && boundedJson(point.negative) ? { "otel.negative_buckets": boundedJson(point.negative)! } : {}),
+            ...(kind === "exponential_histogram" && typeof point.scale === "number" ? { "otel.scale": point.scale } : {}),
+            ...(kind === "exponential_histogram" && finiteNumber(point.zeroCount) !== undefined ? { "otel.zero_count": finiteNumber(point.zeroCount)! } : {}),
+            ...(finiteNumber(point.min) !== undefined ? { "otel.min": finiteNumber(point.min)! } : {}),
+            ...(finiteNumber(point.max) !== undefined ? { "otel.max": finiteNumber(point.max)! } : {}),
           });
           const time = timestamp(point.timeUnixNano ?? point.startTimeUnixNano);
-          const number = point.asDouble !== undefined ? Number(point.asDouble) : Number(point.asInt);
-          if (Number.isFinite(number)) {
+          const number = finiteNumber(point.asDouble ?? point.asInt);
+          if (number !== undefined) {
             events.push({ type: "metric", name, value: number, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
-          } else if (kind.includes("histogram")) {
-            const count = Number(point.count);
-            const sum = Number(point.sum);
-            if (Number.isFinite(count)) events.push({ type: "metric", name: name + ".count", value: count, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
-            if (Number.isFinite(sum)) events.push({ type: "metric", name: name + ".sum", value: sum, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
+          } else if (kind.includes("histogram") || kind === "summary") {
+            const count = finiteNumber(point.count);
+            const sum = finiteNumber(point.sum);
+            if (count !== undefined) events.push({ type: "metric", name: name + ".count", value: count, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
+            if (sum !== undefined) events.push({ type: "metric", name: name + ".sum", value: sum, ...(time ? { timestamp: time } : {}), attributes: pointAttrs });
+            if (kind === "summary" && Array.isArray(point.quantileValues)) {
+              for (const item of point.quantileValues) {
+                const quantile = object(item);
+                const value = finiteNumber(quantile.value);
+                const rank = finiteNumber(quantile.quantile);
+                if (value === undefined || rank === undefined) continue;
+                events.push({
+                  type: "metric",
+                  name: name + ".quantile",
+                  value,
+                  ...(time ? { timestamp: time } : {}),
+                  attributes: { ...pointAttrs, "otel.quantile": rank },
+                });
+              }
+            }
           }
         }
       }
