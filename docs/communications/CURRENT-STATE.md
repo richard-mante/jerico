@@ -1,6 +1,6 @@
 # Jerico — Current Project Handover
 
-**Last updated:** 2026-11-12  
+**Last updated:** 2026-11-13  
 **Repository:** https://github.com/richard-mante/jerico  
 **Main branch:** `main`  
 **Latest feature/code merge:** PR #166 — byte-aware SDK batching (`554be19bd8f7174f4aabf9e4901477819dbe1c13`)  
@@ -12,7 +12,7 @@
 
 Jerico is an extensible, open-source Founder Operating System. Jerico Observability is the first independently useful product. It must support managed cloud and self-hosted deployments, monitor Jerico itself, and allow external developers to instrument and monitor their applications. Founder OS financial intelligence and business analysis are later phases.
 
-## Confirmed architecture
+## Latest in-progress feature branch — OpenTelemetry HTTP/JSON ingestion\n\nBranch `feature/otlp-http-ingestion` adds OTLP JSON endpoints for logs, traces, and metrics (`/v1/logs`, `/v1/traces`, `/v1/metrics`). It converts resource/scope attributes, log severity, trace/span IDs and duration, gauge/sum points, and histogram count/sum into the existing Jerico telemetry event model, then delegates to the existing credential/quota/idempotency/outbox/queue pipeline. See [the OTLP ingestion guide](../guides/otlp-http-ingestion.md). This is an initial JSON adapter, not full OTLP compatibility: protobuf/gRPC, exemplars, histogram buckets, temporality conversion, and per-record partial rejection are not implemented. It has not been built or runtime-validated and is not merged into `main` yet.\n\n## Confirmed architecture
 
 - pnpm + Turborepo monorepo.
 - Next.js + React + TypeScript web dashboard.
