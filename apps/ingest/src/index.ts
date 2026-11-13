@@ -47,6 +47,13 @@ app.use("*", async (context, next) => {
   await next();
 });
 
+app.use("/v1/*", cors({
+  origin: "*",
+  allowHeaders: ["Authorization", "Content-Type", "X-Request-Id", "Idempotency-Key"],
+  allowMethods: ["POST", "OPTIONS"],
+  maxAge: 86400,
+}));
+
 app.use("/ingest/*", cors({
   origin: "*",
   allowHeaders: ["Authorization", "Content-Type", "X-Request-Id", "Idempotency-Key"],
@@ -172,7 +179,7 @@ for (const signal of ["logs", "traces", "metrics"] as const) {
     } catch (error) {
       return context.json({ error: { code: "INVALID_OTLP", message: error instanceof Error ? error.message : "The OTLP payload is invalid.", requestId: context.get("requestId") } }, 400);
     }
-    if (events.length === 0) return context.json({ partialSuccess: { rejectedLogRecords: 0, rejectedSpans: 0, rejectedDataPoints: 0, errorMessage: "" } });
+    if (events.length === 0) return context.json({ partialSuccess: { errorMessage: "" } });
     const headers = new Headers({
       "content-type": "application/json",
       authorization: context.req.header("authorization") ?? "",
@@ -187,7 +194,7 @@ for (const signal of ["logs", "traces", "metrics"] as const) {
     });
     const accepted = await app.fetch(forwarded, context.env);
     if (!accepted.ok) return accepted;
-    return context.json({ partialSuccess: { rejectedLogRecords: 0, rejectedSpans: 0, rejectedDataPoints: 0, errorMessage: "" } });
+    return context.json({ partialSuccess: { errorMessage: "" } });
   });
 }
 
