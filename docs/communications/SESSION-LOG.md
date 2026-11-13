@@ -1056,3 +1056,4 @@
 - Added `docs/guides/otlp-http-ingestion.md` and updated the roadmap/current-state handover.
 - Scope remains OTLP HTTP/JSON only. Protobuf/gRPC, exemplars, individual bucket expansion, and per-record partial rejection are not implemented. This is not full OpenTelemetry Collector compatibility.
 - No tests, builds, typechecks, migrations, Docker checks, or runtime validation were run, per the user's implementation-first instruction. `pnpm-lock.yaml` was not touched. The two existing validation issues (#73 and #107) remain open.
+- Added an OpenTelemetry Collector `otlp_http` exporter example using JSON encoding and compression disabled (the current ingestion handler does not decompress gzip). Created follow-up issue #172 to track protobuf/gRPC, decompression, partial-success semantics, exemplars, and interoperability validation.
