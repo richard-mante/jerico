@@ -25,6 +25,55 @@ Idempotency-Key: exporter-batch-000042
 
 The request body is the corresponding OTLP JSON export request (`resourceLogs`, `resourceSpans`, or `resourceMetrics`).
 
+## OpenTelemetry Collector example
+
+The Collector's current HTTP exporter is named `otlp_http`. Set `encoding: json` because Jerico currently accepts OTLP JSON, and set `compression: none`: the ingestion service currently expects a directly readable JSON request body and does not decompress gzip payloads.
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 20
+    send_batch_max_size: 50
+    timeout: 5s
+
+exporters:
+  otlp_http/jerico:
+    endpoint: https://INGEST_HOST
+    encoding: json
+    compression: none
+    timeout: 10s
+    headers:
+      Authorization: "Bearer ${env:JERICO_INGEST_TOKEN}"
+    retry_on_failure:
+      enabled: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/jerico]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/jerico]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/jerico]
+```
+
+Replace `INGEST_HOST` with the host for the Jerico ingestion service and provide `JERICO_INGEST_TOKEN` through the Collector's secret/environment mechanism. The exporter appends the signal paths to the base endpoint. Keep batches conservative: Jerico rejects raw bodies over 96 KiB or requests that normalize to more than 100 telemetry points. Collector batch counts do not guarantee a byte-size ceiling, so tune the batch processor to the shape and size of your telemetry and monitor exporter rejections.
+
+This example uses the stable `otlp_http` component name and the exporter's JSON encoding option. See the [OpenTelemetry Collector OTLP HTTP exporter documentation](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) and the [OTLP exporter protocol specification](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) for version-specific configuration details.
+
 ## Normalization
 
 - Resource and instrumentation-scope attributes are retained with `resource.` and `scope.` prefixes.
